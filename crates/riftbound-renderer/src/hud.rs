@@ -74,26 +74,8 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         let total = u16::try_from(data.total).unwrap_or(u16::MAX);
         (f32::from(collected) / f32::from(total)).clamp(0.0, 1.0)
     };
-    rect(
-        out,
-        38.0,
-        86.0,
-        270.0 * ratio,
-        9.0,
-        cyan,
-        width,
-        height,
-    );
-    text(
-        out,
-        &data.status,
-        38.0,
-        108.0,
-        1.5,
-        white,
-        width,
-        height,
-    );
+    rect(out, 38.0, 86.0, 270.0 * ratio, 9.0, cyan, width, height);
+    text(out, &data.status, 38.0, 108.0, 1.5, white, width, height);
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
         rect(out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
@@ -107,16 +89,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
             width,
             height,
         );
-        text(
-            out,
-            prompt,
-            40.0,
-            panel_y + 16.0,
-            2.0,
-            white,
-            width,
-            height,
-        );
+        text(out, prompt, 40.0, panel_y + 16.0, 2.0, white, width, height)
     }
 }
 
