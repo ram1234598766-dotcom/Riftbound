@@ -215,3 +215,8 @@ The vehicle collision API now uses an oriented-rectangle separating-axis test ag
 ### Terrain surface handling foundation
 
 The shared terrain module now exposes a deterministic surface query for the starter region. The initial layout has a paved north-south road spine plus gravel, mud, sand, snow, and rock zones. The native vehicle simulation samples this query at its current position, so grip, speed cap, and rolling resistance change with the terrain instead of always using asphalt. This is a gameplay/data foundation only: the current arena renderer still does not paint these regions as matching material zones, and the small arena is not yet an explorable open world. The renderer should consume the same surface query when terrain material blending and streamed region data are introduced.
+
+
+### Shared terrain visuals and vehicle surface palette
+
+The native terrain mesh now samples the same `terrain_surface` query used by vehicle physics and assigns a distinct vertex-color palette for asphalt, gravel, mud, sand, snow, and rock. This makes the starter region's handling zones visible in the terrain instead of leaving the surface map data-only. Colors are baked per terrain vertex and shared by detailed and LOD chunk generation, preserving matching chunk-edge samples. This is a stylized blockout palette, not final AAA ground materials, decals, textures, or biome art.
