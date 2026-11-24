@@ -291,14 +291,14 @@ async fn publish_snapshot(state: &HostState) {
 }
 
 fn move_player(x: f32, y: f32, dx: f32, dy: f32) -> (f32, f32) {
-    let mut next_x = (x + dx).clamp(50.0, WORLD_WIDTH - 50.0);
+    let mut next_x = clamp_world_position(x + dx, WORLD_WIDTH - 50.0).max(50.0);
     if WORLD_OBSTACLES
         .iter()
         .any(|wall| circle_intersects_rect(next_x, y, PLAYER_RADIUS, *wall))
     {
         next_x = x;
     }
-    let mut next_y = (y + dy).clamp(50.0, WORLD_HEIGHT - 50.0);
+    let mut next_y = clamp_world_position(y + dy, WORLD_HEIGHT - 50.0).max(50.0);
     if WORLD_OBSTACLES
         .iter()
         .any(|wall| circle_intersects_rect(next_x, next_y, PLAYER_RADIUS, *wall))
