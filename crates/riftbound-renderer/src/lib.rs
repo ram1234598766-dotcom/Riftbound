@@ -92,6 +92,7 @@ impl Renderer {
     ///
     /// Returns an error if no compatible GPU adapter or surface configuration is available,
     /// or if the graphics device cannot be created.
+    #[allow(clippy::too_many_lines)]
     pub async fn new(
         display: OwnedDisplayHandle,
         window: Arc<Window>,
