@@ -617,9 +617,16 @@ impl Renderer {
             if mesh_index != 0 && !(3..=6).contains(&mesh_index) { continue; }
             let world = self.scene.world_matrix(object.id)
                 .expect("iterated scene objects must have valid hierarchy");
-            let dx = world[12] - self.camera_offset[0];
-            let dy = world[13] - self.camera_offset[1];
-            let dz = world[14] - self.camera_offset[2];
+            // Terrain chunks share one LOD tier so adjacent chunks never form T-junctions.
+            // Their common arena-centre distance keeps all four edges on matching samples.
+            let center = if mesh_index == 0 {
+                [world[12], world[13], world[14]]
+            } else {
+                [0.0, 0.0, 0.0]
+            };
+            let dx = center[0] - self.camera_offset[0];
+            let dy = center[1] - self.camera_offset[1];
+            let dz = center[2] - self.camera_offset[2];
             let distance = (dx * dx + dy * dy + dz * dz).sqrt();
             let state_index = self.lod_states.iter().position(|(id, _)| *id == object.id);
             let was_low = state_index.is_some_and(|index| self.lod_states[index].1);
