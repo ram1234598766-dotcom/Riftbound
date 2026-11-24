@@ -43,7 +43,7 @@ impl Mesh {
         indices: &[u16],
         label: &str,
     ) -> Option<Self> {
-        if vertices.is_empty() || indices.is_empty() || indices.len() % 3 != 0 {
+        if vertices.is_empty() || indices.is_empty() || !indices.len().is_multiple_of(3) {
             return None;
         }
         if indices
