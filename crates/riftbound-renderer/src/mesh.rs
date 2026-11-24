@@ -1,6 +1,6 @@
 //! CPU mesh descriptions and their GPU vertex/index-buffer representation.
 
-use riftbound_core::terrain_height;
+use riftbound_core::{terrain_height, terrain_surface, VehicleSurface};
 use wgpu::util::DeviceExt;
 
 /// One position-and-color vertex in the renderer's standard mesh format.
@@ -252,6 +252,18 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
+
+fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
+    match surface {
+        VehicleSurface::Asphalt => [0.20, 0.23, 0.28],
+        VehicleSurface::Gravel => [0.42, 0.35, 0.25],
+        VehicleSurface::Mud => [0.24, 0.15, 0.10],
+        VehicleSurface::Sand => [0.62, 0.48, 0.28],
+        VehicleSurface::Snow => [0.66, 0.76, 0.86],
+        VehicleSurface::Rock => [0.34, 0.38, 0.43],
+    }
+}
+
 fn terrain_chunk_data(
     chunk_x: u8,
     chunk_z: u8,
@@ -284,12 +296,13 @@ fn terrain_chunk_data(
             ) * 0.012;
             let height = terrain_height(world_x, world_z);
             let elevation_tint = height.max(0.0) * 0.22;
+            let base_color = terrain_surface_color(terrain_surface(world_x, world_z));
             vertices.push(MeshVertex {
                 position: [local_x, height, local_z],
                 color: [
-                    0.055 + variation + elevation_tint,
-                    0.13 + variation + elevation_tint,
-                    0.22 + variation * 1.5 + elevation_tint,
+                    (base_color[0] + variation + elevation_tint).min(1.0),
+                    (base_color[1] + variation + elevation_tint).min(1.0),
+                    (base_color[2] + variation * 1.5 + elevation_tint).min(1.0),
                 ],
             });
         }
@@ -421,6 +434,27 @@ mod tests {
                 .iter()
                 .all(|vertex| vertex.position.iter().all(|v| v.is_finite()))
         );
+    }
+
+
+    #[test]
+    fn terrain_surface_palette_distinguishes_all_driving_zones() {
+        let colors = [
+            terrain_surface_color(VehicleSurface::Asphalt),
+            terrain_surface_color(VehicleSurface::Gravel),
+            terrain_surface_color(VehicleSurface::Mud),
+            terrain_surface_color(VehicleSurface::Sand),
+            terrain_surface_color(VehicleSurface::Snow),
+            terrain_surface_color(VehicleSurface::Rock),
+        ];
+        for color in colors {
+            assert!(color.iter().all(|component| (0.0..=1.0).contains(component)));
+        }
+        for first in 0..colors.len() {
+            for second in first + 1..colors.len() {
+                assert_ne!(colors[first], colors[second]);
+            }
+        }
     }
 
     #[test]
