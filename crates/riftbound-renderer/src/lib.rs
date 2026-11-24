@@ -661,10 +661,12 @@ impl Renderer {
                     &mut batch.instance_staging,
                     &InstanceRaw::from_matrix(world, material_tint(object.material)),
                 );
-                if use_low {
-                    low_detail_instances = low_detail_instances.saturating_add(1);
-                } else {
-                    high_detail_instances = high_detail_instances.saturating_add(1);
+                if object_mesh == 0 {
+                    if use_low {
+                        low_detail_instances = low_detail_instances.saturating_add(1);
+                    } else {
+                        high_detail_instances = high_detail_instances.saturating_add(1);
+                    }
                 }
                 count = count.saturating_add(1);
             }
