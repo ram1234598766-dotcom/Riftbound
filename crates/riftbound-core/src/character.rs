@@ -44,9 +44,13 @@ impl Default for VerticalMotionConfig {
 /// High-level locomotion state suitable for animation selection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharacterMovementState {
+    /// No meaningful horizontal movement while grounded.
     Idle,
+    /// Horizontal movement while grounded.
     Moving,
+    /// Airborne and travelling upward.
     Jumping,
+    /// Airborne and travelling downward.
     Falling,
 }
 
