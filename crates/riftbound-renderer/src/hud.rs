@@ -39,9 +39,21 @@ impl HudVertex {
 
 /// Builds screen-space triangles for the current mission HUD.
 pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex> {
+    let mut out = Vec::new();
+    build_vertices_into(data, width, height, &mut out);
+    out
+}
+
+/// Rebuilds HUD geometry into an existing vector, retaining its allocation across frames.
+pub fn build_vertices_into(
+    data: &HudData,
+    width: u32,
+    height: u32,
+    out: &mut Vec<HudVertex>,
+) {
     let width = f32::from(u16::try_from(width.max(1)).unwrap_or(u16::MAX));
     let height = f32::from(u16::try_from(height.max(1)).unwrap_or(u16::MAX));
-    let mut out = Vec::new();
+    out.clear();
     let cyan = [0.25, 0.88, 1.0, 1.0];
     let white = [0.86, 0.93, 1.0, 1.0];
     let muted = [0.35, 0.52, 0.66, 1.0];
@@ -111,7 +123,6 @@ pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex>
             height,
         );
     }
-    out
 }
 
 #[allow(clippy::many_single_char_names, clippy::too_many_arguments)]
