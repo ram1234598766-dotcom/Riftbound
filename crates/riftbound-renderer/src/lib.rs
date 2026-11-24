@@ -598,7 +598,8 @@ impl Renderer {
                 });
                 batch.instance_capacity = required;
             }
-            self.queue.write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
+            self.queue
+                .write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
         }
     }
 
