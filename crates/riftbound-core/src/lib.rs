@@ -38,6 +38,6 @@ pub use scene::{MaterialId, MeshId, Scene, SceneObject};
 pub use terrain::terrain_height;
 pub use transform::Transform3;
 pub use vehicle::{
-    SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
-    VehicleSurface,
+    SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
+    VehicleRecovery, VehicleState, VehicleSurface,
 };
