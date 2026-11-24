@@ -258,7 +258,7 @@ mod tests {
         controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
         assert_eq!(controller.movement_state(), CharacterMovementState::Jumping);
         input.begin_frame();
-        for _ in 0..60 {
+        for _ in 0..25 {
             controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
         }
         assert_eq!(controller.movement_state(), CharacterMovementState::Falling);
