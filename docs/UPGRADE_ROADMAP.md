@@ -20,7 +20,7 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [x] Reuse changed-entity and affected-mesh tracking buffers.
 - [x] Skip uploads for unaffected mesh batches after transform changes.
 - [x] Camera-frustum culling for native scene instances, recalculated only after camera, scene, viewport, or transform changes.
-- [ ] Add renderer counters for submitted, visible, and culled instances.
+- [x] Add renderer counters for submitted, visible, and culled instances.
 - [ ] Profile frame time and memory on representative low-, mid-, and high-tier hardware.
 - [ ] Add a low-memory browser quality preset with explicit limits for DPR, effects, and particle counts.
 
