@@ -30,7 +30,7 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [x] Add a simplified distance-based terrain LOD tier (5×5 instead of 9×9 samples), with hysteresis and synchronized chunk switching to keep shared edges aligned.
 - [ ] Extend LOD tiers to environment props and additional mesh types.
 - [x] Split the native arena floor into four frustum-culled terrain chunks with matching shared-edge height and colour samples.
-- [ ] Add a compact lighting model and tone-controlled environment palette.
+- [x] Enhance the native compact lighting model with cool fill, warm key accents, view-dependent cyan rim light, and distance haze in the existing WGSL shader.
 - [ ] Add bounded ambient effects with quality-scalable density.
 - [ ] Add asset/mesh validation and graceful fallback for missing resources.
 
@@ -67,4 +67,4 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ## Current implementation note
 
-The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. Terrain chunks now have detailed 9×9 and simplified 5×5 grids; all four chunks switch together with hysteresis so adjacent edges use matching samples. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
+The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. Terrain chunks now have detailed 9×9 and simplified 5×5 grids; all four chunks switch together with hysteresis so adjacent edges use matching samples. The native world shader now adds low-cost cool fill, warm key accents, a view-dependent cyan rim, and deep-blue distance haze without adding textures or extra render passes. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
