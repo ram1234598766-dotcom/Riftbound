@@ -616,89 +616,94 @@ impl Renderer {
             let start = index * 4;
             *value = f32::from_ne_bytes(camera[start..start + 4].try_into().expect("matrix float"));
         }
+
+        // Clear reusable staging storage once, then distribute visible objects in one
+        // scene traversal instead of rescanning the entire scene for every mesh batch.
+        for batch in &mut self.mesh_batches {
+            batch.instance_staging.clear();
+            batch.instance_count = 0;
+        }
+
+        let mut submitted = 0_u32;
+        let mut visible_instances = 0_u32;
+        let mut low_detail_instances = 0_u32;
+        let mut high_detail_instances = 0_u32;
+
         for object in self.scene.iter() {
-            let Ok(mesh_index) = usize::try_from(object.mesh.index()) else {
+            submitted = submitted.saturating_add(1);
+            let Ok(object_mesh) = usize::try_from(object.mesh.index()) else {
                 continue;
             };
-            if mesh_index != 0 && !(3..=6).contains(&mesh_index) {
-                continue;
-            }
+            let supports_lod = object_mesh == 0 || (3..=6).contains(&object_mesh);
             let world = self
                 .scene
                 .world_matrix(object.id)
                 .expect("iterated scene objects must have valid hierarchy");
-            // Terrain chunks share one LOD tier so adjacent chunks never form T-junctions.
-            // Their common arena-centre distance keeps all four edges on matching samples.
-            let center = if mesh_index == 0 {
-                [world[12], world[13], world[14]]
+
+            let use_low = if supports_lod {
+                // Terrain chunks share one LOD tier so adjacent chunks never form T-junctions.
+                let center = if object_mesh == 0 {
+                    [world[12], world[13], world[14]]
+                } else {
+                    [0.0, 0.0, 0.0]
+                };
+                let dx = center[0] - self.camera_offset[0];
+                let dy = center[1] - self.camera_offset[1];
+                let dz = center[2] - self.camera_offset[2];
+                let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+                let was_low = self.lod_states.get(&object.id).copied().unwrap_or(false);
+                let selected = if object_mesh == 0 {
+                    select_cube_lod(distance, was_low)
+                } else {
+                    select_terrain_lod(distance, was_low)
+                };
+                self.lod_states.insert(object.id, selected);
+                selected
             } else {
-                [0.0, 0.0, 0.0]
+                false
             };
-            let dx = center[0] - self.camera_offset[0];
-            let dy = center[1] - self.camera_offset[1];
-            let dz = center[2] - self.camera_offset[2];
-            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
-            let was_low = self.lod_states.get(&object.id).copied().unwrap_or(false);
-            let use_low = if mesh_index == 0 {
-                select_cube_lod(distance, was_low)
-            } else {
-                select_terrain_lod(distance, was_low)
-            };
-            self.lod_states.insert(object.id, use_low);
-        }
-        let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
-        let mut visible_instances = 0_u32;
-        let mut low_detail_instances = 0_u32;
-        let mut high_detail_instances = 0_u32;
-        let mut visible_batches = 0_u32;
-        for batch in &mut self.mesh_batches {
-            batch.instance_staging.clear();
-            let mut count = 0_u32;
-            for object in self.scene.iter() {
-                let object_mesh = usize::try_from(object.mesh.index()).unwrap_or(usize::MAX);
-                let use_low = (object_mesh == 0 || (3..=6).contains(&object_mesh))
-                    && self.lod_states.get(&object.id).copied().unwrap_or(false);
-                let lod_mesh_index = if object_mesh == 0 {
+
+            let target_mesh = if use_low {
+                if object_mesh == 0 {
                     CUBE_LOD_MESH_INDEX
                 } else {
                     TERRAIN_LOD_BASE_INDEX + object_mesh - 3
-                };
-                let matches_batch = if use_low {
-                    batch.mesh_index == lod_mesh_index
-                } else {
-                    object_mesh == batch.mesh_index
-                };
-                if !matches_batch {
-                    continue;
                 }
-                let world = self
-                    .scene
-                    .world_matrix(object.id)
-                    .expect("iterated scene objects must have valid hierarchy");
-                if !sphere_in_frustum(&view_projection, world) {
-                    continue;
-                }
-                append_instance_bytes(
-                    &mut batch.instance_staging,
-                    &InstanceRaw::from_matrix(world, material_tint(object.material)),
-                );
-                if object_mesh == 0 {
-                    if use_low {
-                        low_detail_instances = low_detail_instances.saturating_add(1);
-                    } else {
-                        high_detail_instances = high_detail_instances.saturating_add(1);
-                    }
-                }
-                count = count.saturating_add(1);
-            }
-            batch.instance_count = count;
-            visible_instances = visible_instances.saturating_add(count);
-            if count > 0 {
-                visible_batches = visible_batches.saturating_add(1);
-            }
-            if batch.instance_staging.is_empty() {
+            } else {
+                object_mesh
+            };
+            let Some(batch) = self
+                .mesh_batches
+                .iter_mut()
+                .find(|batch| batch.mesh_index == target_mesh)
+            else {
+                continue;
+            };
+            if !sphere_in_frustum(&view_projection, world) {
                 continue;
             }
+
+            append_instance_bytes(
+                &mut batch.instance_staging,
+                &InstanceRaw::from_matrix(world, material_tint(object.material)),
+            );
+            batch.instance_count = batch.instance_count.saturating_add(1);
+            visible_instances = visible_instances.saturating_add(1);
+            if object_mesh == 0 {
+                if use_low {
+                    low_detail_instances = low_detail_instances.saturating_add(1);
+                } else {
+                    high_detail_instances = high_detail_instances.saturating_add(1);
+                }
+            }
+        }
+
+        let mut visible_batches = 0_u32;
+        for batch in &mut self.mesh_batches {
+            if batch.instance_count == 0 {
+                continue;
+            }
+            visible_batches = visible_batches.saturating_add(1);
             let required = u64::try_from(batch.instance_staging.len()).unwrap_or(u64::MAX);
             if required > batch.instance_capacity {
                 batch.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -712,6 +717,7 @@ impl Renderer {
             self.queue
                 .write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
         }
+
         self.render_stats = RenderStats {
             submitted_instances: submitted,
             visible_instances,
