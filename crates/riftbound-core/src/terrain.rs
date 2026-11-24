@@ -22,7 +22,6 @@ pub fn terrain_height(world_x: f32, world_z: f32) -> f32 {
     edge_fade * ridges * 0.075
 }
 
-
 /// Returns the authored handling surface at a world-space position.
 ///
 /// This first-region layout is deliberately data-only for now: renderer material
@@ -67,7 +66,6 @@ mod tests {
         assert_eq!(terrain_height(0.0, 10.0), 0.0);
         assert_eq!(terrain_height(10.1, 0.0), 0.0);
     }
-
 
     #[test]
     fn terrain_surface_regions_provide_distinct_vehicle_handling() {
