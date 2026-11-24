@@ -152,8 +152,9 @@ pub async fn serve() {
         }
     };
     let lan_ip = discover_lan_ip().unwrap_or_else(|| "PC-LAN-IP".to_owned());
-    log::info!("Riftbound LAN session ready: http://{lan_ip}:{PORT}");
-    log::info!("Open the address on devices connected to the same Wi-Fi network.");
+    log::info!("Riftbound host is ready. Play on this PC: http://127.0.0.1:{PORT}");
+    log::info!("Join from other devices on the same Wi-Fi: http://{lan_ip}:{PORT}");
+    log::info!("The PC browser and mobile browsers join the same hosted session.");
     if let Err(error) = axum::serve(listener, app).await {
         log::error!("Riftbound LAN server stopped: {error}");
     }
