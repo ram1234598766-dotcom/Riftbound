@@ -4,10 +4,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EntityId,
-    EnemyBrain, EnemyConfig, EnemyEvent, EnemyState, ExtractionZone, InputState, MaterialId,
-    MeshId, MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup,
-    PickupTracker, Scene, Transform3, Vec3, terrain_height,
+    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EnemyBrain,
+    EnemyConfig, EnemyEvent, EnemyState, EntityId, ExtractionZone, InputState, MaterialId, MeshId,
+    MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker, Scene,
+    Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -130,9 +130,8 @@ impl ApplicationHandler for RiftboundApp {
                 self.sentinel_entity = Some(sentinel_entity);
                 self.sentinel_effect_entity = Some(sentinel_effect_entity);
                 self.sentinel_brain = Some(sentinel_brain);
-                self.sentinel_objective = Some(ObjectiveProgress::new(ObjectiveKind::Defeat {
-                    target: 1,
-                }));
+                self.sentinel_objective =
+                    Some(ObjectiveProgress::new(ObjectiveKind::Defeat { target: 1 }));
                 self.sentinel_pulse_timer = 0.0;
                 self.animation_time = 0.0;
                 self.last_frame = Some(Instant::now());
@@ -394,9 +393,7 @@ impl ApplicationHandler for RiftboundApp {
                         self.sentinel_effect_entity,
                         self.sentinel_brain.as_mut(),
                     ) {
-                        if let Some(mut enemy_transform) =
-                            renderer.scene().get(sentinel).copied()
-                        {
+                        if let Some(mut enemy_transform) = renderer.scene().get(sentinel).copied() {
                             let event = brain.update(
                                 &mut enemy_transform.translation,
                                 transform.translation,
@@ -548,7 +545,9 @@ impl ApplicationHandler for RiftboundApp {
                                     objective.advance(1);
                                 }
                                 window.set_title("RIFTBOUND — Sentinel disabled");
-                                log::info!("Sentinel encounter complete; defeat objective advanced");
+                                log::info!(
+                                    "Sentinel encounter complete; defeat objective advanced"
+                                );
                             }
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
@@ -585,9 +584,9 @@ impl ApplicationHandler for RiftboundApp {
                                 })
                             });
                             let sentinel_can_be_disabled = near_sentinel
-                                && self.sentinel_brain.is_some_and(|brain| {
-                                    brain.state() == EnemyState::Recover
-                                });
+                                && self
+                                    .sentinel_brain
+                                    .is_some_and(|brain| brain.state() == EnemyState::Recover);
                             let near_checkpoint = self.checkpoint.is_some_and(|checkpoint| {
                                 !self
                                     .checkpoint_progress
@@ -793,11 +792,7 @@ fn build_sentinel(scene: &mut Scene) -> (EntityId, EntityId, EnemyBrain) {
     let home = Vec3::new(-5.0, terrain_height(-5.0, 0.0) + 0.62, 0.0);
     let sentinel = scene
         .spawn_with_mesh(
-            Transform3::new(
-                home,
-                Vec3::new(0.0, 0.0, 0.0),
-                Vec3::new(0.58, 0.78, 0.58),
-            ),
+            Transform3::new(home, Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.58, 0.78, 0.58)),
             MeshId::CRYSTAL,
         )
         .expect("sentinel entity ID space available");
@@ -813,7 +808,11 @@ fn build_sentinel(scene: &mut Scene) -> (EntityId, EntityId, EnemyBrain) {
         )
         .expect("sentinel effect entity ID space available");
     scene.set_material(effect, MaterialId::RIFT);
-    (sentinel, effect, EnemyBrain::new(home, EnemyConfig::default()))
+    (
+        sentinel,
+        effect,
+        EnemyBrain::new(home, EnemyConfig::default()),
+    )
 }
 
 fn build_checkpoint(scene: &mut Scene) -> (EntityId, Checkpoint) {
