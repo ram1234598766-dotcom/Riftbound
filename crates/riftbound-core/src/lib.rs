@@ -19,6 +19,7 @@ mod scene;
 mod terrain;
 mod transform;
 mod vehicle;
+mod world_streaming;
 mod world_terrain;
 
 pub use character::{
@@ -41,5 +42,9 @@ pub use transform::Transform3;
 pub use vehicle::{
     SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
     VehicleRecovery, VehicleState, VehicleSurface,
+};
+pub use world_streaming::{
+    MAX_WORLD_CHUNK_RADIUS, WORLD_CHUNK_SIZE, WorldChunkConfig, WorldChunkCoord,
+    WorldChunkLod, WorldChunkRequest, WorldChunkStreamer,
 };
 pub use world_terrain::{WorldTerrainSample, world_terrain_sample};
