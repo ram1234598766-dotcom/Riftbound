@@ -28,6 +28,9 @@ use winit::{event_loop::OwnedDisplayHandle, window::Window};
 const CUBE_SHADER: &str = include_str!("../shaders/cube.wgsl");
 
 const HUD_BUFFER_CAPACITY: u64 = 512 * 1024;
+const CUBE_LOD_MESH_INDEX: usize = 4;
+const CUBE_LOD_ENTER_DISTANCE: f32 = 10.0;
+const CUBE_LOD_EXIT_DISTANCE: f32 = 8.0;
 
 /// Owns the GPU device, presentation surface, depth target, and scene pipeline.
 pub struct Renderer {
@@ -53,6 +56,7 @@ pub struct Renderer {
     affected_meshes: Vec<bool>,
     visibility_dirty: bool,
     render_stats: RenderStats,
+    lod_states: Vec<(riftbound_core::EntityId, bool)>,
     scene: Scene,
     camera_offset: [f32; 3],
     camera_yaw: f32,
@@ -155,6 +159,7 @@ impl Renderer {
             Mesh::pyramid(&device).ok_or("Failed to create the built-in pyramid mesh")?,
             Mesh::crystal(&device).ok_or("Failed to create the built-in crystal mesh")?,
             Mesh::terrain(&device).ok_or("Failed to create the built-in terrain mesh")?,
+            Mesh::cube_lod(&device).ok_or("Failed to create the compact cube LOD mesh")?,
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
@@ -190,6 +195,7 @@ impl Renderer {
             affected_meshes,
             visibility_dirty: true,
             render_stats: RenderStats::default(),
+            lod_states: Vec::with_capacity(64),
             scene,
             camera_offset: [0.0; 3],
             camera_yaw: 0.588,
@@ -585,6 +591,25 @@ impl Renderer {
             let start = index * 4;
             *value = f32::from_ne_bytes(camera[start..start + 4].try_into().expect("matrix float"));
         }
+        for object in self.scene.iter() {
+            if usize::try_from(object.mesh.index()).ok() != Some(0) {
+                continue;
+            }
+            let world = self.scene.world_matrix(object.id)
+                .expect("iterated scene objects must have valid hierarchy");
+            let dx = world[12] - self.camera_offset[0];
+            let dy = world[13] - self.camera_offset[1];
+            let dz = world[14] - self.camera_offset[2];
+            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+            let state_index = self.lod_states.iter().position(|(id, _)| *id == object.id);
+            let was_low = state_index.map(|index| self.lod_states[index].1).unwrap_or(false);
+            let use_low = select_cube_lod(distance, was_low);
+            if let Some(index) = state_index {
+                self.lod_states[index].1 = use_low;
+            } else {
+                self.lod_states.push((object.id, use_low));
+            }
+        }
         let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
         let mut visible_instances = 0_u32;
         let mut visible_batches = 0_u32;
@@ -739,7 +764,23 @@ fn create_mesh_batches(
     let groups = scene_instances_by_mesh(scene, mesh_count);
     let mut batches = Vec::new();
     for (mesh_index, instances) in groups.iter().enumerate() {
-        if instances.is_empty() {
+        if instances.is_empty() && mesh_index != CUBE_LOD_MESH_INDEX {
+            continue;
+        }
+        if mesh_index == CUBE_LOD_MESH_INDEX && instances.is_empty() {
+            let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("riftbound-cube-lod-instance-batch"),
+                size: 80,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            batches.push(MeshBatch {
+                mesh_index,
+                instance_buffer,
+                instance_capacity: 80,
+                instance_staging: Vec::with_capacity(80),
+                instance_count: 0,
+            });
             continue;
         }
         let instance_count = u32::try_from(instances.len())?;
@@ -759,6 +800,17 @@ fn create_mesh_batches(
         });
     }
     Ok(batches)
+}
+
+fn select_cube_lod(distance: f32, was_low_detail: bool) -> bool {
+    if !distance.is_finite() {
+        return false;
+    }
+    if was_low_detail {
+        distance >= CUBE_LOD_EXIT_DISTANCE
+    } else {
+        distance > CUBE_LOD_ENTER_DISTANCE
+    }
 }
 
 fn material_tint(material: MaterialId) -> [f32; 4] {
@@ -1043,6 +1095,16 @@ fn normalize(value: [f32; 3]) -> [f32; 3] {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cube_lod_uses_hysteresis_at_distance_boundaries() {
+        assert!(!select_cube_lod(10.0, false));
+        assert!(select_cube_lod(10.01, false));
+        assert!(select_cube_lod(9.0, true));
+        assert!(!select_cube_lod(7.99, true));
+        assert!(!select_cube_lod(f32::NAN, true));
+    }
+
+
     use super::*;
 
     #[test]
