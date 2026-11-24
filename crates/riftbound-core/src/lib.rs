@@ -16,10 +16,10 @@ mod scene;
 mod terrain;
 mod transform;
 
-pub use checkpoint::{Checkpoint, CheckpointProgress};
 pub use character::{
     CharacterController, CharacterMovementState, MovementConfig, VerticalMotionConfig,
 };
+pub use checkpoint::{Checkpoint, CheckpointProgress};
 pub use clock::{FixedClock, TickBatch};
 pub use collision::{Aabb2, CollisionResult, CollisionWorld};
 pub use entity::{EntityArena, EntityId};
