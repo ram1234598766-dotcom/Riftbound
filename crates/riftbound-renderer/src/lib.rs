@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use riftbound_core::{MeshId, Scene, Transform3, Vec3};
+use riftbound_core::{MaterialId, MeshId, Scene, Transform3, Vec3};
 use wgpu::util::DeviceExt;
 
 mod mesh;
@@ -256,22 +256,28 @@ impl Renderer {
 #[derive(Clone, Copy)]
 struct InstanceRaw {
     model: [f32; 16],
+    tint: [f32; 4],
 }
 
 impl InstanceRaw {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 4] =
-        wgpu::vertex_attr_array![2 => Float32x4, 3 => Float32x4, 4 => Float32x4, 5 => Float32x4];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+        2 => Float32x4,
+        3 => Float32x4,
+        4 => Float32x4,
+        5 => Float32x4,
+        6 => Float32x4
+    ];
 
     const fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: 64,
+            array_stride: 80,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &Self::ATTRIBUTES,
         }
     }
 
-    fn from_matrix(model: [f32; 16]) -> Self {
-        Self { model }
+    fn from_matrix(model: [f32; 16], tint: [f32; 4]) -> Self {
+        Self { model, tint }
     }
 }
 
@@ -300,9 +306,14 @@ fn starter_scene() -> Scene {
         } else {
             MeshId::CUBE
         };
-        scene
+        let id = scene
             .spawn_with_mesh(transform, mesh)
             .expect("starter scene entity ID space available");
+        if index == 1 {
+            assert!(scene.set_material(id, MaterialId::RIFT));
+        } else if index == 2 {
+            assert!(scene.set_material(id, MaterialId::AMBER));
+        }
     }
     scene
 }
@@ -319,7 +330,7 @@ fn scene_instances_by_mesh(scene: &Scene, mesh_count: usize) -> Vec<Vec<Instance
         let world = scene
             .world_matrix(object.id)
             .expect("iterated scene objects must have valid hierarchy");
-        group.push(InstanceRaw::from_matrix(world));
+        group.push(InstanceRaw::from_matrix(world, material_tint(object.material)));
     }
     groups
 }
@@ -351,10 +362,18 @@ fn create_mesh_batches(
     Ok(batches)
 }
 
+fn material_tint(material: MaterialId) -> [f32; 4] {
+    match material {
+        MaterialId::RIFT => [0.45, 0.9, 1.0, 1.0],
+        MaterialId::AMBER => [1.0, 0.62, 0.28, 1.0],
+        _ => [1.0, 1.0, 1.0, 1.0],
+    }
+}
+
 fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(instances.len() * 64);
+    let mut bytes = Vec::with_capacity(instances.len() * 80);
     for instance in instances {
-        for component in instance.model {
+        for component in instance.model.iter().chain(instance.tint.iter()) {
             bytes.extend_from_slice(&component.to_ne_bytes());
         }
     }
@@ -551,7 +570,9 @@ mod tests {
                 .iter()
                 .all(|instance| { instance.model.iter().all(|component| component.is_finite()) })
         );
-        assert_eq!(instance_bytes(&groups[0]).len(), groups[0].len() * 64);
+        assert_eq!(instance_bytes(&groups[0]).len(), groups[0].len() * 80);
+        assert_eq!(groups[1][0].tint, material_tint(MaterialId::RIFT));
+        assert_eq!(material_tint(MaterialId::AMBER), [1.0, 0.62, 0.28, 1.0]);
     }
 
     #[test]
