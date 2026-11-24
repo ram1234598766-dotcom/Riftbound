@@ -14,6 +14,8 @@ impl MeshId {
     pub const CUBE: Self = Self(0);
     /// Built-in pyramid mesh used by the starter scene.
     pub const PYRAMID: Self = Self(1);
+    /// Faceted octahedral crystal mesh for rift landmarks.
+    pub const CRYSTAL: Self = Self(2);
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
