@@ -220,7 +220,7 @@ impl ApplicationHandler for RiftboundApp {
                         let movement = (horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
                             .sqrt()
-                            .div_euclid(4.5)
+                            / 4.5
                             .clamp(0.0, 1.0);
                         let gait = self.animation_time * 8.0;
                         let leg_swing = gait.sin() * 0.72 * movement;
