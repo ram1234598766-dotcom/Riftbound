@@ -230,37 +230,85 @@ impl ApplicationHandler for RiftboundApp {
                             (
                                 parts.torso,
                                 character_part_transform(
-                                    0.0, 0.48 + bob, 0.0, 0.0, 0.0, 0.0, 0.58, 0.72, 0.34,
+                                    0.0,
+                                    0.48 + bob,
+                                    0.0,
+                                    0.0,
+                                    0.0,
+                                    0.0,
+                                    0.58,
+                                    0.72,
+                                    0.34,
                                 ),
                             ),
                             (
                                 parts.head,
                                 character_part_transform(
-                                    0.0, 1.15 + bob, 0.0, 0.0, 0.0, 0.0, 0.38, 0.38, 0.38,
+                                    0.0,
+                                    1.15 + bob,
+                                    0.0,
+                                    0.0,
+                                    0.0,
+                                    0.0,
+                                    0.38,
+                                    0.38,
+                                    0.38,
                                 ),
                             ),
                             (
                                 parts.left_arm,
                                 character_part_transform(
-                                    -0.43, 0.48 + bob, 0.0, arm_swing, 0.0, -0.08, 0.20, 0.62, 0.22,
+                                    -0.43,
+                                    0.48 + bob,
+                                    0.0,
+                                    arm_swing,
+                                    0.0,
+                                    -0.08,
+                                    0.20,
+                                    0.62,
+                                    0.22,
                                 ),
                             ),
                             (
                                 parts.right_arm,
                                 character_part_transform(
-                                    0.43, 0.48 + bob, 0.0, -arm_swing, 0.0, 0.08, 0.20, 0.62, 0.22,
+                                    0.43,
+                                    0.48 + bob,
+                                    0.0,
+                                    -arm_swing,
+                                    0.0,
+                                    0.08,
+                                    0.20,
+                                    0.62,
+                                    0.22,
                                 ),
                             ),
                             (
                                 parts.left_leg,
                                 character_part_transform(
-                                    -0.19, -0.32, 0.0, leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
+                                    -0.19,
+                                    -0.32,
+                                    0.0,
+                                    leg_swing,
+                                    0.0,
+                                    0.0,
+                                    0.22,
+                                    0.62,
+                                    0.26,
                                 ),
                             ),
                             (
                                 parts.right_leg,
                                 character_part_transform(
-                                    0.19, -0.32, 0.0, -leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
+                                    0.19,
+                                    -0.32,
+                                    0.0,
+                                    -leg_swing,
+                                    0.0,
+                                    0.0,
+                                    0.22,
+                                    0.62,
+                                    0.26,
                                 ),
                             ),
                         ]);
@@ -631,6 +679,72 @@ fn build_arena(scene: &mut Scene) {
         scene,
         Vec3::new(0.0, 0.75, 4.0),
         Vec3::new(2.0, 1.5, 1.5),
+        MaterialId::AMBER,
+    );
+
+    // Cyan corner pylons give the arena a readable silhouette and scale reference.
+    for x in [-8.6, 8.6] {
+        for z in [-8.6, 8.6] {
+            spawn_box(
+                scene,
+                Vec3::new(x, 1.7, z),
+                Vec3::new(0.55, 3.4, 0.55),
+                MaterialId::RIFT,
+            );
+            spawn_box(
+                scene,
+                Vec3::new(x, 3.5, z),
+                Vec3::new(0.95, 0.22, 0.95),
+                MaterialId::AMBER,
+            );
+        }
+    }
+
+    // Low floor inlays create directional lanes without blocking player movement.
+    for offset in [-6.0, -3.0, 3.0, 6.0] {
+        spawn_box(
+            scene,
+            Vec3::new(offset, 0.012, 0.0),
+            Vec3::new(0.08, 0.024, 15.0),
+            MaterialId::RIFT,
+        );
+        spawn_box(
+            scene,
+            Vec3::new(0.0, 0.013, offset),
+            Vec3::new(15.0, 0.026, 0.08),
+            MaterialId::RIFT,
+        );
+    }
+
+    // A raised, amber-edged landing pad frames the extraction beacon.
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 0.025, -8.0),
+        Vec3::new(3.8, 0.05, 3.8),
+        MaterialId::DEFAULT,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 0.06, -6.12),
+        Vec3::new(3.8, 0.07, 0.12),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 0.06, -9.88),
+        Vec3::new(3.8, 0.07, 0.12),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(-1.88, 0.06, -8.0),
+        Vec3::new(0.12, 0.07, 3.8),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(1.88, 0.06, -8.0),
+        Vec3::new(0.12, 0.07, 3.8),
         MaterialId::AMBER,
     );
 }
