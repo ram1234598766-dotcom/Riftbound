@@ -173,9 +173,11 @@ impl WorldChunkSlotMap {
     /// cannot fit in the fixed slot capacity.
     pub fn apply_changes(&mut self, changes: &WorldChunkChanges) -> bool {
         for (index, removed) in changes.removed.iter().enumerate() {
-            if !self.slots.iter().any(|slot| {
-                slot.is_some_and(|request| request.coord == *removed)
-            }) || changes.removed[..index].contains(removed)
+            if !self
+                .slots
+                .iter()
+                .any(|slot| slot.is_some_and(|request| request.coord == *removed))
+                || changes.removed[..index].contains(removed)
             {
                 return false;
             }
@@ -183,8 +185,7 @@ impl WorldChunkSlotMap {
         for (index, updated) in changes.updated.iter().enumerate() {
             if !self.slots.iter().any(|slot| {
                 slot.is_some_and(|request| {
-                    request.coord == updated.coord
-                        && !changes.removed.contains(&request.coord)
+                    request.coord == updated.coord && !changes.removed.contains(&request.coord)
                 })
             }) || changes.updated[..index]
                 .iter()
@@ -194,7 +195,11 @@ impl WorldChunkSlotMap {
             }
         }
         for (index, added) in changes.added.iter().enumerate() {
-            if self.slots.iter().flatten().any(|request| request.coord == added.coord)
+            if self
+                .slots
+                .iter()
+                .flatten()
+                .any(|request| request.coord == added.coord)
                 && !changes.removed.contains(&added.coord)
                 || changes.added[..index]
                     .iter()
@@ -204,24 +209,28 @@ impl WorldChunkSlotMap {
             }
         }
 
-        let free_after_removals = self.slots.iter().filter(|slot| slot.is_none()).count()
-            + changes.removed.len();
+        let free_after_removals =
+            self.slots.iter().filter(|slot| slot.is_none()).count() + changes.removed.len();
         if changes.added.len() > free_after_removals {
             return false;
         }
 
         for removed in &changes.removed {
-            let Some(slot) = self.slots.iter_mut().find(|slot| {
-                slot.is_some_and(|request| request.coord == *removed)
-            }) else {
+            let Some(slot) = self
+                .slots
+                .iter_mut()
+                .find(|slot| slot.is_some_and(|request| request.coord == *removed))
+            else {
                 return false;
             };
             *slot = None;
         }
         for updated in &changes.updated {
-            let Some(slot) = self.slots.iter_mut().find(|slot| {
-                slot.is_some_and(|request| request.coord == updated.coord)
-            }) else {
+            let Some(slot) = self
+                .slots
+                .iter_mut()
+                .find(|slot| slot.is_some_and(|request| request.coord == updated.coord))
+            else {
                 return false;
             };
             *slot = Some(*updated);
@@ -479,7 +488,9 @@ mod tests {
         assert!(slots.apply_changes(streamer.changes()));
         assert_eq!(slots.occupied(), 25);
         assert_eq!(
-            slots.slots()[retained].expect("origin slot remains occupied").coord,
+            slots.slots()[retained]
+                .expect("origin slot remains occupied")
+                .coord,
             WorldChunkCoord { x: 0, z: 0 }
         );
         assert!(
