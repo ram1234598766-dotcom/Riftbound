@@ -196,7 +196,10 @@ impl Renderer {
         &mut self,
         transforms: &[(riftbound_core::EntityId, Transform3)],
     ) -> Result<bool, std::num::TryFromIntError> {
-        if transforms.iter().any(|(id, _)| self.scene.get(*id).is_none()) {
+        if transforms
+            .iter()
+            .any(|(id, _)| self.scene.get(*id).is_none())
+        {
             return Ok(false);
         }
         for (id, transform) in transforms {
