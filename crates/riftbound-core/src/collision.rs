@@ -15,7 +15,12 @@ impl Aabb2 {
     /// Creates an axis-aligned footprint.
     #[must_use]
     pub const fn new(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> Self {
-        Self {\n            min_x,\n            max_x,\n            min_z,\n            max_z,\n        }
+        Self {
+            min_x,
+            max_x,
+            min_z,
+            max_z,
+        }
     }
 
     fn contains_expanded(self, x: f32, z: f32, radius: f32) -> bool {
@@ -45,7 +50,10 @@ impl CollisionWorld {
     /// Creates a world whose bounds define the walkable outer rectangle.
     #[must_use]
     pub fn new(bounds: Aabb2) -> Self {
-        Self {\n            bounds,\n            obstacles: Vec::new(),\n        }
+        Self {
+            bounds,
+            obstacles: Vec::new(),
+        }
     }
 
     /// Adds a solid obstacle footprint.
@@ -68,7 +76,11 @@ impl CollisionWorld {
             || !start.x.is_finite() || !start.z.is_finite()
             || !displacement.x.is_finite() || !displacement.z.is_finite()
         {
-            return CollisionResult {\n                position: start,\n                blocked_x: false,\n                blocked_z: false,\n            };
+            return CollisionResult {
+                position: start,
+                blocked_x: false,
+                blocked_z: false,
+            };
         }
 
         let steps = (displacement.x.abs().max(displacement.z.abs()) / 0.1)
@@ -76,7 +88,11 @@ impl CollisionWorld {
             .max(1.0) as usize;
         let step_x = displacement.x / steps as f32;
         let step_z = displacement.z / steps as f32;
-        let mut result = CollisionResult {\n            position: start,\n            blocked_x: false,\n            blocked_z: false,\n        };
+        let mut result = CollisionResult {
+            position: start,
+            blocked_x: false,
+            blocked_z: false,
+        };
 
         for _ in 0..steps {
             let next_x = result.position.x + step_x;
@@ -128,7 +144,10 @@ impl CollisionWorld {
         {
             return false;
         }
-        !self\n            .obstacles\n            .iter()\n            .any(|obstacle| obstacle.contains_expanded(x, z, radius))
+        !self
+            .obstacles
+            .iter()
+            .any(|obstacle| obstacle.contains_expanded(x, z, radius))
     }
 }
 
