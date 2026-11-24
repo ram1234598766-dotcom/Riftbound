@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EntityId, ExtractionZone, InputState,
-    MaterialId, MeshId, MissionPhase, MissionProgress, Pickup, PickupTracker, Scene, Transform3,
-    Vec3, terrain_height,
+    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EntityId,
+    ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, Pickup,
+    PickupTracker, Scene, Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -419,17 +419,20 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
-                            let checkpoint_activated = match (self.checkpoint, self.checkpoint_progress.as_mut()) {
-                                (Some(checkpoint), Some(progress)) => progress.activate(
-                                    checkpoint,
-                                    transform.translation,
-                                    interact_pressed,
-                                ),
-                                _ => false,
-                            };
+                            let checkpoint_activated =
+                                match (self.checkpoint, self.checkpoint_progress.as_mut()) {
+                                    (Some(checkpoint), Some(progress)) => progress.activate(
+                                        checkpoint,
+                                        transform.translation,
+                                        interact_pressed,
+                                    ),
+                                    _ => false,
+                                };
                             if checkpoint_activated {
                                 window.set_title("RIFTBOUND — Checkpoint activated");
-                                log::info!("Checkpoint activated; falling will return the player here");
+                                log::info!(
+                                    "Checkpoint activated; falling will return the player here"
+                                );
                             }
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
@@ -460,12 +463,13 @@ impl ApplicationHandler for RiftboundApp {
                                 distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0))
                                     <= 1.9 * 1.9;
                             let near_checkpoint = self.checkpoint.is_some_and(|checkpoint| {
-                                !self.checkpoint_progress.is_some_and(
-                                    CheckpointProgress::has_active_checkpoint,
-                                ) && distance_squared(
-                                    transform.translation,
-                                    checkpoint.position(),
-                                ) <= 1.7 * 1.7
+                                !self
+                                    .checkpoint_progress
+                                    .is_some_and(CheckpointProgress::has_active_checkpoint)
+                                    && distance_squared(
+                                        transform.translation,
+                                        checkpoint.position(),
+                                    ) <= 1.7 * 1.7
                             });
                             let status = if self.mission.phase() == MissionPhase::Complete {
                                 "MISSION COMPLETE!"
@@ -654,11 +658,7 @@ fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
 }
 
 fn build_checkpoint(scene: &mut Scene) -> (EntityId, Checkpoint) {
-    let position = Vec3::new(
-        0.0,
-        terrain_height(0.0, 2.0) + PLAYER_RADIUS + 0.01,
-        2.0,
-    );
+    let position = Vec3::new(0.0, terrain_height(0.0, 2.0) + PLAYER_RADIUS + 0.01, 2.0);
     let visual_position = Vec3::new(0.0, terrain_height(0.0, 2.0) + 0.62, 2.0);
     let transform = Transform3::new(
         visual_position,
