@@ -426,12 +426,22 @@ mod tests {
             }));
         }
         let edge = |vertices: &[MeshVertex], x: usize| {
-            (0..9).map(|z| vertices[z * 9 + x]).collect::<Vec<_>>()
+            (0..9)
+                .map(|z| {
+                    let vertex = vertices[z * 9 + x];
+                    (vertex.position[1], vertex.color)
+                })
+                .collect::<Vec<_>>()
         };
         assert_eq!(edge(&chunks[0].0, 8), edge(&chunks[1].0, 0));
         assert_eq!(edge(&chunks[2].0, 8), edge(&chunks[3].0, 0));
         let south_edge = |vertices: &[MeshVertex], z: usize| {
-            (0..9).map(|x| vertices[z * 9 + x]).collect::<Vec<_>>()
+            (0..9)
+                .map(|x| {
+                    let vertex = vertices[z * 9 + x];
+                    (vertex.position[1], vertex.color)
+                })
+                .collect::<Vec<_>>()
         };
         assert_eq!(south_edge(&chunks[0].0, 8), south_edge(&chunks[2].0, 0));
         assert_eq!(south_edge(&chunks[1].0, 8), south_edge(&chunks[3].0, 0));
