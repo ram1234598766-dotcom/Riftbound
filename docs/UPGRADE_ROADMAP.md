@@ -27,6 +27,7 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ### 2. Renderer and world quality
 - [x] Add an initial camera-distance cube LOD tier with hysteresis to prevent visual popping.
+- [x] Add a simplified distance-based terrain LOD tier (5×5 instead of 9×9 samples), with hysteresis and synchronized chunk switching to keep shared edges aligned.
 - [ ] Extend LOD tiers to environment props and additional mesh types.
 - [x] Split the native arena floor into four frustum-culled terrain chunks with matching shared-edge height and colour samples.
 - [ ] Add a compact lighting model and tone-controlled environment palette.
@@ -66,4 +67,4 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ## Current implementation note
 
-The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
+The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. Terrain chunks now have detailed 9×9 and simplified 5×5 grids; all four chunks switch together with hysteresis so adjacent edges use matching samples. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
