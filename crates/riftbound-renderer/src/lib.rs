@@ -1,16 +1,80 @@
-//! GPU surface and frame presentation for the Riftbound engine.
+//! GPU surface, depth target, camera, and mesh presentation for the Riftbound engine.
 
 use std::sync::Arc;
 
+use wgpu::util::DeviceExt;
 use winit::{event_loop::OwnedDisplayHandle, window::Window};
 
-/// Owns the GPU device, presentation surface, and frame submission path.
+const CUBE_SHADER: &str = r"
+struct Camera {
+    view_projection: mat4x4<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> camera: Camera;
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec3<f32>,
+};
+
+const POSITIONS: array<vec3<f32>, 36> = array<vec3<f32>, 36>(
+    // Front
+    vec3<f32>(-1.0, -1.0,  1.0), vec3<f32>( 1.0, -1.0,  1.0), vec3<f32>( 1.0,  1.0,  1.0),
+    vec3<f32>(-1.0, -1.0,  1.0), vec3<f32>( 1.0,  1.0,  1.0), vec3<f32>(-1.0,  1.0,  1.0),
+    // Back
+    vec3<f32>( 1.0, -1.0, -1.0), vec3<f32>(-1.0, -1.0, -1.0), vec3<f32>(-1.0,  1.0, -1.0),
+    vec3<f32>( 1.0, -1.0, -1.0), vec3<f32>(-1.0,  1.0, -1.0), vec3<f32>( 1.0,  1.0, -1.0),
+    // Right
+    vec3<f32>( 1.0, -1.0,  1.0), vec3<f32>( 1.0, -1.0, -1.0), vec3<f32>( 1.0,  1.0, -1.0),
+    vec3<f32>( 1.0, -1.0,  1.0), vec3<f32>( 1.0,  1.0, -1.0), vec3<f32>( 1.0,  1.0,  1.0),
+    // Left
+    vec3<f32>(-1.0, -1.0, -1.0), vec3<f32>(-1.0, -1.0,  1.0), vec3<f32>(-1.0,  1.0,  1.0),
+    vec3<f32>(-1.0, -1.0, -1.0), vec3<f32>(-1.0,  1.0,  1.0), vec3<f32>(-1.0,  1.0, -1.0),
+    // Top
+    vec3<f32>(-1.0,  1.0,  1.0), vec3<f32>( 1.0,  1.0,  1.0), vec3<f32>( 1.0,  1.0, -1.0),
+    vec3<f32>(-1.0,  1.0,  1.0), vec3<f32>( 1.0,  1.0, -1.0), vec3<f32>(-1.0,  1.0, -1.0),
+    // Bottom
+    vec3<f32>(-1.0, -1.0, -1.0), vec3<f32>( 1.0, -1.0, -1.0), vec3<f32>( 1.0, -1.0,  1.0),
+    vec3<f32>(-1.0, -1.0, -1.0), vec3<f32>( 1.0, -1.0,  1.0), vec3<f32>(-1.0, -1.0,  1.0),
+);
+
+const FACE_COLORS: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
+    vec3<f32>(0.08, 0.78, 1.00),
+    vec3<f32>(0.12, 0.30, 0.82),
+    vec3<f32>(0.55, 0.20, 0.95),
+    vec3<f32>(0.12, 0.88, 0.72),
+    vec3<f32>(0.16, 0.48, 0.92),
+    vec3<f32>(0.06, 0.20, 0.52),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    var output: VertexOutput;
+    let position = POSITIONS[vertex_index];
+    output.clip_position = camera.view_projection * vec4<f32>(position * 0.82, 1.0);
+    output.color = FACE_COLORS[vertex_index / 6u];
+    return output;
+}
+
+@fragment
+fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4<f32>(input.color, 1.0);
+}
+";
+
+/// Owns the GPU device, presentation surface, depth target, and scene pipeline.
 pub struct Renderer {
     _instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    depth_texture: wgpu::Texture,
+    depth_view: wgpu::TextureView,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+    cube_pipeline: wgpu::RenderPipeline,
 }
 
 impl Renderer {
@@ -46,16 +110,96 @@ impl Renderer {
             .ok_or("No compatible surface configuration was reported by the GPU adapter")?;
         surface.configure(&device, &config);
 
+        let camera_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("riftbound-camera-layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("riftbound-camera-uniform"),
+            contents: &camera_bytes(config.width, config.height),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("riftbound-camera-bind-group"),
+            layout: &camera_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("riftbound-cube-shader"),
+            source: wgpu::ShaderSource::Wgsl(CUBE_SHADER.into()),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("riftbound-cube-pipeline-layout"),
+            bind_group_layouts: &[&camera_layout],
+            immediate_size: 0,
+        });
+        let cube_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("riftbound-cube-pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+
+        let (depth_texture, depth_view) =
+            create_depth_target(&device, config.width, config.height);
+
         Ok(Self {
             _instance: instance,
             surface,
             device,
             queue,
             config,
+            depth_texture,
+            depth_view,
+            camera_buffer,
+            camera_bind_group,
+            cube_pipeline,
         })
     }
 
-    /// Updates presentation dimensions after a non-zero window resize.
+    /// Updates presentation dimensions, depth storage, and camera projection after resize.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 {
             return;
@@ -63,9 +207,17 @@ impl Renderer {
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
+        let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            &camera_bytes(width, height),
+        );
     }
 
-    /// Acquires, clears, and presents one frame.
+    /// Draws a lit-color 3D cube with perspective projection and depth testing.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -94,33 +246,135 @@ impl Renderer {
                 label: Some("riftbound-frame-encoder"),
             });
         {
-            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("riftbound-background-pass"),
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("riftbound-world-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.018,
-                            g: 0.032,
-                            b: 0.062,
+                            r: 0.012,
+                            g: 0.018,
+                            b: 0.042,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
+            pass.set_pipeline(&self.cube_pipeline);
+            pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            pass.draw(0..36, 0..1);
         }
         self.queue.submit([encoder.finish()]);
-        self.queue.present(frame);
+        frame.present();
     }
 
     fn reconfigure(&mut self) {
         self.surface.configure(&self.device, &self.config);
+        let (depth_texture, depth_view) =
+            create_depth_target(&self.device, self.config.width, self.config.height);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
     }
+}
+
+fn create_depth_target(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+) -> (wgpu::Texture, wgpu::TextureView) {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("riftbound-depth-buffer"),
+        size: wgpu::Extent3d {
+            width: width.max(1),
+            height: height.max(1),
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    (texture, view)
+}
+
+fn camera_bytes(width: u32, height: u32) -> [u8; 64] {
+    let aspect = width.max(1) as f32 / height.max(1) as f32;
+    let eye = [3.2_f32, 2.4, 4.8];
+    let target = [0.0_f32, 0.0, 0.0];
+    let forward = normalize([
+        target[0] - eye[0],
+        target[1] - eye[1],
+        target[2] - eye[2],
+    ]);
+    let side = normalize(cross(forward, [0.0, 1.0, 0.0]));
+    let up = cross(side, forward);
+
+    let view = [
+        side[0], up[0], -forward[0], 0.0,
+        side[1], up[1], -forward[1], 0.0,
+        side[2], up[2], -forward[2], 0.0,
+        -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0,
+    ];
+    let near = 0.1_f32;
+    let far = 100.0_f32;
+    let focal = 1.0 / (45.0_f32.to_radians() * 0.5).tan();
+    let projection = [
+        focal / aspect, 0.0, 0.0, 0.0,
+        0.0, -focal, 0.0, 0.0,
+        0.0, 0.0, far / (near - far), -1.0,
+        0.0, 0.0, (far * near) / (near - far), 0.0,
+    ];
+    let matrix = multiply(projection, view);
+    let mut bytes = [0_u8; 64];
+    for (index, value) in matrix.iter().enumerate() {
+        bytes[index * 4..index * 4 + 4].copy_from_slice(&value.to_ne_bytes());
+    }
+    bytes
+}
+
+fn multiply(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
+    let mut result = [0.0; 16];
+    for column in 0..4 {
+        for row in 0..4 {
+            for inner in 0..4 {
+                result[column * 4 + row] +=
+                    a[inner * 4 + row] * b[column * 4 + inner];
+            }
+        }
+    }
+    result
+}
+
+fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn normalize(value: [f32; 3]) -> [f32; 3] {
+    let length = dot(value, value).sqrt().max(f32::EPSILON);
+    [value[0] / length, value[1] / length, value[2] / length]
 }
