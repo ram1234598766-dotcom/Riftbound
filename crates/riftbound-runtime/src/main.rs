@@ -23,9 +23,9 @@ impl GpuState {
         display: OwnedDisplayHandle,
         window: Arc<Window>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let instance = wgpu::Instance::new(
-            wgpu::InstanceDescriptor::new_with_display_handle(Box::new(display)),
-        );
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(
+            Box::new(display),
+        ));
         let surface = instance.create_surface(window.clone())?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -84,7 +84,9 @@ impl GpuState {
             }
         };
 
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
