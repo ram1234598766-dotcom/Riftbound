@@ -72,9 +72,12 @@ impl CollisionWorld {
     /// Small substeps prevent a fast frame from tunneling through thin obstacles.
     #[must_use]
     pub fn move_character(&self, start: Vec3, displacement: Vec3, radius: f32) -> CollisionResult {
-        if !radius.is_finite() || radius < 0.0
-            || !start.x.is_finite() || !start.z.is_finite()
-            || !displacement.x.is_finite() || !displacement.z.is_finite()
+        if !radius.is_finite()
+            || radius < 0.0
+            || !start.x.is_finite()
+            || !start.z.is_finite()
+            || !displacement.x.is_finite()
+            || !displacement.z.is_finite()
         {
             return CollisionResult {
                 position: start,
@@ -163,11 +166,8 @@ mod tests {
 
     #[test]
     fn obstacle_blocks_character_and_reports_axis() {
-        let result = world().move_character(
-            Vec3::new(-2.0, 0.0, 0.0),
-            Vec3::new(2.0, 0.0, 0.0),
-            0.25,
-        );
+        let result =
+            world().move_character(Vec3::new(-2.0, 0.0, 0.0), Vec3::new(2.0, 0.0, 0.0), 0.25);
         assert!(result.blocked_x);
         assert!(!result.blocked_z);
         assert!((result.position.x + 1.25).abs() < 0.001);
@@ -175,11 +175,8 @@ mod tests {
 
     #[test]
     fn movement_slides_along_obstacles() {
-        let result = world().move_character(
-            Vec3::new(-2.0, 0.0, 0.0),
-            Vec3::new(2.0, 0.0, 2.0),
-            0.25,
-        );
+        let result =
+            world().move_character(Vec3::new(-2.0, 0.0, 0.0), Vec3::new(2.0, 0.0, 2.0), 0.25);
         assert!(result.blocked_x);
         assert!(!result.blocked_z);
         assert!(result.position.z > 1.9);
@@ -188,22 +185,16 @@ mod tests {
 
     #[test]
     fn outer_bounds_stop_character() {
-        let result = world().move_character(
-            Vec3::new(4.0, 0.0, 0.0),
-            Vec3::new(3.0, 0.0, 0.0),
-            0.25,
-        );
+        let result =
+            world().move_character(Vec3::new(4.0, 0.0, 0.0), Vec3::new(3.0, 0.0, 0.0), 0.25);
         assert!(result.blocked_x);
         assert!((result.position.x - 4.75).abs() < 0.001);
     }
 
     #[test]
     fn very_large_displacement_does_not_tunnel_through_obstacle() {
-        let result = world().move_character(
-            Vec3::new(-4.0, 0.0, 0.0),
-            Vec3::new(8.0, 0.0, 0.0),
-            0.25,
-        );
+        let result =
+            world().move_character(Vec3::new(-4.0, 0.0, 0.0), Vec3::new(8.0, 0.0, 0.0), 0.25);
         assert!(result.blocked_x);
         assert!(result.position.x <= -1.25);
     }
