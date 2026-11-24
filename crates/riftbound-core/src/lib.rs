@@ -7,7 +7,7 @@ mod character;
 mod checkpoint;
 mod clock;
 mod collision;
-mod entity;
+mod entity;\nmod enemy;
 mod input;
 mod math;
 mod mission;\nmod objective;
@@ -22,7 +22,7 @@ pub use character::{
 pub use checkpoint::{Checkpoint, CheckpointProgress};
 pub use clock::{FixedClock, TickBatch};
 pub use collision::{Aabb2, CollisionResult, CollisionWorld};
-pub use entity::{EntityArena, EntityId};
+pub use entity::{EntityArena, EntityId};\npub use enemy::{EnemyBrain, EnemyConfig, EnemyEvent, EnemyState};
 pub use input::{Button, InputState};
 pub use math::{Vec2, Vec3};
 pub use mission::{MissionPhase, MissionProgress};\npub use objective::{ObjectiveKind, ObjectiveProgress};
