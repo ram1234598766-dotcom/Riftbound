@@ -439,13 +439,13 @@ impl ApplicationHandler for RiftboundApp {
                             ));
                             match event {
                                 Some(EnemyEvent::PlayerDetected) => {
-                                    log::info!("Arena sentinel detected the player")
+                                    log::info!("Arena sentinel detected the player");
                                 }
                                 Some(EnemyEvent::AttackTelegraphed) => {
-                                    log::info!("Sentinel attack telegraphed — prepare to evade")
+                                    log::info!("Sentinel attack telegraphed — prepare to evade");
                                 }
                                 Some(EnemyEvent::ReturningHome) => {
-                                    log::info!("Sentinel lost the player and is returning home")
+                                    log::info!("Sentinel lost the player and is returning home");
                                 }
                                 Some(EnemyEvent::PulseReleased) | None => {}
                             }
