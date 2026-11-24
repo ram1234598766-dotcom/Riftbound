@@ -5,7 +5,8 @@ use std::time::{Duration, Instant};
 
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EntityId,
-    ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, Pickup,
+    EnemyBrain, EnemyConfig, EnemyEvent, EnemyState, ExtractionZone, InputState, MaterialId,
+    MeshId, MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup,
     PickupTracker, Scene, Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
@@ -46,6 +47,11 @@ struct RiftboundApp {
     checkpoint_entity: Option<EntityId>,
     checkpoint: Option<Checkpoint>,
     checkpoint_progress: Option<CheckpointProgress>,
+    sentinel_entity: Option<EntityId>,
+    sentinel_effect_entity: Option<EntityId>,
+    sentinel_brain: Option<EnemyBrain>,
+    sentinel_objective: Option<ObjectiveProgress>,
+    sentinel_pulse_timer: f32,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -93,6 +99,8 @@ impl ApplicationHandler for RiftboundApp {
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
                 let (beacon_entity, extraction) = build_extraction_beacon(&mut scene);
                 let (checkpoint_entity, checkpoint) = build_checkpoint(&mut scene);
+                let (sentinel_entity, sentinel_effect_entity, sentinel_brain) =
+                    build_sentinel(&mut scene);
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -119,6 +127,13 @@ impl ApplicationHandler for RiftboundApp {
                     CheckpointProgress::new(player_transform.translation)
                         .expect("player start position is valid"),
                 );
+                self.sentinel_entity = Some(sentinel_entity);
+                self.sentinel_effect_entity = Some(sentinel_effect_entity);
+                self.sentinel_brain = Some(sentinel_brain);
+                self.sentinel_objective = Some(ObjectiveProgress::new(ObjectiveKind::Defeat {
+                    target: 1,
+                }));
+                self.sentinel_pulse_timer = 0.0;
                 self.animation_time = 0.0;
                 self.last_frame = Some(Instant::now());
             }
@@ -143,6 +158,11 @@ impl ApplicationHandler for RiftboundApp {
         self.checkpoint_entity = None;
         self.checkpoint = None;
         self.checkpoint_progress = None;
+        self.sentinel_entity = None;
+        self.sentinel_effect_entity = None;
+        self.sentinel_brain = None;
+        self.sentinel_objective = None;
+        self.sentinel_pulse_timer = 0.0;
         self.animation_time = 0.0;
         self.mission = MissionProgress::new(0);
         self.last_frame = None;
@@ -369,6 +389,71 @@ impl ApplicationHandler for RiftboundApp {
                             ),
                         ));
                     }
+                    if let (Some(sentinel), Some(effect), Some(brain)) = (
+                        self.sentinel_entity,
+                        self.sentinel_effect_entity,
+                        self.sentinel_brain.as_mut(),
+                    ) {
+                        if let Some(mut enemy_transform) =
+                            renderer.scene().get(sentinel).copied()
+                        {
+                            let event = brain.update(
+                                &mut enemy_transform.translation,
+                                transform.translation,
+                                delta,
+                            );
+                            let enemy_position = enemy_transform.translation;
+                            enemy_transform.translation.y =
+                                terrain_height(enemy_position.x, enemy_position.z) + 0.62;
+                            let dx = transform.translation.x - enemy_position.x;
+                            let dz = transform.translation.z - enemy_position.z;
+                            enemy_transform.rotation_radians.y = dx.atan2(-dz);
+                            let telegraph = brain.state() == EnemyState::Telegraph;
+                            let body_pulse = if telegraph {
+                                1.0 + (self.animation_time * 18.0).sin() * 0.12
+                            } else {
+                                1.0 + (self.animation_time * 2.2).sin() * 0.035
+                            };
+                            enemy_transform.scale =
+                                Vec3::new(0.58 * body_pulse, 0.78 * body_pulse, 0.58 * body_pulse);
+                            self.animated_transforms.push((sentinel, enemy_transform));
+                            if event == Some(EnemyEvent::PulseReleased) {
+                                self.sentinel_pulse_timer = 0.32;
+                                log::info!("Sentinel released its pulse; close in during recovery");
+                            }
+                            self.sentinel_pulse_timer =
+                                (self.sentinel_pulse_timer - delta.min(0.1)).max(0.0);
+                            let effect_scale = if telegraph {
+                                0.78 + (self.animation_time * 18.0).sin().abs() * 0.16
+                            } else if self.sentinel_pulse_timer > 0.0 {
+                                0.95 + (0.32 - self.sentinel_pulse_timer) * 3.2
+                            } else {
+                                0.01
+                            };
+                            let effect_y =
+                                terrain_height(enemy_position.x, enemy_position.z) + 0.12;
+                            self.animated_transforms.push((
+                                effect,
+                                Transform3::new(
+                                    Vec3::new(enemy_position.x, effect_y, enemy_position.z),
+                                    Vec3::new(0.0, self.animation_time * 1.8, 0.0),
+                                    Vec3::new(effect_scale, 0.07, effect_scale),
+                                ),
+                            ));
+                            match event {
+                                Some(EnemyEvent::PlayerDetected) => {
+                                    log::info!("Arena sentinel detected the player")
+                                }
+                                Some(EnemyEvent::AttackTelegraphed) => {
+                                    log::info!("Sentinel attack telegraphed — prepare to evade")
+                                }
+                                Some(EnemyEvent::ReturningHome) => {
+                                    log::info!("Sentinel lost the player and is returning home")
+                                }
+                                Some(EnemyEvent::PulseReleased) | None => {}
+                            }
+                        }
+                    }
                     match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
@@ -434,6 +519,37 @@ impl ApplicationHandler for RiftboundApp {
                                     "Checkpoint activated; falling will return the player here"
                                 );
                             }
+                            let sentinel_ready = self
+                                .sentinel_brain
+                                .is_some_and(|brain| brain.state() == EnemyState::Recover);
+                            let sentinel_in_range = self.sentinel_entity.is_some_and(|entity| {
+                                renderer.scene().get(entity).is_some_and(|enemy| {
+                                    distance_squared(transform.translation, enemy.translation)
+                                        <= 2.0 * 2.0
+                                })
+                            });
+                            if interact_pressed && sentinel_ready && sentinel_in_range {
+                                let mut updated_scene = renderer.scene().clone();
+                                if let Some(entity) = self.sentinel_entity {
+                                    updated_scene.despawn(entity);
+                                }
+                                if let Some(effect) = self.sentinel_effect_entity {
+                                    updated_scene.despawn(effect);
+                                }
+                                if let Err(error) = renderer.set_scene(updated_scene) {
+                                    log::error!("Could not disable the sentinel: {error}");
+                                    event_loop.exit();
+                                    return;
+                                }
+                                self.sentinel_entity = None;
+                                self.sentinel_effect_entity = None;
+                                self.sentinel_brain = None;
+                                if let Some(objective) = self.sentinel_objective.as_mut() {
+                                    objective.advance(1);
+                                }
+                                window.set_title("RIFTBOUND — Sentinel disabled");
+                                log::info!("Sentinel encounter complete; defeat objective advanced");
+                            }
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
                             });
@@ -462,6 +578,16 @@ impl ApplicationHandler for RiftboundApp {
                             let near_beacon =
                                 distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0))
                                     <= 1.9 * 1.9;
+                            let near_sentinel = self.sentinel_entity.is_some_and(|entity| {
+                                renderer.scene().get(entity).is_some_and(|enemy| {
+                                    distance_squared(transform.translation, enemy.translation)
+                                        <= 2.0 * 2.0
+                                })
+                            });
+                            let sentinel_can_be_disabled = near_sentinel
+                                && self.sentinel_brain.is_some_and(|brain| {
+                                    brain.state() == EnemyState::Recover
+                                });
                             let near_checkpoint = self.checkpoint.is_some_and(|checkpoint| {
                                 !self
                                     .checkpoint_progress
@@ -473,6 +599,8 @@ impl ApplicationHandler for RiftboundApp {
                             });
                             let status = if self.mission.phase() == MissionPhase::Complete {
                                 "MISSION COMPLETE!"
+                            } else if self.sentinel_entity.is_some() {
+                                "DEFEAT SENTINEL • COLLECT SHARDS"
                             } else if self.mission.extraction_unlocked() {
                                 "RETURN TO BEACON"
                             } else {
@@ -480,6 +608,10 @@ impl ApplicationHandler for RiftboundApp {
                             };
                             let prompt = if self.mission.is_complete() {
                                 None
+                            } else if sentinel_can_be_disabled {
+                                Some(String::from("F - DISABLE SENTINEL"))
+                            } else if near_sentinel {
+                                Some(String::from("SENTINEL LOCKING ON"))
                             } else if self.mission.extraction_unlocked() && near_beacon {
                                 Some(String::from("F - EXTRACT"))
                             } else if near_checkpoint {
@@ -655,6 +787,33 @@ fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
         id,
         ExtractionZone::new(position, 1.9).expect("extraction zone data is valid"),
     )
+}
+
+fn build_sentinel(scene: &mut Scene) -> (EntityId, EntityId, EnemyBrain) {
+    let home = Vec3::new(-5.0, terrain_height(-5.0, 0.0) + 0.62, 0.0);
+    let sentinel = scene
+        .spawn_with_mesh(
+            Transform3::new(
+                home,
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.58, 0.78, 0.58),
+            ),
+            MeshId::CRYSTAL,
+        )
+        .expect("sentinel entity ID space available");
+    scene.set_material(sentinel, MaterialId::AMBER);
+    let effect = scene
+        .spawn_with_mesh(
+            Transform3::new(
+                Vec3::new(home.x, terrain_height(home.x, home.z) + 0.12, home.z),
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.01, 0.07, 0.01),
+            ),
+            MeshId::PYRAMID,
+        )
+        .expect("sentinel effect entity ID space available");
+    scene.set_material(effect, MaterialId::RIFT);
+    (sentinel, effect, EnemyBrain::new(home, EnemyConfig::default()))
 }
 
 fn build_checkpoint(scene: &mut Scene) -> (EntityId, Checkpoint) {
