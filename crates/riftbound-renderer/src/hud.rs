@@ -1,16 +1,24 @@
 //! Small immediate-mode 2D HUD geometry and a compact 5x7 bitmap font.
 
+/// Mission information displayed by the native HUD.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HudData {
+    /// Number of recovered shards.
     pub collected: usize,
+    /// Total number of shards in the mission.
     pub total: usize,
+    /// Short uppercase objective or completion message.
     pub status: String,
+    /// Contextual interaction hint, when the player is in range.
     pub prompt: Option<String>,
 }
 
+/// One colored vertex in the immediate-mode HUD mesh.
 #[derive(Clone, Copy, Debug)]
 pub struct HudVertex {
+    /// Clip-space vertex position.
     pub position: [f32; 2],
+    /// RGBA vertex color.
     pub color: [f32; 4],
 }
 
@@ -52,7 +60,9 @@ pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex>
     let ratio = if data.total == 0 {
         0.0
     } else {
-        (data.collected as f32 / data.total as f32).clamp(0.0, 1.0)
+        let collected = u16::try_from(data.collected).unwrap_or(u16::MAX);
+        let total = u16::try_from(data.total).unwrap_or(u16::MAX);
+        (f32::from(collected) / f32::from(total)).clamp(0.0, 1.0)
     };
     rect(
         &mut out,
@@ -101,6 +111,7 @@ pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex>
     out
 }
 
+#[allow(clippy::many_single_char_names, clippy::too_many_arguments)]
 fn rect(
     out: &mut Vec<HudVertex>,
     x: f32,
@@ -124,6 +135,7 @@ fn rect(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn text(
     out: &mut Vec<HudVertex>,
     value: &str,
@@ -142,8 +154,8 @@ fn text(
                 if bits & (1 << (4 - col)) != 0 {
                     rect(
                         out,
-                        cursor + col as f32 * scale,
-                        y + row as f32 * scale,
+                        cursor + f32::from(u8::try_from(col).unwrap_or(0)) * scale,
+                        y + f32::from(u8::try_from(row).unwrap_or(0)) * scale,
                         scale,
                         scale,
                         color,
