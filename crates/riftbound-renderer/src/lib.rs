@@ -182,10 +182,28 @@ impl Renderer {
         id: riftbound_core::EntityId,
         transform: Transform3,
     ) -> Result<bool, std::num::TryFromIntError> {
-        let Some(current) = self.scene.get_mut(id) else {
+        self.set_object_transforms(&[(id, transform)])
+    }
+
+    /// Updates several live object transforms with one GPU instance-buffer rebuild.
+    ///
+    /// Returns `false` without changing the scene if any supplied entity ID is stale.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scene contains more instances than a GPU draw call can address.
+    pub fn set_object_transforms(
+        &mut self,
+        transforms: &[(riftbound_core::EntityId, Transform3)],
+    ) -> Result<bool, std::num::TryFromIntError> {
+        if transforms.iter().any(|(id, _)| self.scene.get(*id).is_none()) {
             return Ok(false);
-        };
-        *current = transform;
+        }
+        for (id, transform) in transforms {
+            if let Some(current) = self.scene.get_mut(*id) {
+                *current = *transform;
+            }
+        }
         self.mesh_batches = create_mesh_batches(&self.device, &self.scene, self.meshes.len())?;
         Ok(true)
     }
