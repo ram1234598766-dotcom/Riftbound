@@ -200,9 +200,20 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
             let variation =
                 f32::from(u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"))
                     * 0.012;
+            // Fade the procedural ridges to zero at the perimeter so they meet the arena walls.
+            let edge_fade = (std::f32::consts::PI * u).sin()
+                * (std::f32::consts::PI * v).sin();
+            let ridges = (u * std::f32::consts::TAU * 2.0).sin()
+                * (v * std::f32::consts::TAU * 1.5).cos();
+            let height = edge_fade * ridges * 0.075;
+            let elevation_tint = height.max(0.0) * 0.22;
             vertices.push(MeshVertex {
-                position: [u * 2.0 - 1.0, 0.0, v * 2.0 - 1.0],
-                color: [0.055 + variation, 0.13 + variation, 0.22 + variation * 1.5],
+                position: [u * 2.0 - 1.0, height, v * 2.0 - 1.0],
+                color: [
+                    0.055 + variation + elevation_tint,
+                    0.13 + variation + elevation_tint,
+                    0.22 + variation * 1.5 + elevation_tint,
+                ],
             });
         }
     }
@@ -338,6 +349,14 @@ mod tests {
                 .iter()
                 .any(|vertex| vertex.color.map(f32::to_bits) != vertices[0].color.map(f32::to_bits))
         );
+        assert!(vertices.iter().any(|vertex| vertex.position[1] > 0.01));
+        assert!(vertices.iter().any(|vertex| vertex.position[1] < -0.01));
+        assert!(vertices.iter().all(|vertex| vertex.position[1].abs() <= 0.075));
+        assert!(vertices
+            .iter()
+            .filter(|vertex| vertex.position[0].abs() == 1.0
+                || vertex.position[2].abs() == 1.0)
+            .all(|vertex| vertex.position[1] == 0.0));
     }
 
     #[test]
