@@ -270,10 +270,31 @@ mod tests {
         let pyramid = scene
             .spawn_with_mesh(Transform3::IDENTITY, MeshId::PYRAMID)
             .expect("pyramid ID");
-        assert_eq!(scene.iter().find(|object| object.id == cube).expect("cube remains live").mesh, MeshId::CUBE);
-        assert_eq!(scene.iter().find(|object| object.id == pyramid).expect("pyramid remains live").mesh, MeshId::PYRAMID);
+        assert_eq!(
+            scene
+                .iter()
+                .find(|object| object.id == cube)
+                .expect("cube remains live")
+                .mesh,
+            MeshId::CUBE
+        );
+        assert_eq!(
+            scene
+                .iter()
+                .find(|object| object.id == pyramid)
+                .expect("pyramid remains live")
+                .mesh,
+            MeshId::PYRAMID
+        );
         assert!(scene.set_mesh(cube, MeshId::PYRAMID));
-        assert_eq!(scene.iter().find(|object| object.id == cube).unwrap().mesh, MeshId::PYRAMID);
+        assert_eq!(
+            scene
+                .iter()
+                .find(|object| object.id == cube)
+                .expect("cube remains live")
+                .mesh,
+            MeshId::PYRAMID
+        );
         assert!(scene.despawn(cube));
         assert!(!scene.set_mesh(cube, MeshId::CUBE));
     }
