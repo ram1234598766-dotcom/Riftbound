@@ -45,12 +45,7 @@ pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex>
 }
 
 /// Rebuilds HUD geometry into an existing vector, retaining its allocation across frames.
-pub fn build_vertices_into(
-    data: &HudData,
-    width: u32,
-    height: u32,
-    out: &mut Vec<HudVertex>,
-) {
+pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Vec<HudVertex>) {
     let width = f32::from(u16::try_from(width.max(1)).unwrap_or(u16::MAX));
     let height = f32::from(u16::try_from(height.max(1)).unwrap_or(u16::MAX));
     out.clear();
