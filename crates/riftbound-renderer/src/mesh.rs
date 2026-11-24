@@ -3,6 +3,8 @@
 use riftbound_core::{VehicleSurface, terrain_height, terrain_surface, world_terrain_sample};
 use wgpu::util::DeviceExt;
 
+const WORLD_TERRAIN_SKIRT_DEPTH: f32 = 12.0;
+
 /// One position-and-color vertex in the renderer's standard mesh format.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -412,16 +414,15 @@ fn world_terrain_chunk_data(
     // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
     // chunk. Each edge is generated from that chunk's own border samples, so
     // the overlap remains valid even when the two edge profiles differ.
-    const SKIRT_DEPTH: f32 = 12.0;
     let mut append_skirt = |edge: Vec<usize>| -> Option<()> {
         for pair in edge.windows(2) {
             let top_a = *vertices.get(pair[0])?;
             let top_b = *vertices.get(pair[1])?;
             let base = u16::try_from(vertices.len()).ok()?;
             let mut bottom_a = top_a;
-            bottom_a.position[1] -= SKIRT_DEPTH;
+            bottom_a.position[1] -= WORLD_TERRAIN_SKIRT_DEPTH;
             let mut bottom_b = top_b;
-            bottom_b.position[1] -= SKIRT_DEPTH;
+            bottom_b.position[1] -= WORLD_TERRAIN_SKIRT_DEPTH;
             vertices.extend_from_slice(&[top_a, bottom_a, top_b, bottom_b]);
             indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 1, base + 3]);
         }
@@ -625,7 +626,7 @@ mod tests {
         }
         let base_vertex_count = 25;
         assert!(distant.0[base_vertex_count..].chunks_exact(4).all(|skirt| {
-            (skirt[0].position[1] - skirt[1].position[1] - 12.0).abs() < f32::EPSILON
+            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs() < f32::EPSILON
                 && (skirt[2].position[1] - skirt[3].position[1] - 12.0).abs() < f32::EPSILON
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
