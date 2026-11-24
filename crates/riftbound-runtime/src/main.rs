@@ -286,29 +286,13 @@ impl ApplicationHandler for RiftboundApp {
                             (
                                 parts.left_leg,
                                 character_part_transform(
-                                    -0.19,
-                                    -0.32,
-                                    0.0,
-                                    leg_swing,
-                                    0.0,
-                                    0.0,
-                                    0.22,
-                                    0.62,
-                                    0.26,
+                                    -0.19, -0.32, 0.0, leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
                                 ),
                             ),
                             (
                                 parts.right_leg,
                                 character_part_transform(
-                                    0.19,
-                                    -0.32,
-                                    0.0,
-                                    -leg_swing,
-                                    0.0,
-                                    0.0,
-                                    0.22,
-                                    0.62,
-                                    0.26,
+                                    0.19, -0.32, 0.0, -leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
                                 ),
                             ),
                         ]);
