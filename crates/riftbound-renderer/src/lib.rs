@@ -122,6 +122,7 @@ impl Renderer {
             Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?,
             Mesh::pyramid(&device).ok_or("Failed to create the built-in pyramid mesh")?,
             Mesh::crystal(&device).ok_or("Failed to create the built-in crystal mesh")?,
+            Mesh::terrain(&device).ok_or("Failed to create the built-in terrain mesh")?,
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
