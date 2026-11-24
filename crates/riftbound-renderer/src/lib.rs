@@ -217,7 +217,7 @@ fn create_cube_pipeline(
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[MeshVertex::layout()],
+            buffers: &[Some(MeshVertex::layout())],
         },
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
