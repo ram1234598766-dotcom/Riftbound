@@ -423,7 +423,8 @@ impl Renderer {
                     "HUD vertex data exceeds the reusable buffer capacity; skipping HUD draw"
                 );
             } else {
-                self.queue.write_buffer(&self.hud_buffer, 0, &self.hud_bytes);
+                self.queue
+                    .write_buffer(&self.hud_buffer, 0, &self.hud_bytes);
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("riftbound-hud-pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
