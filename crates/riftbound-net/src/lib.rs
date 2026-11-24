@@ -1,17 +1,27 @@
 //! Local-network HTTP and WebSocket host for browser-based Riftbound sessions.
 
-use std::{collections::BTreeMap, net::SocketAddr, sync::{Arc, atomic::{AtomicU64, Ordering}}};
+use std::{
+    collections::BTreeMap,
+    net::SocketAddr,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use axum::{
     Router,
-    extract::{State, ws::{Message, WebSocket, WebSocketUpgrade}},
+    extract::{
+        State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     http::StatusCode,
     response::Html,
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{broadcast, Mutex};
 
 const PORT: u16 = 7878;
 const WORLD_WIDTH: f32 = 2200.0;
@@ -97,7 +107,10 @@ async fn health() -> (StatusCode, &'static str) {
     (StatusCode::OK, "Riftbound LAN host online")
 }
 
-async fn websocket(upgrade: WebSocketUpgrade, State(state): State<HostState>) -> impl axum::response::IntoResponse {
+async fn websocket(
+    upgrade: WebSocketUpgrade,
+    State(state): State<HostState>,
+) -> impl axum::response::IntoResponse {
     upgrade
         .max_message_size(1024)
         .max_frame_size(1024)
@@ -106,7 +119,12 @@ async fn websocket(upgrade: WebSocketUpgrade, State(state): State<HostState>) ->
 
 async fn handle_socket(socket: WebSocket, state: HostState) {
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
-    let initial = PlayerState { id, x: WORLD_WIDTH * 0.5, y: WORLD_HEIGHT * 0.5, face: 0.0 };
+    let initial = PlayerState {
+        id,
+        x: WORLD_WIDTH * 0.5,
+        y: WORLD_HEIGHT * 0.5,
+        face: 0.0,
+    };
     state.players.lock().await.insert(id, initial);
 
     let (mut sender, mut receiver) = socket.split();
@@ -131,8 +149,14 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
             Message::Close(_) => break,
             _ => continue,
         };
-        let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else { continue; };
-        if input.kind != "move" || !input.x.is_finite() || !input.y.is_finite() || !input.face.is_finite() {
+        let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else {
+            continue;
+        };
+        if input.kind != "move"
+            || !input.x.is_finite()
+            || !input.y.is_finite()
+            || !input.face.is_finite()
+        {
             continue;
         }
         {
@@ -153,7 +177,10 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
 
 async fn publish_snapshot(state: &HostState) {
     let players: Vec<PlayerState> = state.players.lock().await.values().cloned().collect();
-    if let Ok(message) = serde_json::to_string(&Snapshot { kind: "snapshot", players: &players }) {
+    if let Ok(message) = serde_json::to_string(&Snapshot {
+        kind: "snapshot",
+        players: &players,
+    }) {
         let _ = state.updates.send(message);
     }
 }
@@ -171,7 +198,10 @@ mod tests {
     #[test]
     fn world_position_is_bounded() {
         assert_eq!(clamp_world_position(-20.0, WORLD_WIDTH), 0.0);
-        assert_eq!(clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH), WORLD_WIDTH);
+        assert_eq!(
+            clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH),
+            WORLD_WIDTH
+        );
         assert_eq!(clamp_world_position(42.0, WORLD_WIDTH), 42.0);
     }
 }
