@@ -6,25 +6,28 @@ Riftbound is a project-owned engine. It does not embed Bevy, Godot, Unity, or an
 
 | Crate | Responsibility | Dependency direction |
 | --- | --- | --- |
-| `riftbound-core` | Deterministic time, input abstractions, entity identity, transforms, math, simulation contracts | No platform or GPU dependencies |
-| `riftbound-platform` | Window lifecycle, OS events, controller and touch input, lifecycle/suspend handling | May depend on low-level windowing APIs |
-| `riftbound-renderer` | GPU device/surface management, render graph, pipelines, materials, lighting, shadows, post-processing | May depend on low-level graphics APIs |
-| `riftbound-assets` | Asset discovery, import, validation, caching, streaming and provenance | Uses project-owned asset formats/contracts |
-| `riftbound-audio` | Audio scene, buses, spatial emitters and mixer policy | Platform audio backend stays behind an adapter |
-| `riftbound-net` | Replication contracts, snapshots, prediction/reconciliation boundaries and transport adapters | Core types only; no rendering dependency |
-| `riftbound-game` | Riftbound content, missions, traversal, vehicles, world rules and UI | Composes the engine crates |
+| riftbound-core | Deterministic time, input abstractions, entity identity, transforms, math, simulation contracts | No platform or GPU dependencies |
+| riftbound-runtime | Application entry point, window lifecycle, event loop and runtime orchestration | Composes platform and renderer-facing APIs |
+| riftbound-renderer | GPU device/surface management, frame submission, render graph, pipelines, materials, lighting, shadows, post-processing | May depend on low-level graphics APIs |
+| riftbound-assets | Asset discovery, import, validation, caching, streaming and provenance | Uses project-owned asset formats/contracts |
+| riftbound-audio | Audio scene, buses, spatial emitters and mixer policy | Platform audio backend stays behind an adapter |
+| riftbound-net | Replication contracts, snapshots, prediction/reconciliation boundaries and transport adapters | Core types only; no rendering dependency |
+| riftbound-game | Riftbound content, missions, traversal, vehicles, world rules and UI | Composes the engine crates |
+
+The runtime currently owns the native window/event loop. The renderer owns the wgpu instance, surface, device, queue, surface configuration and frame presentation. The renderer API does not expose GPU internals to gameplay. A dedicated platform crate remains a future extraction for input mapping and cross-platform lifecycle services.
 
 Dependencies point inward toward stable contracts. The renderer must not own gameplay rules, and the core must remain testable without a GPU or window.
 
 ## Runtime rules
 
-- Simulation uses a fixed timestep through `FixedClock`; rendering may run at a separate variable rate.
+- Simulation uses a fixed timestep through FixedClock; rendering may run at a separate variable rate.
 - Entity handles are generational. A despawned handle must never silently refer to a later entity that reuses its slot.
 - Input is captured at the platform boundary and converted to logical actions before gameplay consumes it.
 - World transforms are explicit data, not hidden renderer state.
 - GPU work is submitted by the renderer; gameplay systems do not issue graphics API calls.
 - Asset loading is asynchronous and budgeted. Large world regions must be streamable instead of loaded as one monolithic scene.
 - Multiplayer authority is explicit. Clients may predict presentation, but shared world facts must be validated by the agreed authority.
+- The event loop waits when idle and requests redraws in response to window lifecycle events. A paced simulation/render scheduler will replace this idle policy when continuous world simulation is introduced.
 
 ## Quality gates
 
