@@ -37,4 +37,7 @@ pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
 pub use terrain::terrain_height;
 pub use transform::Transform3;
-pub use vehicle::{VehicleConfig, VehicleInput, VehicleState, VehicleSurface};
+pub use vehicle::{
+    SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput, VehicleState,
+    VehicleSurface,
+};
