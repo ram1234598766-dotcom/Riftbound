@@ -223,8 +223,13 @@ impl CharacterController {
         let world_x = x * cos_yaw + z * sin_yaw;
         let world_z = -x * sin_yaw + z * cos_yaw;
         let has_input = magnitude_squared > f32::EPSILON;
-        let target_x = world_x * self.config.max_speed;
-        let target_z = world_z * self.config.max_speed;
+        let speed_multiplier = if input.is_held(Button::Sprint) {
+            1.6
+        } else {
+            1.0
+        };
+        let target_x = world_x * self.config.max_speed * speed_multiplier;
+        let target_z = world_z * self.config.max_speed * speed_multiplier;
         let rate = if has_input {
             self.config.acceleration
         } else {
@@ -353,6 +358,31 @@ mod tests {
         let velocity = controller.velocity();
         let speed = (velocity.x * velocity.x + velocity.z * velocity.z).sqrt();
         assert!((speed - 4.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn sprint_increases_speed_and_releasing_it_returns_to_normal_speed() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        input.set_button(Button::Sprint, true);
+        for _ in 0..120 {
+            controller.update(&mut transform, &input, 1.0 / 60.0);
+        }
+        let sprint_speed = (controller.velocity().x.powi(2)
+            + controller.velocity().z.powi(2))
+        .sqrt();
+        assert!((sprint_speed - 7.2).abs() < 0.001);
+
+        input.set_button(Button::Sprint, false);
+        for _ in 0..120 {
+            controller.update(&mut transform, &input, 1.0 / 60.0);
+        }
+        let normal_speed = (controller.velocity().x.powi(2)
+            + controller.velocity().z.powi(2))
+        .sqrt();
+        assert!((normal_speed - 4.5).abs() < 0.001);
     }
 
     #[test]
