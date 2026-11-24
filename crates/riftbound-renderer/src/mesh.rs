@@ -82,6 +82,13 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-cube-mesh")
     }
 
+    /// Creates a compact cube LOD with shared corner vertices.
+    #[must_use]
+    pub fn cube_lod(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = cube_lod_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-cube-lod-mesh")
+    }
+
     /// Creates a low-poly pyramid mesh with a square base and four triangular sides.
     #[must_use]
     pub fn pyramid(device: &wgpu::Device) -> Option<Self> {
@@ -128,6 +135,26 @@ fn valid_index_data(vertex_count: usize, indices: &[u16]) -> bool {
         && indices
             .iter()
             .all(|index| usize::from(*index) < vertex_count)
+}
+
+fn cube_lod_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let color = [0.12, 0.48, 0.82];
+    let vertices = vec![
+        MeshVertex { position: [-1.0, -1.0, -1.0], color },
+        MeshVertex { position: [1.0, -1.0, -1.0], color },
+        MeshVertex { position: [1.0, 1.0, -1.0], color },
+        MeshVertex { position: [-1.0, 1.0, -1.0], color },
+        MeshVertex { position: [-1.0, -1.0, 1.0], color },
+        MeshVertex { position: [1.0, -1.0, 1.0], color },
+        MeshVertex { position: [1.0, 1.0, 1.0], color },
+        MeshVertex { position: [-1.0, 1.0, 1.0], color },
+    ];
+    let indices = vec![
+        4, 5, 6, 4, 6, 7, 1, 0, 3, 1, 3, 2,
+        5, 1, 2, 5, 2, 6, 0, 4, 7, 0, 7, 3,
+        7, 6, 2, 7, 2, 3, 0, 1, 5, 0, 5, 4,
+    ];
+    (vertices, indices)
 }
 
 fn pyramid_data() -> (Vec<MeshVertex>, Vec<u16>) {
@@ -306,6 +333,17 @@ fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cube_lod_preserves_cube_topology_with_fewer_vertices() {
+        let (vertices, indices) = cube_lod_data();
+        assert_eq!(vertices.len(), 8);
+        assert_eq!(indices.len(), 36);
+        assert!(valid_index_data(vertices.len(), &indices));
+        assert!(vertices.iter().all(|vertex| {
+            vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+        }));
+    }
 
     #[test]
     fn pyramid_has_valid_indexed_triangles() {
