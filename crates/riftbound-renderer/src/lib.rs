@@ -452,9 +452,11 @@ mod tests {
         assert_eq!(instances.len(), 3);
         assert_ne!(instances[0].model, instances[1].model);
         assert_ne!(instances[1].model, instances[2].model);
-        assert!(instances.iter().all(|instance| {
-            instance.model.iter().all(|component| component.is_finite())
-        }));
+        assert!(
+            instances
+                .iter()
+                .all(|instance| { instance.model.iter().all(|component| component.is_finite()) })
+        );
         assert_eq!(instance_bytes(&instances).len(), instances.len() * 64);
     }
 
