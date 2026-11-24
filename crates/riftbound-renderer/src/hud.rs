@@ -80,13 +80,37 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         (f32::from(collected) / f32::from(total)).clamp(0.0, 1.0)
     };
     rect(out, 38.0, 86.0, 270.0 * ratio, 9.0, cyan, width, height);
-    text(out, &format!("HEALTH {}/{}", data.health, data.max_health), 38.0, 112.0, 1.5, white, width, height);
+    text(
+        out,
+        &format!("HEALTH {}/{}", data.health, data.max_health),
+        38.0,
+        112.0,
+        1.5,
+        white,
+        width,
+        height,
+    );
     rect(out, 38.0, 136.0, 270.0, 8.0, muted, width, height);
-    let health_ratio = if data.max_health == 0 { 0.0 } else {
+    let health_ratio = if data.max_health == 0 {
+        0.0
+    } else {
         (f32::from(data.health.min(data.max_health)) / f32::from(data.max_health)).clamp(0.0, 1.0)
     };
-    let health_color = if health_ratio <= 0.25 { [1.0, 0.28, 0.22, 1.0] } else { cyan };
-    rect(out, 38.0, 136.0, 270.0 * health_ratio, 8.0, health_color, width, height);
+    let health_color = if health_ratio <= 0.25 {
+        [1.0, 0.28, 0.22, 1.0]
+    } else {
+        cyan
+    };
+    rect(
+        out,
+        38.0,
+        136.0,
+        270.0 * health_ratio,
+        8.0,
+        health_color,
+        width,
+        height,
+    );
     text(out, &data.status, 38.0, 154.0, 1.5, white, width, height);
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
