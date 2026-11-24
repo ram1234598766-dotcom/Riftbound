@@ -97,6 +97,8 @@ impl WorldChunkStreamer {
     /// Creates a streamer with a bounded, pre-reserved active list.
     #[must_use]
     pub fn new(config: WorldChunkConfig) -> Self {
+        let config = WorldChunkConfig::new(config.detailed_radius, config.active_radius)
+            .unwrap_or_default();
         let mut active = Vec::with_capacity(config.max_active_chunks());
         active.clear();
         Self {
@@ -135,10 +137,18 @@ impl WorldChunkStreamer {
         }
         let chunk_x = (world_x / WORLD_CHUNK_SIZE).floor();
         let chunk_z = (world_z / WORLD_CHUNK_SIZE).floor();
-        let margin = f32::from(
-            i16::try_from(self.config.active_radius)
-                .expect("validated chunk radius fits the sampler coordinate type"),
-        );
+        let margin = match self.config.active_radius {
+            0 => 0.0,
+            1 => 1.0,
+            2 => 2.0,
+            3 => 3.0,
+            4 => 4.0,
+            5 => 5.0,
+            6 => 6.0,
+            7 => 7.0,
+            8 => 8.0,
+            _ => return false,
+        };
         if chunk_x < f32::from(i16::MIN) + margin
             || chunk_x > f32::from(i16::MAX) - margin
             || chunk_z < f32::from(i16::MIN) + margin
@@ -171,8 +181,7 @@ impl WorldChunkStreamer {
                         z: focus.z + z_offset,
                     },
                     lod,
-                    distance_squared: u32::try_from(distance * distance)
-                        .expect("bounded chunk radius squared fits u32"),
+                    distance_squared: u32::try_from(distance * distance).unwrap_or_default(),
                 });
             }
         }
