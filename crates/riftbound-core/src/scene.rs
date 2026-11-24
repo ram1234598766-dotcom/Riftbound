@@ -2,13 +2,41 @@
 
 use crate::{EntityArena, EntityId, Transform3};
 
-/// One live scene object, its local transform, and optional parent.
+/// Stable index identifying a renderer mesh asset.
+///
+/// Mesh IDs are assigned by the renderer's asset registry. The core crate stores
+/// the identifier without depending on GPU resources.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct MeshId(u32);
+
+impl MeshId {
+    /// Built-in cube mesh used by ordinary scene spawns.
+    pub const CUBE: Self = Self(0);
+    /// Built-in pyramid mesh used by the starter scene.
+    pub const PYRAMID: Self = Self(1);
+
+    /// Creates an ID for an entry in the renderer's mesh registry.
+    #[must_use]
+    pub const const fn new(index: u32) -> Self {
+        Self(index)
+    }
+
+    /// Returns the registry index represented by this ID.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// One live scene object, its mesh, local transform, and optional parent.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SceneObject {
     /// Generational identity of this object.
     pub id: EntityId,
     /// Transform relative to its parent (or world space when unparented).
     pub transform: Transform3,
+    /// Renderer mesh asset used to draw this object.
+    pub mesh: MeshId,
     /// Optional parent object.
     pub parent: Option<EntityId>,
 }
@@ -32,13 +60,28 @@ impl Scene {
 
     /// Adds an unparented object with the supplied local transform.
     pub fn spawn(&mut self, transform: Transform3) -> Option<EntityId> {
+        self.spawn_with_mesh(transform, MeshId::CUBE)
+    }
+
+    /// Adds an unparented object using an explicitly selected mesh asset.
+    pub fn spawn_with_mesh(&mut self, transform: Transform3, mesh: MeshId) -> Option<EntityId> {
         let id = self.entities.spawn()?;
         self.objects.push(SceneObject {
             id,
             transform,
+            mesh,
             parent: None,
         });
         Some(id)
+    }
+
+    /// Changes the mesh asset assigned to a live object.
+    pub fn set_mesh(&mut self, id: EntityId, mesh: MeshId) -> bool {
+        let Some(object) = self.objects.iter_mut().find(|object| object.id == id) else {
+            return false;
+        };
+        object.mesh = mesh;
+        true
     }
 
     /// Removes an object and detaches its direct children.
@@ -218,6 +261,21 @@ mod tests {
         assert!(scene.is_empty());
         assert_eq!(scene.get(id), None);
         assert!(!scene.despawn(id));
+    }
+
+    #[test]
+    fn objects_default_to_cube_and_can_select_another_mesh() {
+        let mut scene = Scene::new();
+        let cube = scene.spawn(Transform3::IDENTITY).expect("cube ID");
+        let pyramid = scene
+            .spawn_with_mesh(Transform3::IDENTITY, MeshId::PYRAMID)
+            .expect("pyramid ID");
+        assert_eq!(scene.iter().find(|object| object.id == cube).unwrap().mesh, MeshId::CUBE);
+        assert_eq!(scene.iter().find(|object| object.id == pyramid).unwrap().mesh, MeshId::PYRAMID);
+        assert!(scene.set_mesh(cube, MeshId::PYRAMID));
+        assert_eq!(scene.iter().find(|object| object.id == cube).unwrap().mesh, MeshId::PYRAMID);
+        assert!(scene.despawn(cube));
+        assert!(!scene.set_mesh(cube, MeshId::CUBE));
     }
 
     #[test]
