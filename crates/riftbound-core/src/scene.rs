@@ -28,7 +28,32 @@ impl MeshId {
     }
 }
 
-/// One live scene object, its mesh, local transform, and optional parent.
+/// Stable identifier for a renderer material preset.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct MaterialId(u32);
+
+impl MaterialId {
+    /// Neutral material that preserves mesh vertex colors.
+    pub const DEFAULT: Self = Self(0);
+    /// Cool cyan material tint for rift structures.
+    pub const RIFT: Self = Self(1);
+    /// Warm amber material tint for highlights and props.
+    pub const AMBER: Self = Self(2);
+
+    /// Creates an ID for a renderer material preset.
+    #[must_use]
+    pub const fn new(index: u32) -> Self {
+        Self(index)
+    }
+
+    /// Returns the renderer material-preset index.
+    #[must_use]
+    pub const fn index(self) -> u32 {
+        self.0
+    }
+}
+
+/// One live scene object, its mesh, material, local transform, and optional parent.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SceneObject {
     /// Generational identity of this object.
@@ -37,6 +62,8 @@ pub struct SceneObject {
     pub transform: Transform3,
     /// Renderer mesh asset used to draw this object.
     pub mesh: MeshId,
+    /// Renderer material preset used to shade this object.
+    pub material: MaterialId,
     /// Optional parent object.
     pub parent: Option<EntityId>,
 }
@@ -70,6 +97,7 @@ impl Scene {
             id,
             transform,
             mesh,
+            material: MaterialId::DEFAULT,
             parent: None,
         });
         Some(id)
@@ -81,6 +109,15 @@ impl Scene {
             return false;
         };
         object.mesh = mesh;
+        true
+    }
+
+    /// Changes the material preset assigned to a live object.
+    pub fn set_material(&mut self, id: EntityId, material: MaterialId) -> bool {
+        let Some(object) = self.objects.iter_mut().find(|object| object.id == id) else {
+            return false;
+        };
+        object.material = material;
         true
     }
 
@@ -287,6 +324,11 @@ mod tests {
             MeshId::PYRAMID
         );
         assert!(scene.set_mesh(cube, MeshId::PYRAMID));
+        assert!(scene.set_material(cube, MaterialId::RIFT));
+        assert_eq!(
+            scene.iter().find(|object| object.id == cube).expect("cube remains live").material,
+            MaterialId::RIFT
+        );
         assert_eq!(
             scene
                 .iter()
@@ -297,6 +339,7 @@ mod tests {
         );
         assert!(scene.despawn(cube));
         assert!(!scene.set_mesh(cube, MeshId::CUBE));
+        assert!(!scene.set_material(cube, MaterialId::DEFAULT));
     }
 
     #[test]
