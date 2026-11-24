@@ -16,8 +16,14 @@ impl MeshId {
     pub const PYRAMID: Self = Self(1);
     /// Faceted octahedral crystal mesh for rift landmarks.
     pub const CRYSTAL: Self = Self(2);
-    /// Subdivided vertex-coloured ground surface for terrain rendering.
-    pub const TERRAIN: Self = Self(3);
+    /// North-west terrain quadrant.
+    pub const TERRAIN_NW: Self = Self(3);
+    /// North-east terrain quadrant.
+    pub const TERRAIN_NE: Self = Self(4);
+    /// South-west terrain quadrant.
+    pub const TERRAIN_SW: Self = Self(5);
+    /// South-east terrain quadrant.
+    pub const TERRAIN_SE: Self = Self(6);
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
