@@ -482,11 +482,13 @@ mod tests {
             slots.slots()[retained].expect("origin slot remains occupied").coord,
             WorldChunkCoord { x: 0, z: 0 }
         );
-        assert!(slots
-            .slots()
-            .iter()
-            .flatten()
-            .any(|request| request.coord == WorldChunkCoord { x: 3, z: 0 }));
+        assert!(
+            slots
+                .slots()
+                .iter()
+                .flatten()
+                .any(|request| request.coord == WorldChunkCoord { x: 3, z: 0 })
+        );
     }
 
     #[test]
