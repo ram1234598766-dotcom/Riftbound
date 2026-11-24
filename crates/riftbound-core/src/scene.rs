@@ -253,7 +253,11 @@ mod tests {
         assert!(scene.despawn(second));
         assert!(!scene.set_parent(first, Some(second)));
         assert_eq!(
-            scene.iter().find(|object| object.id == first).expect("first live").parent,
+            scene
+                .iter()
+                .find(|object| object.id == first)
+                .expect("first live")
+                .parent,
             None
         );
     }
