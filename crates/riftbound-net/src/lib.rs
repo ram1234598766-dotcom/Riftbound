@@ -181,73 +181,84 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else {
             continue;
         };
-        match input.kind.as_str() {
-            "move" => {
-                let (Some(dx), Some(dy), Some(face)) = (input.dx, input.dy, input.face) else {
-                    continue;
-                };
-                if !dx.is_finite() || !dy.is_finite() || !face.is_finite() {
-                    continue;
-                }
-                let magnitude = dx.hypot(dy);
-                if magnitude > 1.01 {
-                    continue;
-                }
-                let elapsed = last_input_at.elapsed().as_secs_f32().min(MAX_INPUT_DELTA);
-                last_input_at = Instant::now();
-                let mut players = state.players.lock().await;
-                if let Some(player) = players.get_mut(&id) {
-                    let scale = if magnitude > 1.0 {
-                        1.0 / magnitude
-                    } else {
-                        1.0
-                    };
-                    player.x = clamp_world_position(
-                        player.x + dx * scale * PLAYER_SPEED * elapsed,
-                        WORLD_WIDTH,
-                    );
-                    player.y = clamp_world_position(
-                        player.y + dy * scale * PLAYER_SPEED * elapsed,
-                        WORLD_HEIGHT,
-                    );
-                    player.face = face;
-                }
-            }
-            "collect" => {
-                let Some(index) = input.shard else {
-                    continue;
-                };
-                let players = state.players.lock().await;
-                let Some(player) = players.get(&id) else {
-                    continue;
-                };
-                if index >= SHARD_POSITIONS.len() || !within_pickup_range(player.x, player.y, index)
-                {
-                    continue;
-                }
-                drop(players);
-                state.shards.lock().await[index] = true;
-            }
-            "extract" => {
-                let players = state.players.lock().await;
-                let Some(player) = players.get(&id) else {
-                    continue;
-                };
-                let in_range = within_extraction_range(player.x, player.y);
-                drop(players);
-                let all_collected = state.shards.lock().await.iter().all(|taken| *taken);
-                if all_collected && in_range {
-                    *state.extracted.lock().await = true;
-                }
-            }
-            _ => continue,
+        if handle_client_message(&state, id, input, &mut last_input_at).await {
+            publish_snapshot(&state).await;
         }
-        publish_snapshot(&state).await;
     }
 
     state.players.lock().await.remove(&id);
     publish_snapshot(&state).await;
     writer.abort();
+}
+
+async fn handle_client_message(
+    state: &HostState,
+    id: u64,
+    input: ClientMessage,
+    last_input_at: &mut Instant,
+) -> bool {
+    match input.kind.as_str() {
+        "move" => {
+            let (Some(dx), Some(dy), Some(face)) = (input.dx, input.dy, input.face) else {
+                continue;
+            };
+            if !dx.is_finite() || !dy.is_finite() || !face.is_finite() {
+                continue;
+            }
+            let magnitude = dx.hypot(dy);
+            if magnitude > 1.01 {
+                continue;
+            }
+            let elapsed = last_input_at.elapsed().as_secs_f32().min(MAX_INPUT_DELTA);
+            last_input_at = Instant::now();
+            let mut players = state.players.lock().await;
+            if let Some(player) = players.get_mut(&id) {
+                let scale = if magnitude > 1.0 {
+                    1.0 / magnitude
+                } else {
+                    1.0
+                };
+                player.x = clamp_world_position(
+                    player.x + dx * scale * PLAYER_SPEED * elapsed,
+                    WORLD_WIDTH,
+                );
+                player.y = clamp_world_position(
+                    player.y + dy * scale * PLAYER_SPEED * elapsed,
+                    WORLD_HEIGHT,
+                );
+                player.face = face;
+            }
+        }
+        "collect" => {
+            let Some(index) = input.shard else {
+                continue;
+            };
+            let players = state.players.lock().await;
+            let Some(player) = players.get(&id) else {
+                continue;
+            };
+            if index >= SHARD_POSITIONS.len() || !within_pickup_range(player.x, player.y, index)
+            {
+                continue;
+            }
+            drop(players);
+            state.shards.lock().await[index] = true;
+        }
+        "extract" => {
+            let players = state.players.lock().await;
+            let Some(player) = players.get(&id) else {
+                continue;
+            };
+            let in_range = within_extraction_range(player.x, player.y);
+            drop(players);
+            let all_collected = state.shards.lock().await.iter().all(|taken| *taken);
+            if all_collected && in_range {
+                *state.extracted.lock().await = true;
+            }
+        }
+        _ => continue,
+    }
+    publish_snapshot(&state).await;
 }
 
 async fn publish_snapshot(state: &HostState) {
