@@ -583,6 +583,7 @@ impl Renderer {
 
     /// Rebuilds visible instance lists only when the camera or scene changes.
     /// CPU staging vectors and GPU buffers are retained between updates.
+    #[allow(clippy::too_many_lines)]
     fn update_visible_instance_buffers(&mut self) {
         let camera = camera_bytes(
             self.config.width,
