@@ -9,7 +9,9 @@ pub struct PlayerHealth {
 }
 
 impl Default for PlayerHealth {
-    fn default() -> Self { Self::new(100) }
+    fn default() -> Self {
+        Self::new(100)
+    }
 }
 
 impl PlayerHealth {
@@ -17,7 +19,11 @@ impl PlayerHealth {
     #[must_use]
     pub const fn new(maximum: u8) -> Self {
         let maximum = if maximum == 0 { 1 } else { maximum };
-        Self { current: maximum, maximum, protection_remaining: 0.0 }
+        Self {
+            current: maximum,
+            maximum,
+            protection_remaining: 0.0,
+        }
     }
 
     /// Current health points.
