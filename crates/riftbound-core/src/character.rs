@@ -23,11 +23,32 @@ impl Default for MovementConfig {
     }
 }
 
-/// Converts logical input into smooth horizontal movement.
+/// Tunable vertical movement parameters.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VerticalMotionConfig {
+    /// Downward acceleration in world units per second squared.
+    pub gravity: f32,
+    /// Initial upward velocity when a grounded jump begins.
+    pub jump_speed: f32,
+}
+
+impl Default for VerticalMotionConfig {
+    fn default() -> Self {
+        Self {
+            gravity: 22.0,
+            jump_speed: 7.2,
+        }
+    }
+}
+
+/// Converts logical input into smooth horizontal and vertical movement.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CharacterController {
     velocity: Vec3,
+    vertical_velocity: f32,
+    grounded: bool,
     config: MovementConfig,
+    vertical_config: VerticalMotionConfig,
 }
 
 impl Default for CharacterController {
@@ -42,7 +63,84 @@ impl CharacterController {
     pub const fn new(config: MovementConfig) -> Self {
         Self {
             velocity: Vec3::new(0.0, 0.0, 0.0),
+            vertical_velocity: 0.0,
+            grounded: false,
             config,
+            vertical_config: VerticalMotionConfig {
+                gravity: 22.0,
+                jump_speed: 7.2,
+            },
+        }
+    }
+
+    /// Creates a controller with explicit horizontal and vertical movement settings.
+    #[must_use]
+    pub const fn with_vertical_config(
+        config: MovementConfig,
+        vertical_config: VerticalMotionConfig,
+    ) -> Self {
+        Self {
+            velocity: Vec3::new(0.0, 0.0, 0.0),
+            vertical_velocity: 0.0,
+            grounded: false,
+            config,
+            vertical_config,
+        }
+    }
+
+    /// Current vertical velocity.
+    #[must_use]
+    pub const fn vertical_velocity(&self) -> f32 {
+        self.vertical_velocity
+    }
+
+    /// Whether the character is standing on the configured ground plane.
+    #[must_use]
+    pub const fn is_grounded(&self) -> bool {
+        self.grounded
+    }
+
+    /// Advances jumping and gravity relative to the character's ground-center height.
+    pub fn update_vertical(
+        &mut self,
+        transform: &mut Transform3,
+        input: &InputState,
+        delta_seconds: f32,
+        ground_height: f32,
+    ) {
+        if !delta_seconds.is_finite()
+            || delta_seconds <= 0.0
+            || !ground_height.is_finite()
+            || !self.vertical_config.gravity.is_finite()
+            || self.vertical_config.gravity < 0.0
+            || !self.vertical_config.jump_speed.is_finite()
+            || self.vertical_config.jump_speed <= 0.0
+        {
+            return;
+        }
+
+        let delta = delta_seconds.min(0.1);
+        if transform.translation.y <= ground_height + 0.0001 && self.vertical_velocity <= 0.0 {
+            transform.translation.y = ground_height;
+            self.vertical_velocity = 0.0;
+            self.grounded = true;
+        } else {
+            self.grounded = false;
+        }
+
+        if self.grounded && input.was_pressed(Button::Jump) {
+            self.vertical_velocity = self.vertical_config.jump_speed;
+            self.grounded = false;
+        }
+
+        if !self.grounded {
+            self.vertical_velocity -= self.vertical_config.gravity * delta;
+            transform.translation.y += self.vertical_velocity * delta;
+            if transform.translation.y <= ground_height {
+                transform.translation.y = ground_height;
+                self.vertical_velocity = 0.0;
+                self.grounded = true;
+            }
         }
     }
 
@@ -164,5 +262,65 @@ mod tests {
         controller.update(&mut transform, &input, f32::NAN);
         assert_eq!(transform, Transform3::IDENTITY);
         assert_eq!(controller.velocity(), Vec3::new(0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn jump_applies_upward_velocity_only_while_grounded() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert!(controller.is_grounded());
+
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert!(!controller.is_grounded());
+        assert!(controller.vertical_velocity() > 0.0);
+        assert!(transform.translation.y > 0.2);
+
+        input.begin_frame();
+        let velocity = controller.vertical_velocity();
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert!(controller.vertical_velocity() < velocity);
+    }
+
+    #[test]
+    fn jump_lands_on_ground_and_resets_vertical_velocity() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        input.begin_frame();
+
+        for _ in 0..120 {
+            controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        }
+
+        assert!(controller.is_grounded());
+        assert!((transform.translation.y - 0.2).abs() < 0.0001);
+        assert_eq!(controller.vertical_velocity(), 0.0);
+    }
+
+    #[test]
+    fn airborne_character_cannot_double_jump() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        input.begin_frame();
+
+        for _ in 0..5 {
+            controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        }
+        let velocity = controller.vertical_velocity();
+        input.set_button(Button::Jump, false);
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+
+        assert!(controller.vertical_velocity() < velocity);
     }
 }
