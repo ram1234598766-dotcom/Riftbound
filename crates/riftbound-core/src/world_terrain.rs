@@ -55,6 +55,66 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     WorldTerrainSample { height, surface }
 }
 
+/// Samples the dominant world surface beneath all four tyre contact points.
+///
+/// The centre surface wins ties, keeping handling stable when a vehicle straddles
+/// a road edge. This uses the same wheel-space convention as suspension sampling.
+#[must_use]
+pub fn world_terrain_vehicle_surface(
+    world_x: f32,
+    world_z: f32,
+    heading: f32,
+    half_track: f32,
+    half_wheelbase: f32,
+) -> VehicleSurface {
+    if !world_x.is_finite()
+        || !world_z.is_finite()
+        || !heading.is_finite()
+        || !half_track.is_finite()
+        || !half_wheelbase.is_finite()
+        || half_track <= 0.0
+        || half_wheelbase <= 0.0
+    {
+        return VehicleSurface::Rock;
+    }
+
+    let (sin_heading, cos_heading) = heading.sin_cos();
+    let mut counts = [0_u8; 6];
+    for local_x in [-half_track, half_track] {
+        for local_z in [-half_wheelbase, half_wheelbase] {
+            let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
+            let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
+            let surface = world_terrain_sample(contact_x, contact_z).surface;
+            counts[surface_index(surface)] += 1;
+        }
+    }
+
+    let center_surface = world_terrain_sample(world_x, world_z).surface;
+    let dominant_count = counts.iter().copied().max().unwrap_or(0);
+    if counts[surface_index(center_surface)] == dominant_count {
+        return center_surface;
+    }
+    match counts.iter().position(|count| *count == dominant_count) {
+        Some(0) => VehicleSurface::Asphalt,
+        Some(1) => VehicleSurface::Gravel,
+        Some(2) => VehicleSurface::Mud,
+        Some(3) => VehicleSurface::Sand,
+        Some(4) => VehicleSurface::Snow,
+        Some(_) | None => VehicleSurface::Rock,
+    }
+}
+
+const fn surface_index(surface: VehicleSurface) -> usize {
+    match surface {
+        VehicleSurface::Asphalt => 0,
+        VehicleSurface::Gravel => 1,
+        VehicleSurface::Mud => 2,
+        VehicleSurface::Sand => 3,
+        VehicleSurface::Snow => 4,
+        VehicleSurface::Rock => 5,
+    }
+}
+
 // Input coordinates are bounded by world_terrain_sample before reaching this helper.
 #[allow(clippy::cast_possible_truncation)]
 fn value_noise(sample_x: f32, sample_z: f32) -> f32 {
@@ -131,6 +191,42 @@ mod tests {
         assert_eq!(
             world_terrain_sample(-800.0, 0.0).surface,
             VehicleSurface::Mud
+        );
+    }
+
+    #[test]
+    fn world_vehicle_surface_uses_four_wheel_contacts_across_biomes() {
+        assert_eq!(
+            world_terrain_vehicle_surface(800.0, 0.0, 0.0, 0.3, 0.5),
+            VehicleSurface::Sand
+        );
+        assert_eq!(
+            world_terrain_vehicle_surface(-800.0, 0.0, 0.0, 0.3, 0.5),
+            VehicleSurface::Mud
+        );
+        assert_eq!(
+            world_terrain_vehicle_surface(0.0, -800.0, 0.0, 0.3, 0.5),
+            VehicleSurface::Snow
+        );
+    }
+
+    #[test]
+    fn world_vehicle_surface_ties_favor_the_center_surface() {
+        assert_eq!(
+            world_terrain_vehicle_surface(2.5, 0.0, 0.0, 0.78, 1.32),
+            VehicleSurface::Gravel
+        );
+    }
+
+    #[test]
+    fn invalid_world_vehicle_surface_inputs_fall_back_to_rock() {
+        assert_eq!(
+            world_terrain_vehicle_surface(0.0, 0.0, f32::NAN, 0.8, 1.3),
+            VehicleSurface::Rock
+        );
+        assert_eq!(
+            world_terrain_vehicle_surface(0.0, 0.0, 0.0, 0.8, f32::INFINITY),
+            VehicleSurface::Rock
         );
     }
 
