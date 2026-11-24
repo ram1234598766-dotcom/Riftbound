@@ -1,6 +1,6 @@
 //! CPU mesh descriptions and their GPU vertex/index-buffer representation.
 
-use riftbound_core::{terrain_height, terrain_surface, VehicleSurface};
+use riftbound_core::{VehicleSurface, terrain_height, terrain_surface};
 use wgpu::util::DeviceExt;
 
 /// One position-and-color vertex in the renderer's standard mesh format.
@@ -252,7 +252,6 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-
 fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
     match surface {
         VehicleSurface::Asphalt => [0.20, 0.23, 0.28],
@@ -436,7 +435,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn terrain_surface_palette_distinguishes_all_driving_zones() {
         let colors = [
@@ -448,7 +446,11 @@ mod tests {
             terrain_surface_color(VehicleSurface::Rock),
         ];
         for color in colors {
-            assert!(color.iter().all(|component| (0.0..=1.0).contains(component)));
+            assert!(
+                color
+                    .iter()
+                    .all(|component| (0.0..=1.0).contains(component))
+            );
         }
         for (index, first) in colors.iter().enumerate() {
             for second in colors.iter().skip(index + 1) {
