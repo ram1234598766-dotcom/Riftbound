@@ -314,6 +314,39 @@ impl InstanceRaw {
     }
 }
 
+
+fn starter_scene() -> Scene {
+    let mut scene = Scene::new();
+    let objects = [
+        Transform3::new(
+            Vec3::new(-1.65, 0.0, 0.0),
+            Vec3::new(0.0, -0.25, 0.0),
+            Vec3::new(0.58, 0.58, 0.58),
+        ),
+        Transform3::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.15, 0.0),
+            Vec3::new(0.82, 0.82, 0.82),
+        ),
+        Transform3::new(
+            Vec3::new(1.65, 0.0, 0.0),
+            Vec3::new(0.0, 0.45, 0.0),
+            Vec3::new(0.58, 0.58, 0.58),
+        ),
+    ];
+    for transform in objects {
+        let _ = scene.spawn(transform);
+    }
+    scene
+}
+
+fn scene_instances(scene: &Scene) -> Vec<InstanceRaw> {
+    scene
+        .iter()
+        .map(|object| InstanceRaw::from_transform(object.transform))
+        .collect()
+}
+
 fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(instances.len() * 64);
     for instance in instances {
