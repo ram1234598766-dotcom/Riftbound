@@ -20,7 +20,7 @@ The browser mission is an early playable vertical slice, not the final open-worl
 
 Launching the native Riftbound runtime also starts a local HTTP/WebSocket host on TCP port 7878. The host binds to all network interfaces so devices on the same trusted Wi-Fi/LAN can join without installing an app.
 
-1. Build and launch the native runtime on the PC.
+1. Install Rust and launch the native runtime from the repository with `cargo run -p riftbound-runtime`.
 2. Read the LAN URL printed in the runtime log (for example, `http://192.168.1.20:7878`).
 3. Open that URL in a PC browser or on a phone/tablet connected to the same Wi-Fi.
 4. If the phone cannot connect, allow the Riftbound executable through the PC firewall for private networks and check that the router does not isolate wireless clients.
