@@ -626,8 +626,7 @@ mod tests {
         }
         let base_vertex_count = 25;
         assert!(distant.0[base_vertex_count..].chunks_exact(4).all(|skirt| {
-            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
-                < 1.0e-4
+            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs() < 1.0e-4
                 && (skirt[2].position[1] - skirt[3].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
                     < 1.0e-4
         }));
