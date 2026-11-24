@@ -242,3 +242,7 @@ The core now includes a CPU-side `WorldChunkStreamer` that maps an absolute play
 ### World terrain LOD seam protection
 
 World-scale detailed and distant chunks now add a bounded vertical skirt along all four mesh borders. The skirts extend 12 world units below each chunk's sampled edge and are generated from the chunk's own edge profile, masking cracks when a detailed 9×9 chunk borders a distant 5×5 chunk whose intermediate edge heights differ. Tests validate the added geometry counts, finite vertex data, valid triangle indices, and skirt depth for both LOD tiers. This is a seam-mitigation foundation rather than a complete terrain stitching system: skirt visibility and depth still need visual validation in the live renderer, and skirts do not replace future neighbor-aware transition meshes for close-up terrain.
+
+### Reusable renderer slot allocation for streamed chunks
+
+Added a fixed-capacity `WorldChunkSlotMap` alongside the CPU chunk planner. It retains a stable slot for chunks that remain active, preserves that slot when only the LOD changes, releases slots for evicted coordinates, and reuses released slots for incoming chunks. Change application validates removals, updates, duplicate additions, and capacity before mutation so an invalid delta cannot partially corrupt the mapping. The default 5×5 window reserves exactly 25 slots. This is the renderer-facing allocation contract; GPU mesh creation, replacement, eviction, and native runtime wiring are still pending.
