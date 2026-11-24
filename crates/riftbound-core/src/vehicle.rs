@@ -163,7 +163,12 @@ impl VehicleState {
             config.max_forward_speed * surface.speed_factor(),
         );
 
-        let speed_fraction = (self.speed.abs() / config.max_forward_speed).clamp(0.0, 1.0);
+        let speed_limit = if self.speed < 0.0 {
+            config.max_reverse_speed
+        } else {
+            config.max_forward_speed
+        };
+        let speed_fraction = (self.speed.abs() / speed_limit).clamp(0.0, 1.0);
         self.heading +=
             steering * config.steering_rate * grip * speed_fraction * self.speed.signum() * dt;
         self.position.x += self.heading.sin() * self.speed * dt;
@@ -252,6 +257,44 @@ mod tests {
             f32::NAN,
         );
         assert_eq!(vehicle, VehicleState::default());
+    }
+
+
+    #[test]
+    fn reverse_steering_uses_reverse_speed_scale() {
+        let mut vehicle = VehicleState {
+            speed: -7.0,
+            ..VehicleState::default()
+        };
+        vehicle.update(
+            VehicleInput {
+                steering: 1.0,
+                ..VehicleInput::default()
+            },
+            VehicleSurface::Asphalt,
+            VehicleConfig::default(),
+            0.1,
+        );
+        let expected = VehicleConfig::default().steering_rate * 0.1;
+        assert!((vehicle.heading - expected).abs() < 0.0001);
+    }
+
+    #[test]
+    fn reverse_speed_is_limited_independently_from_forward_speed() {
+        let mut vehicle = VehicleState::default();
+        for _ in 0..200 {
+            vehicle.update(
+                VehicleInput {
+                    throttle: -1.0,
+                    ..VehicleInput::default()
+                },
+                VehicleSurface::Asphalt,
+                VehicleConfig::default(),
+                0.1,
+            );
+        }
+        assert!(vehicle.speed >= -VehicleConfig::default().max_reverse_speed);
+        assert!(vehicle.speed < 0.0);
     }
 
     #[test]
