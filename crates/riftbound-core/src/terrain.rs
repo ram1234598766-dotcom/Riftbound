@@ -6,8 +6,8 @@
 /// its perimeter so it meets the arena boundary cleanly.
 #[must_use]
 pub fn terrain_height(world_x: f32, world_z: f32) -> f32 {
-    let u = (world_x / 10.0 + 1.0) * 0.5;
-    let v = (world_z / 10.0 + 1.0) * 0.5;
+    let u = f32::midpoint(world_x / 10.0, 1.0);
+    let v = f32::midpoint(world_z / 10.0, 1.0);
     if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
         return 0.0;
     }
@@ -31,8 +31,8 @@ mod tests {
 
     #[test]
     fn terrain_height_is_finite_and_bounded() {
-        for step in -100..=100 {
-            let coordinate = step as f32 / 10.0;
+        for step in -100_i16..=100 {
+            let coordinate = f32::from(step) / 10.0;
             let height = terrain_height(coordinate, -coordinate);
             assert!(height.is_finite());
             assert!(height.abs() <= 0.075);
