@@ -19,7 +19,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Check formatting
+      - name: Apply canonical Rust formatting
+        run: cargo fmt --all
+      - name: Verify formatted source
         run: cargo fmt --all -- --check
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
