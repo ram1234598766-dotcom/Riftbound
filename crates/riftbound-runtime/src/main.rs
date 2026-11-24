@@ -735,6 +735,59 @@ fn build_arena(scene: &mut Scene) {
         Vec3::new(0.12, 0.07, 3.8),
         MaterialId::AMBER,
     );
+    build_arena_architecture(scene);
+}
+
+fn build_arena_architecture(scene: &mut Scene) {
+    // Repeating wall fins make the perimeter read as a constructed facility.
+    for z in [-5.0, 0.0, 5.0] {
+        for x in [-9.18, 9.18] {
+            spawn_box(
+                scene,
+                Vec3::new(x, 1.65, z),
+                Vec3::new(0.18, 3.3, 0.42),
+                MaterialId::AMBER,
+            );
+            spawn_box(
+                scene,
+                Vec3::new(x, 3.35, z),
+                Vec3::new(0.34, 0.12, 0.58),
+                MaterialId::RIFT,
+            );
+        }
+    }
+    for x in [-5.0, 0.0, 5.0] {
+        for z in [-9.18, 9.18] {
+            spawn_box(
+                scene,
+                Vec3::new(x, 1.65, z),
+                Vec3::new(0.42, 3.3, 0.18),
+                MaterialId::AMBER,
+            );
+        }
+    }
+
+    // A gateway marks the extraction approach while leaving its center open.
+    for x in [-2.15, 2.15] {
+        spawn_box(
+            scene,
+            Vec3::new(x, 1.65, -4.65),
+            Vec3::new(0.28, 3.3, 0.32),
+            MaterialId::RIFT,
+        );
+    }
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 3.32, -4.65),
+        Vec3::new(4.55, 0.28, 0.42),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 3.48, -4.65),
+        Vec3::new(3.4, 0.06, 0.46),
+        MaterialId::RIFT,
+    );
 }
 
 fn arena_collision_world() -> CollisionWorld {
