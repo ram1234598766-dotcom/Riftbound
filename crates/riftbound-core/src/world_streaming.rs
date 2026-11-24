@@ -209,10 +209,7 @@ mod tests {
         assert!(streamer.update_focus(1.0, 1.0));
         assert!(!streamer.update_focus(63.9, 12.0));
         assert!(streamer.update_focus(64.0, 12.0));
-        assert_eq!(
-            streamer.focus_chunk(),
-            Some(WorldChunkCoord { x: 1, z: 0 })
-        );
+        assert_eq!(streamer.focus_chunk(), Some(WorldChunkCoord { x: 1, z: 0 }));
     }
 
     #[test]
