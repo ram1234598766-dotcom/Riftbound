@@ -663,15 +663,7 @@ impl Renderer {
                 false
             };
 
-            let target_mesh = if use_low {
-                if object_mesh == 0 {
-                    CUBE_LOD_MESH_INDEX
-                } else {
-                    TERRAIN_LOD_BASE_INDEX + object_mesh - 3
-                }
-            } else {
-                object_mesh
-            };
+            let target_mesh = lod_target_mesh_index(object_mesh, use_low);
             let Some(batch) = self
                 .mesh_batches
                 .iter_mut()
@@ -867,6 +859,19 @@ fn create_mesh_batches(
         });
     }
     Ok(batches)
+}
+
+fn lod_target_mesh_index(object_mesh: usize, use_low: bool) -> usize {
+    if !use_low {
+        return object_mesh;
+    }
+    if object_mesh == 0 {
+        CUBE_LOD_MESH_INDEX
+    } else if (3..=6).contains(&object_mesh) {
+        TERRAIN_LOD_BASE_INDEX + object_mesh - 3
+    } else {
+        object_mesh
+    }
 }
 
 fn is_lod_batch_index(mesh_index: usize) -> bool {
@@ -1179,6 +1184,21 @@ fn normalize(value: [f32; 3]) -> [f32; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lod_batch_routing_preserves_high_detail_and_maps_compact_meshes() {
+        assert_eq!(lod_target_mesh_index(0, false), 0);
+        assert_eq!(lod_target_mesh_index(0, true), CUBE_LOD_MESH_INDEX);
+        for terrain_mesh in 3..=6 {
+            assert_eq!(lod_target_mesh_index(terrain_mesh, false), terrain_mesh);
+            assert_eq!(
+                lod_target_mesh_index(terrain_mesh, true),
+                TERRAIN_LOD_BASE_INDEX + terrain_mesh - 3
+            );
+        }
+        assert_eq!(lod_target_mesh_index(1, true), 1);
+        assert_eq!(lod_target_mesh_index(2, true), 2);
+    }
 
     #[test]
     fn every_lod_mesh_has_a_batch_even_when_initially_empty() {
