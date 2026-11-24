@@ -35,7 +35,7 @@ pub use mission::{MissionPhase, MissionProgress};
 pub use objective::{ObjectiveKind, ObjectiveProgress};
 pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
-pub use terrain::{terrain_height, terrain_surface};
+pub use terrain::{terrain_height, terrain_surface, terrain_vehicle_surface};
 pub use transform::Transform3;
 pub use vehicle::{
     SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
