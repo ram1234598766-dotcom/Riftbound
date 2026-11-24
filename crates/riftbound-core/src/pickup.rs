@@ -106,9 +106,61 @@ impl PickupTracker {
     }
 }
 
+
+/// A world-space zone that completes a mission after its prerequisites are met.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ExtractionZone {
+    position: Vec3,
+    radius: f32,
+}
+
+impl ExtractionZone {
+    /// Creates an extraction zone with finite coordinates and a positive radius.
+    #[must_use]
+    pub fn new(position: Vec3, radius: f32) -> Option<Self> {
+        let finite = position.x.is_finite()
+            && position.y.is_finite()
+            && position.z.is_finite()
+            && radius.is_finite();
+        (finite && radius > 0.0).then_some(Self { position, radius })
+    }
+
+    /// Whether an interaction at this position can complete the mission.
+    #[must_use]
+    pub fn can_extract(self, position: Vec3, interact_pressed: bool, prerequisites_met: bool) -> bool {
+        if !interact_pressed || !prerequisites_met
+            || !position.x.is_finite()
+            || !position.y.is_finite()
+            || !position.z.is_finite()
+        {
+            return false;
+        }
+        let dx = position.x - self.position.x;
+        let dy = position.y - self.position.y;
+        let dz = position.z - self.position.z;
+        dx * dx + dy * dy + dz * dz <= self.radius * self.radius
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extraction_requires_all_prerequisites_interaction_and_proximity() {
+        let zone = ExtractionZone::new(Vec3::new(0.0, 0.0, 0.0), 2.0).unwrap();
+        let player = Vec3::new(1.0, 0.0, 0.0);
+        assert!(!zone.can_extract(player, true, false));
+        assert!(!zone.can_extract(player, false, true));
+        assert!(!zone.can_extract(Vec3::new(4.0, 0.0, 0.0), true, true));
+        assert!(zone.can_extract(player, true, true));
+    }
+
+    #[test]
+    fn extraction_zone_rejects_invalid_data() {
+        assert!(ExtractionZone::new(Vec3::new(0.0, f32::NAN, 0.0), 1.0).is_none());
+        assert!(ExtractionZone::new(Vec3::new(0.0, 0.0, 0.0), -1.0).is_none());
+    }
 
     #[test]
     fn pickup_rejects_invalid_position_and_radius() {
