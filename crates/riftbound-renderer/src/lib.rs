@@ -5,9 +5,23 @@ use std::sync::Arc;
 use riftbound_core::{MaterialId, MeshId, Scene, Transform3, Vec3};
 use wgpu::util::DeviceExt;
 
+mod hud;
 mod mesh;
 
+use hud::{HudData, HudVertex};
 use mesh::{Mesh, MeshVertex};
+
+const HUD_SHADER: &str = r#"
+struct VertexInput { @location(0) position: vec2<f32>, @location(1) color: vec4<f32> };
+struct VertexOutput { @builtin(position) position: vec4<f32>, @location(0) color: vec4<f32> };
+@vertex fn vs_main(input: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.position = vec4<f32>(input.position, 0.0, 1.0);
+    out.color = input.color;
+    return out;
+}
+@fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> { return input.color; }
+"#;
 use winit::{event_loop::OwnedDisplayHandle, window::Window};
 
 const CUBE_SHADER: &str = include_str!("../shaders/cube.wgsl");
@@ -24,6 +38,8 @@ pub struct Renderer {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     cube_pipeline: wgpu::RenderPipeline,
+    hud_pipeline: wgpu::RenderPipeline,
+    hud_data: HudData,
     meshes: Vec<Mesh>,
     mesh_batches: Vec<MeshBatch>,
     scene: Scene,
@@ -100,6 +116,7 @@ impl Renderer {
         });
 
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
+        let hud_pipeline = create_hud_pipeline(&device, config.format);
         let meshes = vec![
             Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?,
             Mesh::pyramid(&device).ok_or("Failed to create the built-in pyramid mesh")?,
@@ -120,6 +137,8 @@ impl Renderer {
             camera_buffer,
             camera_bind_group,
             cube_pipeline,
+            hud_pipeline,
+            hud_data: HudData { collected: 0, total: 5, status: String::from("COLLECT RIFT SHARDS"), prompt: None },
             meshes,
             mesh_batches,
             scene,
@@ -281,7 +300,12 @@ impl Renderer {
         Ok(())
     }
 
-    /// Draws each indexed mesh batch with depth testing.
+    /// Updates the native mission HUD content.
+    pub fn set_hud(&mut self, data: HudData) {
+        self.hud_data = data;
+    }
+
+    /// Draws the world followed by a depth-independent 2D HUD overlay.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -349,6 +373,32 @@ impl Renderer {
                 pass.set_index_buffer(mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
                 pass.draw_indexed(0..mesh.index_count(), 0, 0..batch.instance_count);
             }
+        }
+        let hud_vertices = hud::build_vertices(&self.hud_data, self.config.width, self.config.height);
+        if !hud_vertices.is_empty() {
+            let mut bytes = Vec::with_capacity(hud_vertices.len() * 24);
+            for vertex in &hud_vertices {
+                for value in vertex.position.iter().chain(vertex.color.iter()) {
+                    bytes.extend_from_slice(&value.to_ne_bytes());
+                }
+            }
+            let hud_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("riftbound-hud-vertices"),
+                contents: &bytes,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("riftbound-hud-pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view, depth_slice: None, resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None, occlusion_query_set: None, multiview_mask: None,
+            });
+            pass.set_pipeline(&self.hud_pipeline);
+            pass.set_vertex_buffer(0, hud_buffer.slice(..));
+            pass.draw(0..u32::try_from(hud_vertices.len()).unwrap_or(0), 0..1);
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
@@ -491,6 +541,24 @@ fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
         }
     }
     bytes
+}
+
+fn create_hud_pipeline(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("riftbound-hud-shader"),
+        source: wgpu::ShaderSource::Wgsl(HUD_SHADER.into()),
+    });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("riftbound-hud-layout"), bind_group_layouts: &[], immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("riftbound-hud-pipeline"), layout: Some(&layout),
+        vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_main"), compilation_options: wgpu::PipelineCompilationOptions::default(), buffers: &[Some(HudVertex::layout())] },
+        primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleList, cull_mode: None, ..Default::default() },
+        depth_stencil: None, multisample: wgpu::MultisampleState::default(),
+        fragment: Some(wgpu::FragmentState { module: &shader, entry_point: Some("fs_main"), compilation_options: wgpu::PipelineCompilationOptions::default(), targets: &[Some(wgpu::ColorTargetState { format: surface_format, blend: Some(wgpu::BlendState::ALPHA_BLENDING), write_mask: wgpu::ColorWrites::ALL })] }),
+        multiview_mask: None, cache: None,
+    })
 }
 
 fn create_cube_pipeline(
