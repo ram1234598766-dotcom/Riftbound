@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use riftbound_core::{
     Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
-    MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3, terrain_height,
+    MaterialId, MeshId, MissionPhase, MissionProgress, Pickup, PickupTracker, Scene, Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -43,7 +43,7 @@ struct RiftboundApp {
     extraction: Option<ExtractionZone>,
     beacon_entity: Option<EntityId>,
     animation_time: f32,
-    mission_complete: bool,
+    mission: MissionProgress,
     lan_server_started: bool,
 }
 
@@ -103,12 +103,13 @@ impl ApplicationHandler for RiftboundApp {
                 self.player_parts = Some(player_parts);
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
+                self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
                 self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
                 self.extraction = Some(extraction);
                 self.beacon_entity = Some(beacon_entity);
                 self.animation_time = 0.0;
-                self.mission_complete = false;
+                self.mission = MissionProgress::new(0);
                 self.last_frame = Some(Instant::now());
             }
             Err(error) => {
@@ -130,7 +131,7 @@ impl ApplicationHandler for RiftboundApp {
         self.extraction = None;
         self.beacon_entity = None;
         self.animation_time = 0.0;
-        self.mission_complete = false;
+        self.mission = MissionProgress::new(0);
         self.last_frame = None;
         self.camera_target = Vec3::new(0.0, 0.0, 0.0);
         self.controller = CharacterController::default();
@@ -350,6 +351,7 @@ impl ApplicationHandler for RiftboundApp {
                                 transform.translation,
                                 self.input.was_pressed(Button::Interact),
                             );
+                            let collected_count = collected.len();
                             if !collected.is_empty() {
                                 let mut updated_scene = renderer.scene().clone();
                                 for index in collected {
@@ -362,32 +364,31 @@ impl ApplicationHandler for RiftboundApp {
                                     event_loop.exit();
                                     return;
                                 }
-                                let progress = if self.pickups.is_complete() {
+                                let unlocked = self.mission.record_collected(collected_count);
+                                let progress = if self.mission.extraction_unlocked() {
                                     format!(
                                         "RIFTBOUND — Return to extraction beacon ({}/{})",
-                                        self.pickups.collected(),
-                                        self.pickups.total(),
+                                        self.mission.collected(),
+                                        self.mission.total(),
                                     )
                                 } else {
                                     format!(
                                         "RIFTBOUND — Shards: {}/{}",
-                                        self.pickups.collected(),
-                                        self.pickups.total(),
+                                        self.mission.collected(),
+                                        self.mission.total(),
                                     )
                                 };
                                 window.set_title(&progress);
                                 log::info!("{progress}");
+                                if unlocked {
+                                    log::info!("All rift shards recovered; extraction is now unlocked");
+                                }
                             }
-                            if !self.mission_complete
-                                && self.extraction.is_some_and(|zone| {
-                                    zone.can_extract(
-                                        transform.translation,
-                                        self.input.was_pressed(Button::Interact),
-                                        self.pickups.is_complete(),
-                                    )
-                                })
-                            {
-                                self.mission_complete = true;
+                            let interact_pressed = self.input.was_pressed(Button::Interact);
+                            let inside_extraction = self.extraction.is_some_and(|zone| {
+                                zone.can_extract(transform.translation, true, true)
+                            });
+                            if self.mission.try_extract(interact_pressed, inside_extraction) {
                                 window.set_title("RIFTBOUND — Mission complete!");
                                 log::info!(
                                     "Shardfall mission completed: all shards recovered and extraction reached"
@@ -399,7 +400,7 @@ impl ApplicationHandler for RiftboundApp {
                                     .iter()
                                     .enumerate()
                                     .any(|(index, position)| {
-                                        self.pickups.collected() < self.pickups.total()
+                                        !self.mission.extraction_unlocked()
                                             && distance_squared(transform.translation, *position)
                                                 <= 1.7 * 1.7
                                             && self.pickup_entities.get(index).is_some_and(|id| {
@@ -409,18 +410,18 @@ impl ApplicationHandler for RiftboundApp {
                             let near_beacon =
                                 distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0))
                                     <= 1.9 * 1.9;
-                            let status = if self.mission_complete {
+                            let status = if self.mission.phase() == MissionPhase::Complete {
                                 "MISSION COMPLETE!"
-                            } else if self.pickups.is_complete() {
+                            } else if self.mission.extraction_unlocked() {
                                 "RETURN TO BEACON"
                             } else {
                                 "COLLECT RIFT SHARDS"
                             };
-                            let prompt = if self.mission_complete {
+                            let prompt = if self.mission.is_complete() {
                                 None
-                            } else if self.pickups.is_complete() && near_beacon {
+                            } else if self.mission.extraction_unlocked() && near_beacon {
                                 Some(String::from("F - EXTRACT"))
-                            } else if !self.pickups.is_complete() && near_pickup {
+                            } else if !self.mission.extraction_unlocked() && near_pickup {
                                 Some(String::from("F - COLLECT"))
                             } else {
                                 None
