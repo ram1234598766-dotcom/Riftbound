@@ -254,7 +254,8 @@ impl Renderer {
             return Ok(false);
         }
         self.changed_ids.clear();
-        self.changed_ids.extend(transforms.iter().map(|(id, _)| *id));
+        self.changed_ids
+            .extend(transforms.iter().map(|(id, _)| *id));
         for (id, transform) in transforms {
             if let Some(current) = self.scene.get_mut(*id) {
                 *current = *transform;
