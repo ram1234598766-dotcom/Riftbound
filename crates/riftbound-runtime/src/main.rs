@@ -127,15 +127,7 @@ impl ApplicationHandler for RiftboundApp {
                 }
                 if let PhysicalKey::Code(key) = event.physical_key {
                     if event.state == ElementState::Pressed {
-                        if let Some(renderer) = self.renderer.as_mut() {
-                            match key {
-                                KeyCode::KeyQ => renderer.orbit_camera(-0.12, 0.0),
-                                KeyCode::KeyE => renderer.orbit_camera(0.12, 0.0),
-                                KeyCode::Minus => renderer.zoom_camera(0.6),
-                                KeyCode::Equal => renderer.zoom_camera(-0.6),
-                                _ => {}
-                            }
-                        }
+                        update_camera_controls(self.renderer.as_mut(), key);
                     }
                     if let Some(button) = movement_button(key) {
                         self.input
@@ -296,6 +288,19 @@ fn arena_collision_world() -> CollisionWorld {
     world.add_obstacle(Aabb2::new(1.75, 3.25, 0.75, 2.25));
     world.add_obstacle(Aabb2::new(-1.0, 1.0, 3.25, 4.75));
     world
+}
+
+fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
+    let Some(renderer) = renderer else {
+        return;
+    };
+    match key {
+        KeyCode::KeyQ => renderer.orbit_camera(-0.12, 0.0),
+        KeyCode::KeyE => renderer.orbit_camera(0.12, 0.0),
+        KeyCode::Minus => renderer.zoom_camera(0.6),
+        KeyCode::Equal => renderer.zoom_camera(-0.6),
+        _ => {}
+    }
 }
 
 fn movement_button(key: KeyCode) -> Option<Button> {
