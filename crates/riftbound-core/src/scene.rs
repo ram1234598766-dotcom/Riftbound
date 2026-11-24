@@ -22,7 +22,10 @@ impl Scene {
     /// Creates an empty scene.
     #[must_use]
     pub const fn new() -> Self {
-        Self { entities: EntityArena::new(), objects: Vec::new() }
+        Self {
+            entities: EntityArena::new(),
+            objects: Vec::new(),
+        }
     }
 
     /// Adds an object with the supplied transform.
@@ -34,7 +37,9 @@ impl Scene {
 
     /// Removes an object if its ID still refers to the same entity lifetime.
     pub fn despawn(&mut self, id: EntityId) -> bool {
-        if !self.entities.despawn(id) { return false; }
+        if !self.entities.despawn(id) {
+            return false;
+        }
         self.objects.retain(|object| object.id != id);
         true
     }
@@ -42,24 +47,36 @@ impl Scene {
     /// Returns an object's transform when its ID is live.
     #[must_use]
     pub fn get(&self, id: EntityId) -> Option<&Transform3> {
-        self.objects.iter().find(|object| object.id == id).map(|object| &object.transform)
+        self.objects
+            .iter()
+            .find(|object| object.id == id)
+            .map(|object| &object.transform)
     }
 
     /// Returns a mutable transform when its ID is live.
     pub fn get_mut(&mut self, id: EntityId) -> Option<&mut Transform3> {
-        self.objects.iter_mut().find(|object| object.id == id).map(|object| &mut object.transform)
+        self.objects
+            .iter_mut()
+            .find(|object| object.id == id)
+            .map(|object| &mut object.transform)
     }
 
     /// Iterates over live scene objects in insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = &SceneObject> { self.objects.iter() }
+    pub fn iter(&self) -> impl Iterator<Item = &SceneObject> {
+        self.objects.iter()
+    }
 
     /// Returns the number of live objects.
     #[must_use]
-    pub fn len(&self) -> usize { self.objects.len() }
+    pub fn len(&self) -> usize {
+        self.objects.len()
+    }
 
     /// Returns whether the scene has no live objects.
     #[must_use]
-    pub fn is_empty(&self) -> bool { self.objects.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.objects.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -73,7 +90,11 @@ mod tests {
         let id = scene.spawn(Transform3::IDENTITY).expect("ID available");
         assert_eq!(scene.len(), 1);
         assert_eq!(scene.get(id), Some(&Transform3::IDENTITY));
-        let moved = Transform3::new(Vec3::new(2.0, 0.0, -3.0), Vec3::new(0.0, 0.5, 0.0), Vec3::new(1.0, 2.0, 1.0));
+        let moved = Transform3::new(
+            Vec3::new(2.0, 0.0, -3.0),
+            Vec3::new(0.0, 0.5, 0.0),
+            Vec3::new(1.0, 2.0, 1.0),
+        );
         *scene.get_mut(id).expect("object remains live") = moved;
         assert_eq!(scene.get(id), Some(&moved));
         assert!(scene.despawn(id));
