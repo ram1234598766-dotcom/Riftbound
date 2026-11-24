@@ -249,7 +249,6 @@ impl CollisionWorld {
         result
     }
 
-
     /// Moves a vehicle with a conservative world-space footprint derived from heading.
     /// This prevents a rotated vehicle from using the narrower unrotated footprint.
     #[must_use]
