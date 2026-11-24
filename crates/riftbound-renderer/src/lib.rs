@@ -71,6 +71,10 @@ pub struct RenderStats {
     pub submitted_instances: u32,
     /// Instances retained for drawing after frustum testing.
     pub visible_instances: u32,
+    /// Visible instances using the compact cube mesh.
+    pub low_detail_instances: u32,
+    /// Visible instances using their original mesh.
+    pub high_detail_instances: u32,
     /// Instances rejected by the frustum test.
     pub culled_instances: u32,
     /// Mesh batches containing at least one visible instance.
@@ -616,6 +620,8 @@ impl Renderer {
         }
         let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
         let mut visible_instances = 0_u32;
+        let mut low_detail_instances = 0_u32;
+        let mut high_detail_instances = 0_u32;
         let mut visible_batches = 0_u32;
         for batch in &mut self.mesh_batches {
             batch.instance_staging.clear();
@@ -647,6 +653,11 @@ impl Renderer {
                     &mut batch.instance_staging,
                     &InstanceRaw::from_matrix(world, material_tint(object.material)),
                 );
+                if use_low {
+                    low_detail_instances = low_detail_instances.saturating_add(1);
+                } else {
+                    high_detail_instances = high_detail_instances.saturating_add(1);
+                }
                 count = count.saturating_add(1);
             }
             batch.instance_count = count;
@@ -673,6 +684,8 @@ impl Renderer {
         self.render_stats = RenderStats {
             submitted_instances: submitted,
             visible_instances,
+            low_detail_instances,
+            high_detail_instances,
             culled_instances: submitted.saturating_sub(visible_instances),
             visible_batches,
         };
