@@ -22,14 +22,18 @@ pub enum WorldChunkLod {
 /// Integer coordinate of a 64-by-64 world terrain chunk.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WorldChunkCoord {
+    /// Absolute chunk coordinate on the world's X axis.
     pub x: i32,
+    /// Absolute chunk coordinate on the world's Z axis.
     pub z: i32,
 }
 
 /// One chunk requested by the current streaming window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WorldChunkRequest {
+    /// Absolute coordinate of the requested chunk.
     pub coord: WorldChunkCoord,
+    /// Mesh detail tier selected for this chunk.
     pub lod: WorldChunkLod,
     /// Squared Chebyshev distance from the focus chunk.
     pub distance_squared: u32,
@@ -72,7 +76,8 @@ impl WorldChunkConfig {
     /// Maximum number of chunks in the square active window.
     #[must_use]
     pub const fn max_active_chunks(self) -> usize {
-        let side = (self.active_radius * 2 + 1) as usize;
+        let side = usize::try_from(self.active_radius * 2 + 1)
+            .expect("validated chunk radius always fits usize");
         side * side
     }
 }
@@ -123,13 +128,17 @@ impl WorldChunkStreamer {
     ///
     /// Non-finite and out-of-range positions are rejected without changing the
     /// previous window. Returns `true` only when the active window was rebuilt.
+    #[allow(clippy::cast_possible_truncation)] // Range-checked to i16 before conversion.
     pub fn update_focus(&mut self, world_x: f32, world_z: f32) -> bool {
         if !world_x.is_finite() || !world_z.is_finite() {
             return false;
         }
         let chunk_x = (world_x / WORLD_CHUNK_SIZE).floor();
         let chunk_z = (world_z / WORLD_CHUNK_SIZE).floor();
-        let margin = self.config.active_radius as f32;
+        let margin = f32::from(
+            i16::try_from(self.config.active_radius)
+                .expect("validated chunk radius fits the sampler coordinate type"),
+        );
         if chunk_x < f32::from(i16::MIN) + margin
             || chunk_x > f32::from(i16::MAX) - margin
             || chunk_z < f32::from(i16::MIN) + margin
@@ -162,7 +171,8 @@ impl WorldChunkStreamer {
                         z: focus.z + z_offset,
                     },
                     lod,
-                    distance_squared: (distance * distance) as u32,
+                    distance_squared: u32::try_from(distance * distance)
+                        .expect("bounded chunk radius squared fits u32"),
                 });
             }
         }
@@ -227,8 +237,8 @@ mod tests {
         assert!(streamer.update_focus(max_safe, min_safe));
         let chunks = streamer.active_chunks();
         assert!(chunks.iter().all(|chunk| {
-            (i16::MIN..=i16::MAX).contains(&chunk.coord.x)
-                && (i16::MIN..=i16::MAX).contains(&chunk.coord.z)
+            (i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&chunk.coord.x)
+                && (i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&chunk.coord.z)
         }));
         let before = chunks.to_vec();
         assert!(!streamer.update_focus(f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE, 0.0));
