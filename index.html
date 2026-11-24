@@ -94,8 +94,10 @@ function renderRift3D(){
  const cx=player.x,cz=player.y,eye=[cx+520,760,cz+680],view=lookAt(eye,[cx,0,cz],[0,1,0]),proj=perspective(.92,w/h,1,4000),vp=mul4(proj,view);
  drawMesh('cube',modelMatrix(1100,-24,750,2300,40,1600),vp,[.055,.105,.16,1]);
  // Arena perimeter and cover geometry.
- for(const b of walls)drawMesh('cube',modelMatrix(b.x+b.w/2,b.h/2,b.y+b.h/2,b.w,Math.max(38,b.h===42?74:58),b.h),vp,[.09,.18,.24,1]);
- // Raised floor rails and luminous perimeter accents.
+ for(const b of walls)drawMesh('cube',modelMatrix(b.x+b.w/2,42,b.y+b.h/2,b.w,84,b.h),vp,[.09,.18,.24,1]);
+ // Low-contrast floor grid and luminous perimeter accents.
+ for(let x=120;x<2200;x+=240)drawMesh('cube',modelMatrix(x,0,750,2,1,1450),vp,[.09,.17,.23,1]);
+ for(let z=120;z<1500;z+=240)drawMesh('cube',modelMatrix(1100,0,z,2150,1,2),vp,[.09,.17,.23,1]);
  for(let x=90;x<2200;x+=220){drawMesh('cube',modelMatrix(x,1,55,100,3,5),vp,[.08,.42,.48,1]);drawMesh('cube',modelMatrix(x,1,1445,100,3,5),vp,[.08,.42,.48,1])}
  drawMesh('octa',modelMatrix(1100,8,750,125,20,125),vp,[.08,.65,.72,.48]);
  for(const shard of shards)if(!shard.taken){const bob=Math.sin(time*2+shard.phase)*7;drawMesh('octa',modelMatrix(shard.x,38+bob,shard.y,25,48,25,time*.7+shard.phase),vp,[.28,.9,1,1])}
@@ -104,6 +106,10 @@ function renderRift3D(){
  drawMesh('cube',modelMatrix(player.x,39,player.y,34,58,26,player.face),vp,player.inv>0&&Math.floor(time*18)%2===0?[.5,.85,1,.6]:[.75,.94,1,1]);
  drawMesh('octa',modelMatrix(player.x,78,player.y,21,22,21,player.face),vp,[.18,.72,.86,1]);
  drawMesh('cube',modelMatrix(player.x-19,38,player.y+7,17,39,17,-player.face*.25),vp,[.12,.27,.37,1]);
+ drawMesh('cube',modelMatrix(player.x-10,10,player.y-8,11,22,12,player.face),vp,[.18,.42,.52,1]);
+ drawMesh('cube',modelMatrix(player.x+10,10,player.y+8,11,22,12,player.face),vp,[.18,.42,.52,1]);
+ drawMesh('cube',modelMatrix(player.x+20,37,player.y-4,11,35,11,player.face-.2),vp,[.22,.48,.58,1]);
+ drawMesh('cube',modelMatrix(player.x-20,37,player.y+4,11,35,11,player.face+.2),vp,[.22,.48,.58,1]);
 }
 try{initRift3D()}catch(error){console.warn('3D renderer unavailable; retaining 2D fallback',error)}
 
