@@ -52,6 +52,16 @@ impl CharacterController {
         self.velocity
     }
 
+    /// Clears velocity along axes blocked by the collision solver.
+    pub fn resolve_collision(&mut self, blocked_x: bool, blocked_z: bool) {
+        if blocked_x {
+            self.velocity.x = 0.0;
+        }
+        if blocked_z {
+            self.velocity.z = 0.0;
+        }
+    }
+
     /// Advances movement by a bounded time step and updates the transform.
     pub fn update(&mut self, transform: &mut Transform3, input: &InputState, delta_seconds: f32) {
         if !delta_seconds.is_finite() || delta_seconds <= 0.0 {
