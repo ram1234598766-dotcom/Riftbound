@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+riftbound-core = { path = "../riftbound-core" }
 log = "0.4"
 wgpu = "30.0.2"
 winit = "0.30.13"
