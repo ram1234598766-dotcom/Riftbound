@@ -28,6 +28,9 @@ pub struct Renderer {
     mesh_batches: Vec<MeshBatch>,
     scene: Scene,
     camera_offset: [f32; 3],
+    camera_yaw: f32,
+    camera_pitch: f32,
+    camera_distance: f32,
 }
 
 struct MeshBatch {
@@ -84,7 +87,7 @@ impl Renderer {
         });
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("riftbound-camera-uniform"),
-            contents: &camera_bytes(config.width, config.height, [0.0; 3]),
+            contents: &camera_bytes(config.width, config.height, [0.0; 3], 0.588, 0.40, 6.2),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -121,6 +124,9 @@ impl Renderer {
             mesh_batches,
             scene,
             camera_offset: [0.0; 3],
+            camera_yaw: 0.588,
+            camera_pitch: 0.40,
+            camera_distance: 6.2,
         })
     }
 
@@ -138,7 +144,7 @@ impl Renderer {
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
-            &camera_bytes(width, height, self.camera_offset),
+            &camera_bytes(width, height, self.camera_offset, self.camera_yaw, self.camera_pitch, self.camera_distance),
         );
     }
 
@@ -148,7 +154,7 @@ impl Renderer {
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
-            &camera_bytes(self.config.width, self.config.height, self.camera_offset),
+            &camera_bytes(self.config.width, self.config.height, self.camera_offset, self.camera_yaw, self.camera_pitch, self.camera_distance),
         );
     }
 
@@ -178,6 +184,40 @@ impl Renderer {
             &self.camera_buffer,
             0,
             &camera_bytes(self.config.width, self.config.height, self.camera_offset),
+        );
+    }
+
+    /// Rotates the orbit camera around its followed target.
+    pub fn orbit_camera(&mut self, yaw_delta: f32, pitch_delta: f32) {
+        if !yaw_delta.is_finite() || !pitch_delta.is_finite() {
+            return;
+        }
+        self.camera_yaw = (self.camera_yaw + yaw_delta).rem_euclid(std::f32::consts::TAU);
+        self.camera_pitch = (self.camera_pitch + pitch_delta).clamp(0.12, 1.15);
+        self.write_camera();
+    }
+
+    /// Adjusts orbit camera distance, clamped to a useful third-person range.
+    pub fn zoom_camera(&mut self, distance_delta: f32) {
+        if !distance_delta.is_finite() {
+            return;
+        }
+        self.camera_distance = (self.camera_distance + distance_delta).clamp(3.0, 12.0);
+        self.write_camera();
+    }
+
+    fn write_camera(&self) {
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            &camera_bytes(
+                self.config.width,
+                self.config.height,
+                self.camera_offset,
+                self.camera_yaw,
+                self.camera_pitch,
+                self.camera_distance,
+            ),
         );
     }
 
@@ -484,10 +524,22 @@ fn create_depth_target(
     (texture, view)
 }
 
-fn camera_bytes(width: u32, height: u32, offset: [f32; 3]) -> [u8; 64] {
+fn camera_bytes(
+    width: u32,
+    height: u32,
+    offset: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+    distance: f32,
+) -> [u8; 64] {
     #[allow(clippy::cast_precision_loss)]
     let aspect = width.max(1) as f32 / height.max(1) as f32;
-    let eye = [3.2_f32 + offset[0], 2.4 + offset[1], 4.8 + offset[2]];
+    let horizontal = distance * pitch.cos();
+    let eye = [
+        offset[0] + yaw.sin() * horizontal,
+        offset[1] + distance * pitch.sin(),
+        offset[2] + yaw.cos() * horizontal,
+    ];
     let target = offset;
     let forward = normalize([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
     let side = normalize(cross(forward, [0.0, 1.0, 0.0]));
@@ -577,8 +629,8 @@ mod tests {
     #[test]
     fn camera_uniform_is_finite_for_landscape_and_portrait_targets() {
         for bytes in [
-            camera_bytes(1280, 720, [0.0; 3]),
-            camera_bytes(720, 1280, [1.0, 0.0, -1.0]),
+            camera_bytes(1280, 720, [0.0; 3], 0.588, 0.40, 6.2),
+            camera_bytes(720, 1280, [1.0, 0.0, -1.0], 1.2, 0.8, 8.0),
         ] {
             for chunk in bytes.chunks_exact(4) {
                 let value = f32::from_ne_bytes(chunk.try_into().expect("four-byte float"));
