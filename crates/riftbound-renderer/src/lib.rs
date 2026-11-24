@@ -159,7 +159,7 @@ impl Renderer {
         &self.scene
     }
 
-    /// Replaces the scene and uploads its transforms to the GPU instance buffer.
+    /// Replaces the scene and rebuilds its per-mesh GPU instance batches.
     ///
     /// # Errors
     ///
@@ -171,7 +171,7 @@ impl Renderer {
         Ok(())
     }
 
-    /// Draws the indexed cube mesh as transformed scene objects with depth testing.
+    /// Draws each indexed mesh batch with depth testing.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -306,7 +306,10 @@ fn starter_scene() -> Scene {
 fn scene_instances_by_mesh(scene: &Scene, mesh_count: usize) -> Vec<Vec<InstanceRaw>> {
     let mut groups = (0..mesh_count).map(|_| Vec::new()).collect::<Vec<_>>();
     for object in scene.iter() {
-        let Some(group) = groups.get_mut(object.mesh.index()) else {
+        let Ok(mesh_index) = usize::try_from(object.mesh.index()) else {
+            continue;
+        };
+        let Some(group) = groups.get_mut(mesh_index) else {
             continue;
         };
         let world = scene
