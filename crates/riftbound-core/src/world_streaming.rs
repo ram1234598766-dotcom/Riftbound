@@ -10,6 +10,9 @@ pub const WORLD_CHUNK_SIZE: f32 = 64.0;
 /// Maximum supported chunk radius, keeping the active window predictably bounded.
 pub const MAX_WORLD_CHUNK_RADIUS: i32 = 8;
 
+/// Largest absolute chunk index whose full 64-unit mesh remains inside the sampler.
+const MAX_SAMPLED_CHUNK: i32 = 15_624;
+
 /// Detail tier requested for a world terrain chunk.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WorldChunkLod {
@@ -149,10 +152,11 @@ impl WorldChunkStreamer {
             8 => 8.0,
             _ => return false,
         };
-        if chunk_x < f32::from(i16::MIN) + margin
-            || chunk_x > f32::from(i16::MAX) - margin
-            || chunk_z < f32::from(i16::MIN) + margin
-            || chunk_z > f32::from(i16::MAX) - margin
+        let max_chunk = (MAX_SAMPLED_CHUNK - self.config.active_radius) as f32;
+        if chunk_x < -max_chunk
+            || chunk_x > max_chunk
+            || chunk_z < -max_chunk
+            || chunk_z > max_chunk
         {
             return false;
         }
@@ -241,8 +245,8 @@ mod tests {
     #[test]
     fn focus_reserves_room_for_the_entire_window_at_sampler_limits() {
         let mut streamer = WorldChunkStreamer::standard();
-        let max_safe = f32::from(i16::MAX - 2) * WORLD_CHUNK_SIZE;
-        let min_safe = f32::from(i16::MIN + 2) * WORLD_CHUNK_SIZE;
+        let max_safe = (MAX_SAMPLED_CHUNK - 2) as f32 * WORLD_CHUNK_SIZE;
+        let min_safe = -(MAX_SAMPLED_CHUNK - 2) as f32 * WORLD_CHUNK_SIZE;
         assert!(streamer.update_focus(max_safe, min_safe));
         let chunks = streamer.active_chunks();
         assert!(chunks.iter().all(|chunk| {
@@ -250,7 +254,7 @@ mod tests {
                 && (i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&chunk.coord.z)
         }));
         let before = chunks.to_vec();
-        assert!(!streamer.update_focus(f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE, 0.0));
+        assert!(!streamer.update_focus(MAX_SAMPLED_CHUNK as f32 * WORLD_CHUNK_SIZE, 0.0));
         assert_eq!(streamer.active_chunks(), before);
     }
 
