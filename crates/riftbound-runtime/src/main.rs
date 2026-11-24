@@ -220,6 +220,12 @@ impl ApplicationHandler for RiftboundApp {
                         collision.move_character(previous_position, displacement, PLAYER_RADIUS);
                     transform.translation.x = resolved.position.x;
                     transform.translation.z = resolved.position.z;
+                    let floor_height = terrain_height(resolved.position.x, resolved.position.z)
+                        + PLAYER_RADIUS
+                        + 0.01;
+                    if transform.translation.y < floor_height {
+                        transform.translation.y = floor_height;
+                    }
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     let mut animated_transforms = vec![(player, transform)];
@@ -823,6 +829,21 @@ fn build_crystal_markers(scene: &mut Scene) {
             MaterialId::AMBER,
         );
     }
+}
+
+/// Height of the native arena's procedural ground, in world-space Y units.
+/// Keep this formula aligned with the renderer's terrain vertex generator.
+fn terrain_height(world_x: f32, world_z: f32) -> f32 {
+    let u = (world_x / 10.0 + 1.0) * 0.5;
+    let v = (world_z / 10.0 + 1.0) * 0.5;
+    if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
+        return 0.0;
+    }
+    let edge_fade = (std::f32::consts::PI * u).sin()
+        * (std::f32::consts::PI * v).sin();
+    let ridges = (u * std::f32::consts::TAU * 2.0).sin()
+        * (v * std::f32::consts::TAU * 1.5).cos();
+    edge_fade * ridges * 0.075
 }
 
 fn arena_collision_world() -> CollisionWorld {
