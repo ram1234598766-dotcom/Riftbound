@@ -164,7 +164,8 @@ impl VehicleState {
         );
 
         let speed_fraction = (self.speed.abs() / config.max_forward_speed).clamp(0.0, 1.0);
-        self.heading += steering * config.steering_rate * grip * speed_fraction * self.speed.signum() * dt;
+        self.heading +=
+            steering * config.steering_rate * grip * speed_fraction * self.speed.signum() * dt;
         self.position.x += self.heading.sin() * self.speed * dt;
         self.position.z -= self.heading.cos() * self.speed * dt;
     }
@@ -177,9 +178,17 @@ mod tests {
     #[test]
     fn throttle_accelerates_and_moves_forward() {
         let mut vehicle = VehicleState::default();
-        let input = VehicleInput { throttle: 1.0, ..VehicleInput::default() };
+        let input = VehicleInput {
+            throttle: 1.0,
+            ..VehicleInput::default()
+        };
         for _ in 0..20 {
-            vehicle.update(input, VehicleSurface::Asphalt, VehicleConfig::default(), 0.05);
+            vehicle.update(
+                input,
+                VehicleSurface::Asphalt,
+                VehicleConfig::default(),
+                0.05,
+            );
         }
         assert!(vehicle.speed > 0.0);
         assert!(vehicle.position.z < 0.0);
@@ -187,9 +196,15 @@ mod tests {
 
     #[test]
     fn braking_reduces_speed_without_reversing() {
-        let mut vehicle = VehicleState { speed: 8.0, ..VehicleState::default() };
+        let mut vehicle = VehicleState {
+            speed: 8.0,
+            ..VehicleState::default()
+        };
         vehicle.update(
-            VehicleInput { brake: 1.0, ..VehicleInput::default() },
+            VehicleInput {
+                brake: 1.0,
+                ..VehicleInput::default()
+            },
             VehicleSurface::Asphalt,
             VehicleConfig::default(),
             0.1,
@@ -213,21 +228,35 @@ mod tests {
     fn invalid_delta_and_non_finite_input_are_ignored() {
         let mut vehicle = VehicleState::default();
         vehicle.update(
-            VehicleInput { throttle: f32::NAN, ..VehicleInput::default() },
+            VehicleInput {
+                throttle: f32::NAN,
+                ..VehicleInput::default()
+            },
             VehicleSurface::Asphalt,
             VehicleConfig::default(),
             0.1,
         );
         assert_eq!(vehicle, VehicleState::default());
-        vehicle.update(VehicleInput::default(), VehicleSurface::Asphalt, VehicleConfig::default(), f32::NAN);
+        vehicle.update(
+            VehicleInput::default(),
+            VehicleSurface::Asphalt,
+            VehicleConfig::default(),
+            f32::NAN,
+        );
         assert_eq!(vehicle, VehicleState::default());
     }
 
     #[test]
     fn steering_changes_heading_when_moving() {
-        let mut vehicle = VehicleState { speed: 10.0, ..VehicleState::default() };
+        let mut vehicle = VehicleState {
+            speed: 10.0,
+            ..VehicleState::default()
+        };
         vehicle.update(
-            VehicleInput { steering: 1.0, ..VehicleInput::default() },
+            VehicleInput {
+                steering: 1.0,
+                ..VehicleInput::default()
+            },
             VehicleSurface::Asphalt,
             VehicleConfig::default(),
             0.1,
