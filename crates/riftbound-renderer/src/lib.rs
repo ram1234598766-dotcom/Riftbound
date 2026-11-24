@@ -3,6 +3,10 @@
 use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
+
+mod mesh;
+
+use mesh::{Mesh, MeshVertex};
 use winit::{event_loop::OwnedDisplayHandle, window::Window};
 
 const CUBE_SHADER: &str = include_str!("../shaders/cube.wgsl");
@@ -19,6 +23,7 @@ pub struct Renderer {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     cube_pipeline: wgpu::RenderPipeline,
+    cube_mesh: Mesh,
 }
 
 impl Renderer {
@@ -82,6 +87,7 @@ impl Renderer {
         });
 
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
+        let cube_mesh = Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?;
 
         let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
@@ -96,6 +102,7 @@ impl Renderer {
             camera_buffer,
             camera_bind_group,
             cube_pipeline,
+            cube_mesh,
         })
     }
 
@@ -173,7 +180,8 @@ impl Renderer {
             });
             pass.set_pipeline(&self.cube_pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            pass.draw(0..36, 0..1);
+            pass.set_vertex_buffer(0, self.cube_mesh.vertex_buffer().slice(..));
+            pass.draw(0..self.cube_mesh.vertex_count(), 0..1);
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
@@ -209,7 +217,7 @@ fn create_cube_pipeline(
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[],
+            buffers: &[MeshVertex::layout()],
         },
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
