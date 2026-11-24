@@ -16,6 +16,19 @@ Open [index.html](./index.html) from the repository in a modern browser, or serv
 
 The browser mission is an early playable vertical slice, not the final open-world game.
 
+## PC-hosted LAN play and browser multiplayer
+
+Launching the native Riftbound runtime also starts a local HTTP/WebSocket host on TCP port 7878. The host binds to all network interfaces so devices on the same trusted Wi-Fi/LAN can join without installing an app.
+
+1. Build and launch the native runtime on the PC.
+2. Read the LAN URL printed in the runtime log (for example, `http://192.168.1.20:7878`).
+3. Open that URL in a PC browser or on a phone/tablet connected to the same Wi-Fi.
+4. If the phone cannot connect, allow the Riftbound executable through the PC firewall for private networks and check that the router does not isolate wireless clients.
+
+The browser build includes touch controls and automatically connects to the host's WebSocket endpoint. Connected browser clients see one another's explorer markers update in the shared arena. The PC can also join as a browser client using `http://127.0.0.1:7878`.
+
+**Multiplayer status:** this is the first LAN networking milestone: the PC hosts the web page and relays bounded player-position snapshots to connected browser clients. Movement is currently client-reported, and mission objectives, pickups, enemies, collision outcomes, and progression are not yet server-authoritative or shared. The native 3D window is not yet rendered into the browser; browser clients currently use the existing 2D Shardfall prototype. A later milestone will move gameplay simulation to the host and bring the native and browser clients onto the same authoritative game state.
+
 ## Rust engine
 
 The custom engine foundation lives in crates/riftbound-core. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, 3D transforms, and a scene object store with safe spawn/despawn, transform access, and cycle-safe parent/child hierarchies.
@@ -42,7 +55,7 @@ GitHub Actions runs these checks on pushes and pull requests.
 2. Expand the native shell with platform input, lifecycle handling, and a contextual mission HUD.
 3. Expand the project-owned renderer: reusable scene mesh handles, materials, lighting, and shader management.
 4. Port the player controller and Shardfall mission into the Rust runtime.
-5. Expand traversal, vehicles, larger environments, audio, save data, and multiplayer after the single-player foundation is stable.
+5. Expand traversal, vehicles, larger environments, audio, save data, and authoritative cross-device multiplayer.
 
 ## Quality principles
 
