@@ -126,8 +126,7 @@ impl Renderer {
             cache: None,
         });
 
-        let (depth_texture, depth_view) =
-            create_depth_target(&device, config.width, config.height);
+        let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
         Ok(Self {
             _instance: instance,
@@ -154,11 +153,8 @@ impl Renderer {
         let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
         self._depth_texture = depth_texture;
         self.depth_view = depth_view;
-        self.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            &camera_bytes(width, height),
-        );
+        self.queue
+            .write_buffer(&self.camera_buffer, 0, &camera_bytes(width, height));
     }
 
     /// Draws a colored 3D cube with perspective projection and depth testing.
@@ -230,7 +226,7 @@ impl Renderer {
         self.surface.configure(&self.device, &self.config);
         let (depth_texture, depth_view) =
             create_depth_target(&self.device, self.config.width, self.config.height);
-        self.depth_texture = depth_texture;
+        self._depth_texture = depth_texture;
         self.depth_view = depth_view;
     }
 }
@@ -263,28 +259,48 @@ fn camera_bytes(width: u32, height: u32) -> [u8; 64] {
     let aspect = width.max(1) as f32 / height.max(1) as f32;
     let eye = [3.2_f32, 2.4, 4.8];
     let target = [0.0_f32, 0.0, 0.0];
-    let forward = normalize([
-        target[0] - eye[0],
-        target[1] - eye[1],
-        target[2] - eye[2],
-    ]);
+    let forward = normalize([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
     let side = normalize(cross(forward, [0.0, 1.0, 0.0]));
     let up = cross(side, forward);
 
     let view = [
-        side[0], up[0], -forward[0], 0.0,
-        side[1], up[1], -forward[1], 0.0,
-        side[2], up[2], -forward[2], 0.0,
-        -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0,
+        side[0],
+        up[0],
+        -forward[0],
+        0.0,
+        side[1],
+        up[1],
+        -forward[1],
+        0.0,
+        side[2],
+        up[2],
+        -forward[2],
+        0.0,
+        -dot(side, eye),
+        -dot(up, eye),
+        dot(forward, eye),
+        1.0,
     ];
     let near = 0.1_f32;
     let far = 100.0_f32;
     let focal = 1.0 / (45.0_f32.to_radians() * 0.5).tan();
     let projection = [
-        focal / aspect, 0.0, 0.0, 0.0,
-        0.0, -focal, 0.0, 0.0,
-        0.0, 0.0, far / (near - far), -1.0,
-        0.0, 0.0, (far * near) / (near - far), 0.0,
+        focal / aspect,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -focal,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        far / (near - far),
+        -1.0,
+        0.0,
+        0.0,
+        (far * near) / (near - far),
+        0.0,
     ];
     let matrix = multiply(projection, view);
     let mut bytes = [0_u8; 64];
@@ -341,10 +357,7 @@ mod tests {
     #[test]
     fn matrix_multiplication_preserves_identity() {
         let identity = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
         assert_eq!(multiply(identity, identity), identity);
     }
