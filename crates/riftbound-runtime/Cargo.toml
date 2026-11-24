@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+riftbound-core = { path = "../riftbound-core" }
 env_logger = "0.11"
 log = "0.4"
 pollster = "0.4"
