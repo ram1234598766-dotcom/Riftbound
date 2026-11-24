@@ -53,6 +53,7 @@ struct RiftboundApp {
     sentinel_brain: Option<EnemyBrain>,
     sentinel_objective: Option<ObjectiveProgress>,
     sentinel_pulse_timer: f32,
+    support_enemies: Vec<(EntityId, EntityId, EnemyBrain, f32)>,
     player_health: PlayerHealth,
     animation_time: f32,
     mission: MissionProgress,
@@ -103,6 +104,19 @@ impl ApplicationHandler for RiftboundApp {
                 let (checkpoint_entity, checkpoint) = build_checkpoint(&mut scene);
                 let (sentinel_entity, sentinel_effect_entity, sentinel_brain) =
                     build_sentinel(&mut scene);
+                let mut support_enemies = Vec::with_capacity(2);
+                for (home, archetype, material) in [
+                    (Vec3::new(-7.0, terrain_height(-7.0, 5.0) + 0.62, 5.0), EnemyArchetype::Skirmisher, MaterialId::RIFT),
+                    (Vec3::new(7.0, terrain_height(7.0, 5.0) + 0.62, 5.0), EnemyArchetype::Warden, MaterialId::AMBER),
+                ] {
+                    support_enemies.push(build_profiled_enemy(
+                        &mut scene,
+                        home,
+                        archetype,
+                        EnemyDifficulty::Standard,
+                        material,
+                    ));
+                }
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -135,6 +149,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.sentinel_objective =
                     Some(ObjectiveProgress::new(ObjectiveKind::Defeat { target: 1 }));
                 self.sentinel_pulse_timer = 0.0;
+                self.support_enemies = support_enemies;
                 self.animation_time = 0.0;
                 self.last_frame = Some(Instant::now());
             }
@@ -164,6 +179,7 @@ impl ApplicationHandler for RiftboundApp {
         self.sentinel_brain = None;
         self.sentinel_objective = None;
         self.sentinel_pulse_timer = 0.0;
+        self.support_enemies.clear();
         self.player_health = PlayerHealth::default();
         self.animation_time = 0.0;
         self.mission = MissionProgress::new(0);
@@ -474,6 +490,68 @@ impl ApplicationHandler for RiftboundApp {
                                 Some(EnemyEvent::PulseReleased) | None => {}
                             }
                         }
+                    }
+                    for (enemy, effect, brain, pulse_timer) in &mut self.support_enemies {
+                        let Some(mut enemy_transform) = renderer.scene().get(*enemy).copied() else {
+                            continue;
+                        };
+                        let event = brain.update(
+                            &mut enemy_transform.translation,
+                            transform.translation,
+                            delta,
+                        );
+                        let enemy_position = enemy_transform.translation;
+                        enemy_transform.translation.y =
+                            terrain_height(enemy_position.x, enemy_position.z) + 0.62;
+                        let dx = transform.translation.x - enemy_position.x;
+                        let dz = transform.translation.z - enemy_position.z;
+                        enemy_transform.rotation_radians.y = dx.atan2(-dz);
+                        let telegraph = brain.state() == EnemyState::Telegraph;
+                        let pulse = if telegraph {
+                            1.0 + (self.animation_time * 17.0).sin() * 0.1
+                        } else {
+                            1.0 + (self.animation_time * 1.8).sin() * 0.03
+                        };
+                        enemy_transform.scale =
+                            Vec3::new(0.5 * pulse, 0.68 * pulse, 0.5 * pulse);
+                        self.animated_transforms.push((*enemy, enemy_transform));
+                        if event == Some(EnemyEvent::PulseReleased) {
+                            *pulse_timer = 0.28;
+                            if distance_squared(transform.translation, enemy_position) <= 2.2 * 2.2
+                                && self.player_health.apply_damage(15, 1.0)
+                            {
+                                log::info!("An arena enemy pulse hit the player");
+                                if !self.player_health.is_alive() {
+                                    if let Some(progress) = self.checkpoint_progress {
+                                        transform.translation = progress.respawn_position();
+                                    }
+                                    self.controller = CharacterController::default();
+                                    self.player_health.restore();
+                                    self.animated_transforms.push((player, transform));
+                                    log::info!("Player recovered at the active checkpoint");
+                                }
+                            }
+                        }
+                        *pulse_timer = (*pulse_timer - delta.min(0.1)).max(0.0);
+                        let effect_scale = if telegraph {
+                            0.72 + (self.animation_time * 17.0).sin().abs() * 0.14
+                        } else if *pulse_timer > 0.0 {
+                            0.9 + (0.28 - *pulse_timer) * 3.0
+                        } else {
+                            0.01
+                        };
+                        self.animated_transforms.push((
+                            *effect,
+                            Transform3::new(
+                                Vec3::new(
+                                    enemy_position.x,
+                                    terrain_height(enemy_position.x, enemy_position.z) + 0.12,
+                                    enemy_position.z,
+                                ),
+                                Vec3::new(0.0, self.animation_time * 1.6, 0.0),
+                                Vec3::new(effect_scale, 0.06, effect_scale),
+                            ),
+                        ));
                     }
                     match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
@@ -811,6 +889,39 @@ fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
     (
         id,
         ExtractionZone::new(position, 1.9).expect("extraction zone data is valid"),
+    )
+}
+
+fn build_profiled_enemy(
+    scene: &mut Scene,
+    home: Vec3,
+    archetype: EnemyArchetype,
+    difficulty: EnemyDifficulty,
+    material: MaterialId,
+) -> (EntityId, EntityId, EnemyBrain, f32) {
+    let entity = scene
+        .spawn_with_mesh(
+            Transform3::new(home, Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.5, 0.68, 0.5)),
+            MeshId::CRYSTAL,
+        )
+        .expect("enemy entity ID space available");
+    scene.set_material(entity, material);
+    let effect = scene
+        .spawn_with_mesh(
+            Transform3::new(
+                Vec3::new(home.x, terrain_height(home.x, home.z) + 0.12, home.z),
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.01, 0.06, 0.01),
+            ),
+            MeshId::PYRAMID,
+        )
+        .expect("enemy effect entity ID space available");
+    scene.set_material(effect, material);
+    (
+        entity,
+        effect,
+        EnemyBrain::new(home, EnemyConfig::for_profile(archetype, difficulty)),
+        0.0,
     )
 }
 
