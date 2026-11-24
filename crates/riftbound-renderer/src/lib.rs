@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use riftbound_core::{Scene, Transform3, Vec3};
 use wgpu::util::DeviceExt;
 
 mod mesh;
@@ -26,6 +27,7 @@ pub struct Renderer {
     cube_mesh: Mesh,
     instance_buffer: wgpu::Buffer,
     instance_count: u32,
+    scene: Scene,
     camera_offset: [f32; 3],
 }
 
@@ -91,7 +93,8 @@ impl Renderer {
 
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
         let cube_mesh = Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?;
-        let instances = scene_instances();
+        let scene = starter_scene();
+        let instances = scene_instances(&scene);
         let instance_count = u32::try_from(instances.len())?;
         let instance_bytes = instance_bytes(&instances);
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -116,6 +119,7 @@ impl Renderer {
             cube_mesh,
             instance_buffer,
             instance_count,
+            scene,
             camera_offset: [0.0; 3],
         })
     }
@@ -149,7 +153,25 @@ impl Renderer {
         );
     }
 
-    /// Draws the indexed cube mesh as several transformed instances with depth testing.
+    /// Returns the current CPU-side scene.
+    #[must_use]
+    pub const fn scene(&self) -> &Scene { &self.scene }
+
+    /// Replaces the scene and uploads its transforms to the GPU instance buffer.
+    pub fn set_scene(&mut self, scene: Scene) -> Result<(), std::num::TryFromIntError> {
+        let instances = scene_instances(&scene);
+        let instance_count = u32::try_from(instances.len())?;
+        let mut bytes = instance_bytes(&instances);
+        if bytes.is_empty() { bytes.resize(64, 0); }
+        self.instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("riftbound-scene-instances"), contents: &bytes, usage: wgpu::BufferUsages::VERTEX,
+        });
+        self.instance_count = instance_count;
+        self.scene = scene;
+        Ok(())
+    }
+
+    /// Draws the indexed cube mesh as transformed scene objects with depth testing.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -246,37 +268,28 @@ impl InstanceRaw {
         }
     }
 
-    fn new(x: f32, y: f32, z: f32, scale: f32, rotation_y: f32) -> Self {
-        let (sine, cosine) = rotation_y.sin_cos();
-        Self {
-            model: [
-                cosine * scale,
-                0.0,
-                -sine * scale,
-                0.0,
-                0.0,
-                scale,
-                0.0,
-                0.0,
-                sine * scale,
-                0.0,
-                cosine * scale,
-                0.0,
-                x,
-                y,
-                z,
-                1.0,
-            ],
-        }
+    fn from_transform(transform: Transform3) -> Self {
+        let rotation = transform.rotation_radians;
+        let (sx, cx) = rotation.x.sin_cos();
+        let (sy, cy) = rotation.y.sin_cos();
+        let (sz, cz) = rotation.z.sin_cos();
+        let scale = transform.scale;
+        let r00 = cz * cy;
+        let r01 = cz * sy * sx - sz * cx;
+        let r02 = cz * sy * cx + sz * sx;
+        let r10 = sz * cy;
+        let r11 = sz * sy * sx + cz * cx;
+        let r12 = sz * sy * cx - cz * sx;
+        let r20 = -sy;
+        let r21 = cy * sx;
+        let r22 = cy * cx;
+        Self { model: [
+            r00 * scale.x, r10 * scale.x, r20 * scale.x, 0.0,
+            r01 * scale.y, r11 * scale.y, r21 * scale.y, 0.0,
+            r02 * scale.z, r12 * scale.z, r22 * scale.z, 0.0,
+            transform.translation.x, transform.translation.y, transform.translation.z, 1.0,
+        ] }
     }
-}
-
-fn scene_instances() -> Vec<InstanceRaw> {
-    vec![
-        InstanceRaw::new(-1.65, 0.0, 0.0, 0.58, -0.25),
-        InstanceRaw::new(0.0, 0.0, 0.0, 0.82, 0.15),
-        InstanceRaw::new(1.65, 0.0, 0.0, 0.58, 0.45),
-    ]
 }
 
 fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
@@ -467,7 +480,8 @@ mod tests {
 
     #[test]
     fn scene_instances_have_distinct_finite_model_transforms() {
-        let instances = scene_instances();
+        let scene = starter_scene();
+        let instances = scene_instances(&scene);
         assert_eq!(instances.len(), 3);
         assert_ne!(instances[0].model, instances[1].model);
         assert_ne!(instances[1].model, instances[2].model);
