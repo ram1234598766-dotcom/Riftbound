@@ -200,11 +200,8 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
             let variation =
                 f32::from(u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"))
                     * 0.012;
-            // Fade the procedural ridges to zero at the perimeter so they meet the arena walls.
-            let edge_fade = (std::f32::consts::PI * u).sin() * (std::f32::consts::PI * v).sin();
-            let ridges =
-                (u * std::f32::consts::TAU * 2.0).sin() * (v * std::f32::consts::TAU * 1.5).cos();
-            let height = edge_fade * ridges * 0.075;
+            // Sample the same world-space terrain used by character grounding.
+            let height = terrain_height(u * 20.0 - 10.0, v * 20.0 - 10.0);
             let elevation_tint = height.max(0.0) * 0.22;
             vertices.push(MeshVertex {
                 position: [u * 2.0 - 1.0, height, v * 2.0 - 1.0],
