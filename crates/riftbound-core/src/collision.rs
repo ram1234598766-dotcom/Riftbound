@@ -370,7 +370,6 @@ impl CollisionWorld {
         })
     }
 
-
     fn is_oriented_vehicle_walkable(
         &self,
         x: f32,
@@ -400,8 +399,8 @@ impl CollisionWorld {
             let obstacle_half_z = (obstacle.max_z - obstacle.min_z) * 0.5;
             let overlaps_axis = |axis_x: f32, axis_z: f32, vehicle_radius: f32| {
                 let distance = (center_x * axis_x + center_z * axis_z).abs();
-                let obstacle_radius = obstacle_half_x * axis_x.abs()
-                    + obstacle_half_z * axis_z.abs();
+                let obstacle_radius =
+                    obstacle_half_x * axis_x.abs() + obstacle_half_z * axis_z.abs();
                 distance < vehicle_radius + obstacle_radius
             };
             !overlaps_axis(1.0, 0.0, extent_x)
