@@ -50,16 +50,7 @@ impl ApplicationHandler for RiftboundApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.lan_server_started {
             self.lan_server_started = true;
-            std::thread::Builder::new()
-                .name("riftbound-lan-server".to_owned())
-                .spawn(|| {
-                    let runtime = tokio::runtime::Builder::new_multi_thread()
-                        .enable_all()
-                        .build()
-                        .expect("LAN server runtime should initialize");
-                    runtime.block_on(riftbound_net::serve());
-                })
-                .expect("LAN server thread should start");
+            riftbound_net::spawn();
         }
         if self.renderer.is_some() {
             return;
