@@ -416,7 +416,8 @@ mod tests {
             VehicleConfig::default(),
             0.1,
         );
-        let expected = VehicleConfig::default().steering_rate * 0.1;
+        let config = VehicleConfig::default();
+        let expected = -config.steering_rate * (vehicle.speed.abs() / config.max_reverse_speed) * 0.1;
         assert!((vehicle.heading - expected).abs() < 0.0001);
     }
 
