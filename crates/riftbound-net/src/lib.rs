@@ -26,12 +26,23 @@ use tokio::sync::{Mutex, broadcast};
 const PORT: u16 = 7878;
 const WORLD_WIDTH: f32 = 2200.0;
 const WORLD_HEIGHT: f32 = 1500.0;
+const PICKUP_RANGE: f32 = 48.0;
+const SHARD_POSITIONS: [(f32, f32); 5] = [
+    (380.0, 330.0),
+    (1780.0, 360.0),
+    (430.0, 1190.0),
+    (1780.0, 1150.0),
+    (1100.0, 250.0),
+];
+const EXTRACTION_POSITION: (f32, f32) = (1100.0, 750.0);
 
 #[derive(Clone)]
 struct HostState {
     players: Arc<Mutex<BTreeMap<u64, PlayerState>>>,
     updates: broadcast::Sender<String>,
     next_id: Arc<AtomicU64>,
+    shards: Arc<Mutex<[bool; 5]>>,
+    extracted: Arc<Mutex<bool>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -45,15 +56,18 @@ struct PlayerState {
 #[derive(Deserialize)]
 struct ClientMessage {
     kind: String,
-    x: f32,
-    y: f32,
-    face: f32,
+    x: Option<f32>,
+    y: Option<f32>,
+    face: Option<f32>,
+    shard: Option<usize>,
 }
 
 #[derive(Serialize)]
 struct Snapshot<'a> {
     kind: &'static str,
     players: &'a [PlayerState],
+    shards: &'a [bool; 5],
+    extracted: bool,
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
@@ -86,6 +100,8 @@ pub async fn serve() {
         players: Arc::new(Mutex::new(BTreeMap::new())),
         updates,
         next_id: Arc::new(AtomicU64::new(1)),
+        shards: Arc::new(Mutex::new([false; 5])),
+        extracted: Arc::new(Mutex::new(false)),
     };
     let app = Router::new()
         .route("/", get(index))
@@ -161,20 +177,40 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else {
             continue;
         };
-        if input.kind != "move"
-            || !input.x.is_finite()
-            || !input.y.is_finite()
-            || !input.face.is_finite()
-        {
+        let (Some(x), Some(y), Some(face)) = (input.x, input.y, input.face) else {
+            continue;
+        };
+        if !x.is_finite() || !y.is_finite() || !face.is_finite() {
             continue;
         }
+        let x = clamp_world_position(x, WORLD_WIDTH);
+        let y = clamp_world_position(y, WORLD_HEIGHT);
         {
             let mut players = state.players.lock().await;
             if let Some(player) = players.get_mut(&id) {
-                player.x = clamp_world_position(input.x, WORLD_WIDTH);
-                player.y = clamp_world_position(input.y, WORLD_HEIGHT);
-                player.face = input.face;
+                player.x = x;
+                player.y = y;
+                player.face = face;
             }
+        }
+        match input.kind.as_str() {
+            "move" => {}
+            "collect" => {
+                let Some(index) = input.shard else {
+                    continue;
+                };
+                if index >= SHARD_POSITIONS.len() || !within_pickup_range(x, y, index) {
+                    continue;
+                }
+                state.shards.lock().await[index] = true;
+            }
+            "extract" => {
+                let all_collected = state.shards.lock().await.iter().all(|taken| *taken);
+                if all_collected && within_extraction_range(x, y) {
+                    *state.extracted.lock().await = true;
+                }
+            }
+            _ => continue,
         }
         publish_snapshot(&state).await;
     }
@@ -186,9 +222,13 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
 
 async fn publish_snapshot(state: &HostState) {
     let players: Vec<PlayerState> = state.players.lock().await.values().cloned().collect();
+    let shards = *state.shards.lock().await;
+    let extracted = *state.extracted.lock().await;
     if let Ok(message) = serde_json::to_string(&Snapshot {
         kind: "snapshot",
         players: &players,
+        shards: &shards,
+        extracted,
     }) {
         let _ = state.updates.send(message);
     }
@@ -198,6 +238,17 @@ fn discover_lan_ip() -> Option<String> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("192.0.2.1:80").ok()?;
     Some(socket.local_addr().ok()?.ip().to_string())
+}
+
+fn within_pickup_range(x: f32, y: f32, index: usize) -> bool {
+    let Some((shard_x, shard_y)) = SHARD_POSITIONS.get(index) else {
+        return false;
+    };
+    (x - shard_x).hypot(y - shard_y) <= PICKUP_RANGE
+}
+
+fn within_extraction_range(x: f32, y: f32) -> bool {
+    (x - EXTRACTION_POSITION.0).hypot(y - EXTRACTION_POSITION.1) <= 90.0
 }
 
 fn clamp_world_position(value: f32, maximum: f32) -> f32 {
@@ -222,5 +273,14 @@ mod tests {
             clamp_world_position(42.0, WORLD_WIDTH).to_bits(),
             42.0_f32.to_bits()
         );
+    }
+
+    #[test]
+    fn pickup_and_extraction_ranges_are_checked_on_host() {
+        assert!(within_pickup_range(380.0, 330.0, 0));
+        assert!(!within_pickup_range(900.0, 900.0, 0));
+        assert!(!within_pickup_range(380.0, 330.0, 99));
+        assert!(within_extraction_range(1100.0, 750.0));
+        assert!(!within_extraction_range(300.0, 300.0));
     }
 }
