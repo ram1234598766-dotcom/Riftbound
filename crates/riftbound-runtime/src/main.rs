@@ -3,9 +3,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use riftbound_core::{
-    Button, CharacterController, EntityId, InputState, Transform3, Vec3,
-};
+use riftbound_core::{Button, CharacterController, EntityId, InputState, Transform3, Vec3};
 use riftbound_renderer::Renderer;
 use winit::{
     application::ApplicationHandler,
@@ -126,16 +124,13 @@ impl ApplicationHandler for RiftboundApp {
                     .last_frame
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
-                if let (Some(renderer), Some(player)) =
-                    (self.renderer.as_mut(), self.player)
-                {
+                if let (Some(renderer), Some(player)) = (self.renderer.as_mut(), self.player) {
                     let Some(mut transform) = renderer.scene().get(player).copied() else {
                         log::error!("The player entity is no longer in the active scene");
                         event_loop.exit();
                         return;
                     };
-                    self.controller
-                        .update(&mut transform, &self.input, delta);
+                    self.controller.update(&mut transform, &self.input, delta);
                     match renderer.set_object_transform(player, transform) {
                         Ok(true) => renderer.follow_camera(transform.translation),
                         Ok(false) => {
