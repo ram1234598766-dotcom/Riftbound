@@ -188,7 +188,6 @@ impl Renderer {
     }
 }
 
-
 fn create_cube_pipeline(
     device: &wgpu::Device,
     camera_layout: &wgpu::BindGroupLayout,
