@@ -1,5 +1,6 @@
 //! CPU mesh descriptions and their GPU vertex/index-buffer representation.
 
+use riftbound_core::terrain_height;
 use wgpu::util::DeviceExt;
 
 /// One position-and-color vertex in the renderer's standard mesh format.
