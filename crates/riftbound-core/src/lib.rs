@@ -3,7 +3,7 @@
 //! Keep this crate deterministic and testable. Platform, rendering, audio, and
 //! networking integrations belong in separate crates.
 
-mod character;
+mod character;\nmod collision;
 mod clock;
 mod entity;
 mod input;
@@ -11,7 +11,7 @@ mod math;
 mod scene;
 mod transform;
 
-pub use character::{CharacterController, MovementConfig};
+pub use character::{CharacterController, MovementConfig};\npub use collision::{Aabb2, CollisionResult, CollisionWorld};
 pub use clock::{FixedClock, TickBatch};
 pub use entity::{EntityArena, EntityId};
 pub use input::{Button, InputState};
