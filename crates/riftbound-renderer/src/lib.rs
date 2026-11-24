@@ -1,6 +1,6 @@
 //! GPU surface, depth target, camera, and mesh presentation for the Riftbound engine.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use riftbound_core::{MaterialId, MeshId, Scene, Transform3, Vec3};
 use wgpu::util::DeviceExt;
@@ -59,7 +59,7 @@ pub struct Renderer {
     affected_meshes: Vec<bool>,
     visibility_dirty: bool,
     render_stats: RenderStats,
-    lod_states: Vec<(riftbound_core::EntityId, bool)>,
+    lod_states: HashMap<riftbound_core::EntityId, bool>,
     scene: Scene,
     camera_offset: [f32; 3],
     camera_yaw: f32,
@@ -218,7 +218,7 @@ impl Renderer {
             affected_meshes,
             visibility_dirty: true,
             render_stats: RenderStats::default(),
-            lod_states: Vec::with_capacity(64),
+            lod_states: HashMap::with_capacity(64),
             scene,
             camera_offset: [0.0; 3],
             camera_yaw: 0.588,
@@ -638,18 +638,13 @@ impl Renderer {
             let dy = center[1] - self.camera_offset[1];
             let dz = center[2] - self.camera_offset[2];
             let distance = (dx * dx + dy * dy + dz * dz).sqrt();
-            let state_index = self.lod_states.iter().position(|(id, _)| *id == object.id);
-            let was_low = state_index.is_some_and(|index| self.lod_states[index].1);
+            let was_low = self.lod_states.get(&object.id).copied().unwrap_or(false);
             let use_low = if mesh_index == 0 {
                 select_cube_lod(distance, was_low)
             } else {
                 select_terrain_lod(distance, was_low)
             };
-            if let Some(index) = state_index {
-                self.lod_states[index].1 = use_low;
-            } else {
-                self.lod_states.push((object.id, use_low));
-            }
+            self.lod_states.insert(object.id, use_low);
         }
         let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
         let mut visible_instances = 0_u32;
@@ -662,11 +657,7 @@ impl Renderer {
             for object in self.scene.iter() {
                 let object_mesh = usize::try_from(object.mesh.index()).unwrap_or(usize::MAX);
                 let use_low = (object_mesh == 0 || (3..=6).contains(&object_mesh))
-                    && self
-                        .lod_states
-                        .iter()
-                        .find(|(id, _)| *id == object.id)
-                        .is_some_and(|(_, low)| *low);
+                    && self.lod_states.get(&object.id).copied().unwrap_or(false);
                 let lod_mesh_index = if object_mesh == 0 {
                     CUBE_LOD_MESH_INDEX
                 } else {
@@ -833,13 +824,12 @@ fn create_mesh_batches(
     let groups = scene_instances_by_mesh(scene, mesh_count);
     let mut batches = Vec::new();
     for (mesh_index, instances) in groups.iter().enumerate() {
-        if instances.is_empty() && mesh_index != CUBE_LOD_MESH_INDEX {
+        let is_lod_batch = mesh_index == CUBE_LOD_MESH_INDEX
+            || (TERRAIN_LOD_BASE_INDEX..TERRAIN_LOD_BASE_INDEX + 4).contains(&mesh_index);
+        if instances.is_empty() && !is_lod_batch {
             continue;
         }
-        if (mesh_index == CUBE_LOD_MESH_INDEX
-            || (TERRAIN_LOD_BASE_INDEX..TERRAIN_LOD_BASE_INDEX + 4).contains(&mesh_index))
-            && instances.is_empty()
-        {
+        if is_lod_batch && instances.is_empty() {
             let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("riftbound-cube-lod-instance-batch"),
                 size: 80,
