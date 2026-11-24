@@ -19,10 +19,10 @@ impl Aabb2 {
     }
 
     fn contains_expanded(self, x: f32, z: f32, radius: f32) -> bool {
-        x >= self.min_x - radius
-            && x <= self.max_x + radius
-            && z >= self.min_z - radius
-            && z <= self.max_z + radius
+        x > self.min_x - radius
+            && x < self.max_x + radius
+            && z > self.min_z - radius
+            && z < self.max_z + radius
     }
 }
 
