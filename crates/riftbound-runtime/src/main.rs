@@ -214,7 +214,11 @@ impl ApplicationHandler for RiftboundApp {
                                     "RIFTBOUND — Shards: {}/{}{}",
                                     self.pickups.collected(),
                                     self.pickups.total(),
-                                    if self.pickups.is_complete() { " — Objective complete!" } else { "" },
+                                    if self.pickups.is_complete() {
+                                        " — Objective complete!"
+                                    } else {
+                                        ""
+                                    },
                                 );
                                 window.set_title(&progress);
                                 log::info!("{progress}");
@@ -248,7 +252,6 @@ impl ApplicationHandler for RiftboundApp {
         }
     }
 }
-
 
 fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
     let positions = [
