@@ -131,12 +131,11 @@ impl Renderer {
         let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
-        self.queue
-            .write_buffer(
-                &self.camera_buffer,
-                0,
-                &camera_bytes(width, height, self.camera_offset),
-            );
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            &camera_bytes(width, height, self.camera_offset),
+        );
     }
 
     /// Moves the camera target and eye together across the horizontal world plane.
@@ -455,7 +454,10 @@ mod tests {
 
     #[test]
     fn camera_uniform_is_finite_for_landscape_and_portrait_targets() {
-        for bytes in [camera_bytes(1280, 720, [0.0; 3]), camera_bytes(720, 1280, [1.0, 0.0, -1.0])] {
+        for bytes in [
+            camera_bytes(1280, 720, [0.0; 3]),
+            camera_bytes(720, 1280, [1.0, 0.0, -1.0]),
+        ] {
             for chunk in bytes.chunks_exact(4) {
                 let value = f32::from_ne_bytes(chunk.try_into().expect("four-byte float"));
                 assert!(value.is_finite());
