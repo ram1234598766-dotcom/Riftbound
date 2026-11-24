@@ -95,6 +95,7 @@ impl ApplicationHandler for RiftboundApp {
         self.input = InputState::default();
     }
 
+    #[allow(clippy::too_many_lines)]
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
