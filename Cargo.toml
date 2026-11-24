@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/riftbound-core", "crates/riftbound-runtime"]
+members = [
+    "crates/riftbound-core",
+    "crates/riftbound-renderer",
+    "crates/riftbound-runtime",
+]
 resolver = "2"
 
 [workspace.package]
