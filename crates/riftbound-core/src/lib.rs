@@ -14,5 +14,5 @@ pub use clock::{FixedClock, TickBatch};
 pub use entity::{EntityArena, EntityId};
 pub use input::{Button, InputState};
 pub use math::{Vec2, Vec3};
-pub use scene::{Scene, SceneObject};
+pub use scene::{MeshId, Scene, SceneObject};
 pub use transform::Transform3;
