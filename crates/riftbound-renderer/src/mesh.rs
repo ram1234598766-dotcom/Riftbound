@@ -468,6 +468,29 @@ mod tests {
     }
 
     #[test]
+    fn terrain_lod_uses_quarter_vertex_count_and_keeps_shared_edges() {
+        let northwest = terrain_chunk_data(0, 0, 5).expect("north-west LOD chunk");
+        let northeast = terrain_chunk_data(1, 0, 5).expect("north-east LOD chunk");
+        assert_eq!(northwest.0.len(), 25);
+        assert_eq!(northwest.1.len(), 4 * 4 * 6);
+        assert!(valid_index_data(northwest.0.len(), &northwest.1));
+        let west_edge = (0..5)
+            .map(|z| {
+                let vertex = northwest.0[z * 5 + 4];
+                (vertex.position[1], vertex.color)
+            })
+            .collect::<Vec<_>>();
+        let east_edge = (0..5)
+            .map(|z| {
+                let vertex = northeast.0[z * 5];
+                (vertex.position[1], vertex.color)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(west_edge, east_edge);
+        assert!(terrain_chunk_data(0, 0, 4).is_none());
+    }
+
+    #[test]
     fn cube_uses_shared_face_vertices_and_indexed_triangles() {
         let (vertices, indices) = cube_data();
         assert_eq!(vertices.len(), 24);
