@@ -291,8 +291,7 @@ impl ApplicationHandler for RiftboundApp {
                             }
 
                             let near_pickup = PICKUP_POSITIONS.iter().enumerate().any(|(index, position)| {
-                                index >= self.pickups.total().saturating_sub(self.pickups.total())
-                                    && self.pickups.collected() < self.pickups.total()
+                                self.pickups.collected() < self.pickups.total()
                                     && distance_squared(transform.translation, *position) <= 1.7 * 1.7
                                     && self.pickup_entities.get(index).is_some_and(|id| renderer.scene().get(*id).is_some())
                             });
