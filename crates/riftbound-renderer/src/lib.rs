@@ -142,6 +142,34 @@ impl Renderer {
         );
     }
 
+    /// Moves the camera target and eye to follow a world-space position.
+    pub fn follow_camera(&mut self, position: Vec3) {
+        self.camera_offset = [position.x, position.y, position.z];
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            &camera_bytes(self.config.width, self.config.height, self.camera_offset),
+        );
+    }
+
+    /// Updates one live object's transform and rebuilds its instance batches.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scene contains more instances than a GPU draw call can address.
+    pub fn set_object_transform(
+        &mut self,
+        id: riftbound_core::EntityId,
+        transform: Transform3,
+    ) -> Result<bool, std::num::TryFromIntError> {
+        let Some(current) = self.scene.get_mut(id) else {
+            return Ok(false);
+        };
+        *current = transform;
+        self.mesh_batches = create_mesh_batches(&self.device, &self.scene, self.meshes.len())?;
+        Ok(true)
+    }
+
     /// Moves the camera target and eye together across the horizontal world plane.
     pub fn pan_camera(&mut self, delta_x: f32, delta_z: f32) {
         self.camera_offset[0] += delta_x;
