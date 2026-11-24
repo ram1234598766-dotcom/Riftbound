@@ -626,8 +626,10 @@ mod tests {
         }
         let base_vertex_count = 25;
         assert!(distant.0[base_vertex_count..].chunks_exact(4).all(|skirt| {
-            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs() < f32::EPSILON
-                && (skirt[2].position[1] - skirt[3].position[1] - 12.0).abs() < f32::EPSILON
+            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
+                < f32::EPSILON
+                && (skirt[2].position[1] - skirt[3].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
+                    < f32::EPSILON
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
