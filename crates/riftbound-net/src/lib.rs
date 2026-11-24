@@ -57,6 +57,9 @@ struct Snapshot<'a> {
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
+///
+/// # Errors
+/// Returns an error if the operating system cannot create the server thread.
 pub fn spawn() -> std::io::Result<()> {
     std::thread::Builder::new()
         .name("riftbound-lan-server".to_owned())
@@ -207,11 +210,17 @@ mod tests {
 
     #[test]
     fn world_position_is_bounded() {
-        assert_eq!(clamp_world_position(-20.0, WORLD_WIDTH).to_bits(), 0.0_f32.to_bits());
+        assert_eq!(
+            clamp_world_position(-20.0, WORLD_WIDTH).to_bits(),
+            0.0_f32.to_bits()
+        );
         assert_eq!(
             clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH).to_bits(),
             WORLD_WIDTH.to_bits()
         );
-        assert_eq!(clamp_world_position(42.0, WORLD_WIDTH).to_bits(), 42.0_f32.to_bits());
+        assert_eq!(
+            clamp_world_position(42.0, WORLD_WIDTH).to_bits(),
+            42.0_f32.to_bits()
+        );
     }
 }
