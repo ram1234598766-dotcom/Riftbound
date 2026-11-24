@@ -7,7 +7,7 @@ use riftbound_core::{
     Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
     MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3,
 };
-use riftbound_renderer::Renderer;
+use riftbound_renderer::{HudData, Renderer};
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, WindowEvent},
@@ -289,6 +289,36 @@ impl ApplicationHandler for RiftboundApp {
                                     "Shardfall mission completed: all shards recovered and extraction reached"
                                 );
                             }
+
+                            let near_pickup = PICKUP_POSITIONS.iter().enumerate().any(|(index, position)| {
+                                index >= self.pickups.total().saturating_sub(self.pickups.total())
+                                    && self.pickups.collected() < self.pickups.total()
+                                    && distance_squared(transform.translation, *position) <= 1.7 * 1.7
+                                    && self.pickup_entities.get(index).is_some_and(|id| renderer.scene().get(*id).is_some())
+                            });
+                            let near_beacon = distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0)) <= 1.9 * 1.9;
+                            let status = if self.mission_complete {
+                                "MISSION COMPLETE!"
+                            } else if self.pickups.is_complete() {
+                                "RETURN TO BEACON"
+                            } else {
+                                "COLLECT RIFT SHARDS"
+                            };
+                            let prompt = if self.mission_complete {
+                                None
+                            } else if self.pickups.is_complete() && near_beacon {
+                                Some(String::from("F - EXTRACT"))
+                            } else if !self.pickups.is_complete() && near_pickup {
+                                Some(String::from("F - COLLECT"))
+                            } else {
+                                None
+                            };
+                            renderer.set_hud(HudData {
+                                collected: self.pickups.collected(),
+                                total: self.pickups.total(),
+                                status: String::from(status),
+                                prompt,
+                            });
                         }
                         Ok(false) => {
                             log::error!("The player entity could not be updated");
@@ -317,6 +347,13 @@ impl ApplicationHandler for RiftboundApp {
             window.request_redraw();
         }
     }
+}
+
+fn distance_squared(a: Vec3, b: Vec3) -> f32 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    let dz = a.z - b.z;
+    dx * dx + dy * dy + dz * dz
 }
 
 fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
