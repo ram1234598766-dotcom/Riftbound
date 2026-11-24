@@ -57,17 +57,23 @@ struct Snapshot<'a> {
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
-pub fn spawn() {
+pub fn spawn() -> std::io::Result<()> {
     std::thread::Builder::new()
         .name("riftbound-lan-server".to_owned())
         .spawn(|| {
-            let runtime = tokio::runtime::Builder::new_multi_thread()
+            let runtime = match tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .expect("LAN server runtime should initialize");
+            {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    log::error!("Could not initialize LAN server runtime: {error}");
+                    return;
+                }
+            };
             runtime.block_on(serve());
         })
-        .expect("LAN server thread should start");
+        .map(|_| ())
 }
 
 /// Starts the HTTP and WebSocket server until the host process exits.
@@ -191,21 +197,21 @@ fn discover_lan_ip() -> Option<String> {
     Some(socket.local_addr().ok()?.ip().to_string())
 }
 
+fn clamp_world_position(value: f32, maximum: f32) -> f32 {
+    value.clamp(0.0, maximum)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn world_position_is_bounded() {
-        assert_eq!(clamp_world_position(-20.0, WORLD_WIDTH), 0.0);
+        assert_eq!(clamp_world_position(-20.0, WORLD_WIDTH).to_bits(), 0.0_f32.to_bits());
         assert_eq!(
-            clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH),
-            WORLD_WIDTH
+            clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH).to_bits(),
+            WORLD_WIDTH.to_bits()
         );
-        assert_eq!(clamp_world_position(42.0, WORLD_WIDTH), 42.0);
+        assert_eq!(clamp_world_position(42.0, WORLD_WIDTH).to_bits(), 42.0_f32.to_bits());
     }
-}
-
-fn clamp_world_position(value: f32, maximum: f32) -> f32 {
-    value.clamp(0.0, maximum)
 }
