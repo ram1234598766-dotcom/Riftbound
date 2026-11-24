@@ -88,7 +88,9 @@ impl CharacterController {
 }
 
 fn axis(input: &InputState, positive: Button, negative: Button) -> f32 {
-    let positive = if input.is_held(positive) { 1.0 } else { 0.0 };\n    let negative = if input.is_held(negative) { 1.0 } else { 0.0 };\n    positive - negative
+    let positive = if input.is_held(positive) { 1.0 } else { 0.0 };
+    let negative = if input.is_held(negative) { 1.0 } else { 0.0 };
+    positive - negative
 }
 
 fn approach(current: f32, target: f32, max_delta: f32) -> f32 {
