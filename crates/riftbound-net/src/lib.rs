@@ -2,12 +2,12 @@
 
 use std::{
     collections::BTreeMap,
-    time::Instant,
     net::SocketAddr,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
+    time::Instant,
 };
 
 use axum::{
@@ -197,7 +197,11 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
                 last_input_at = Instant::now();
                 let mut players = state.players.lock().await;
                 if let Some(player) = players.get_mut(&id) {
-                    let scale = if magnitude > 1.0 { 1.0 / magnitude } else { 1.0 };
+                    let scale = if magnitude > 1.0 {
+                        1.0 / magnitude
+                    } else {
+                        1.0
+                    };
                     player.x = clamp_world_position(
                         player.x + dx * scale * PLAYER_SPEED * elapsed,
                         WORLD_WIDTH,
@@ -217,8 +221,7 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
                 let Some(player) = players.get(&id) else {
                     continue;
                 };
-                if index >= SHARD_POSITIONS.len()
-                    || !within_pickup_range(player.x, player.y, index)
+                if index >= SHARD_POSITIONS.len() || !within_pickup_range(player.x, player.y, index)
                 {
                     continue;
                 }
@@ -308,7 +311,10 @@ mod tests {
         let scale = 1.0 / magnitude;
         let step = scale * PLAYER_SPEED * MAX_INPUT_DELTA;
         assert!((step.hypot(step) - PLAYER_SPEED * MAX_INPUT_DELTA).abs() < 0.001);
-        assert_eq!(clamp_world_position(WORLD_WIDTH + step, WORLD_WIDTH), WORLD_WIDTH);
+        assert_eq!(
+            clamp_world_position(WORLD_WIDTH + step, WORLD_WIDTH),
+            WORLD_WIDTH
+        );
     }
 
     #[test]
