@@ -213,7 +213,6 @@ impl Renderer {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct InstanceRaw {
     model: [f32; 16],
