@@ -87,7 +87,7 @@ impl Renderer {
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("riftbound-cube-pipeline-layout"),
-            bind_group_layouts: &[&camera_layout],
+            bind_group_layouts: &[Some(&camera_layout)],
             immediate_size: 0,
         });
         let cube_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -106,8 +106,8 @@ impl Renderer {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -219,7 +219,7 @@ impl Renderer {
             pass.draw(0..36, 0..1);
         }
         self.queue.submit([encoder.finish()]);
-        frame.present();
+        self.queue.present(frame);
     }
 
     fn reconfigure(&mut self) {
