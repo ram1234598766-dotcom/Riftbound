@@ -205,12 +205,6 @@ impl ApplicationHandler for RiftboundApp {
                         transform.rotation_radians.y =
                             horizontal_velocity.x.atan2(-horizontal_velocity.z);
                     }
-                    self.controller.update_vertical(
-                        &mut transform,
-                        &self.input,
-                        delta,
-                        PLAYER_RADIUS + 0.01,
-                    );
                     let displacement = Vec3::new(
                         transform.translation.x - previous_position.x,
                         0.0,
@@ -223,9 +217,12 @@ impl ApplicationHandler for RiftboundApp {
                     let floor_height = terrain_height(resolved.position.x, resolved.position.z)
                         + PLAYER_RADIUS
                         + 0.01;
-                    if transform.translation.y < floor_height {
-                        transform.translation.y = floor_height;
-                    }
+                    self.controller.update_vertical(
+                        &mut transform,
+                        &self.input,
+                        delta,
+                        floor_height,
+                    );
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     let mut animated_transforms = vec![(player, transform)];
