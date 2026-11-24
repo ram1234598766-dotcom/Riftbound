@@ -267,7 +267,9 @@ impl SuspensionState {
             self.compression[index] = (self.compression[index]
                 + self.compression_velocity[index] * dt)
                 .clamp(0.0, config.max_travel);
-            if self.compression[index] == 0.0 || self.compression[index] == config.max_travel {
+            if self.compression[index] <= f32::EPSILON
+                || self.compression[index] >= config.max_travel - f32::EPSILON
+            {
                 self.compression_velocity[index] = 0.0;
             }
         }
@@ -277,10 +279,10 @@ impl SuspensionState {
     /// Returns the current visual chassis response without advancing simulation.
     #[must_use]
     pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
-        let front = (self.compression[0] + self.compression[1]) * 0.5;
-        let rear = (self.compression[2] + self.compression[3]) * 0.5;
-        let left = (self.compression[0] + self.compression[2]) * 0.5;
-        let right = (self.compression[1] + self.compression[3]) * 0.5;
+        let front = f32::midpoint(self.compression[0], self.compression[1]);
+        let rear = f32::midpoint(self.compression[2], self.compression[3]);
+        let left = f32::midpoint(self.compression[0], self.compression[2]);
+        let right = f32::midpoint(self.compression[1], self.compression[3]);
         SuspensionPose {
             average_compression: self.compression.iter().sum::<f32>() * 0.25,
             pitch: ((front - rear) / config.wheelbase.max(f32::EPSILON)).atan(),
