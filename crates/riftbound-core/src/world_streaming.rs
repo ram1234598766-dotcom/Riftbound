@@ -166,11 +166,7 @@ impl WorldChunkStreamer {
             }
         }
         self.active.sort_unstable_by_key(|request| {
-            (
-                request.distance_squared,
-                request.coord.z,
-                request.coord.x,
-            )
+            (request.distance_squared, request.coord.z, request.coord.x)
         });
         true
     }
