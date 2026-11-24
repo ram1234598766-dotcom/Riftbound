@@ -1456,4 +1456,3 @@ fn main() {
         .run_app(&mut app)
         .expect("Riftbound event loop should run");
 }
-
