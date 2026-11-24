@@ -571,7 +571,9 @@ impl Renderer {
                 if usize::try_from(object.mesh.index()).ok() != Some(batch.mesh_index) {
                     continue;
                 }
-                let world = self.scene.world_matrix(object.id)
+                let world = self
+                    .scene
+                    .world_matrix(object.id)
                     .expect("iterated scene objects must have valid hierarchy");
                 if !sphere_in_frustum(&view_projection, world) {
                     continue;
@@ -945,7 +947,14 @@ fn sphere_in_frustum(matrix: &[f32; 16], model: [f32; 16]) -> bool {
         (model[8] * model[8] + model[9] * model[9] + model[10] * model[10]).sqrt(),
     ];
     let radius = scale.into_iter().fold(0.0_f32, f32::max) * 1.733;
-    let row = |index: usize| [matrix[index], matrix[4 + index], matrix[8 + index], matrix[12 + index]];
+    let row = |index: usize| {
+        [
+            matrix[index],
+            matrix[4 + index],
+            matrix[8 + index],
+            matrix[12 + index],
+        ]
+    };
     let r0 = row(0);
     let r1 = row(1);
     let r2 = row(2);
@@ -959,10 +968,10 @@ fn sphere_in_frustum(matrix: &[f32; 16], model: [f32; 16]) -> bool {
         [r3[0] - r2[0], r3[1] - r2[1], r3[2] - r2[2], r3[3] - r2[3]],
     ];
     planes.iter().all(|plane| {
-        let distance = plane[0] * center[0] + plane[1] * center[1]
-            + plane[2] * center[2] + plane[3];
-        let normal_length = (plane[0] * plane[0] + plane[1] * plane[1]
-            + plane[2] * plane[2]).sqrt();
+        let distance =
+            plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] + plane[3];
+        let normal_length =
+            (plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]).sqrt();
         distance >= -radius * normal_length
     })
 }
@@ -1040,8 +1049,9 @@ mod tests {
         for (index, value) in matrix.iter_mut().enumerate() {
             *value = f32::from_ne_bytes(bytes[index * 4..index * 4 + 4].try_into().unwrap());
         }
-        let visible = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let visible = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
         let mut distant = visible;
         distant[12] = 10_000.0;
         assert!(sphere_in_frustum(&matrix, visible));
