@@ -22,31 +22,46 @@ impl PlayerHealth {
 
     /// Current health points.
     #[must_use]
-    pub const fn current(self) -> u8 { self.current }
+    pub const fn current(self) -> u8 {
+        self.current
+    }
 
     /// Maximum health points.
     #[must_use]
-    pub const fn maximum(self) -> u8 { self.maximum }
+    pub const fn maximum(self) -> u8 {
+        self.maximum
+    }
 
     /// Whether the player can continue playing.
     #[must_use]
-    pub const fn is_alive(self) -> bool { self.current > 0 }
+    pub const fn is_alive(self) -> bool {
+        self.current > 0
+    }
 
     /// Whether another hit is currently blocked.
     #[must_use]
-    pub const fn is_protected(self) -> bool { self.protection_remaining > 0.0 }
+    pub const fn is_protected(self) -> bool {
+        self.protection_remaining > 0.0
+    }
 
     /// Advances the protection timer; invalid time steps are ignored.
     pub fn update(&mut self, delta_seconds: f32) {
         if delta_seconds.is_finite() && delta_seconds > 0.0 {
-            self.protection_remaining = (self.protection_remaining - delta_seconds.min(0.25)).max(0.0);
+            self.protection_remaining =
+                (self.protection_remaining - delta_seconds.min(0.25)).max(0.0);
         }
     }
 
     /// Applies one hit and starts protection. Returns true only when damage was applied.
     pub fn apply_damage(&mut self, amount: u8, protection_seconds: f32) -> bool {
-        if amount == 0 || !protection_seconds.is_finite() || protection_seconds <= 0.0
-            || !self.is_alive() || self.is_protected() { return false; }
+        if amount == 0
+            || !protection_seconds.is_finite()
+            || protection_seconds <= 0.0
+            || !self.is_alive()
+            || self.is_protected()
+        {
+            return false;
+        }
         self.current = self.current.saturating_sub(amount);
         self.protection_remaining = protection_seconds;
         true
