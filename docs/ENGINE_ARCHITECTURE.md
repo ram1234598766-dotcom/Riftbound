@@ -23,7 +23,7 @@ Dependencies point inward toward stable contracts. The renderer must not own gam
 - Simulation uses a fixed timestep through FixedClock; rendering may run at a separate variable rate.
 - Entity handles are generational. A despawned handle must never silently refer to a later entity that reuses its slot.
 - Input is captured at the platform boundary and converted to logical actions before gameplay consumes it.
-- Character movement is deterministic and frame-rate bounded. The current arena collision solver resolves a circular horizontal footprint against static axis-aligned obstacles and world bounds, allowing axis-separated wall sliding. It does not yet provide vertical physics, slopes, dynamic bodies, or a general-purpose physics engine.
+- Character movement is deterministic and frame-rate bounded. The current arena collision solver resolves a circular horizontal footprint against static axis-aligned obstacles and world bounds, allowing axis-separated wall sliding. Vertical motion uses a configurable gravity/jump controller with ground-plane landing and edge-triggered jump input. Terrain slopes, ramps, multi-surface ground detection, dynamic bodies, and a general-purpose physics engine are not implemented.
 - World transforms are explicit data, not hidden renderer state. Scene objects use generational IDs, so stale references cannot address newly spawned objects. Parent links are cycle-checked, and world matrices are composed from local transforms in ancestor order. Despawning a parent detaches its direct children.
 - GPU work is submitted by the renderer; gameplay systems do not issue graphics API calls.
 - Asset loading is asynchronous and budgeted. Large world regions must be streamable instead of loaded as one monolithic scene.
