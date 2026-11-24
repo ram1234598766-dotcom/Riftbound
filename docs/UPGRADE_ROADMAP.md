@@ -200,3 +200,8 @@ The native driving prototype now samples the existing shared arena terrain at al
 ### Vehicle fall recovery foundation
 
 The platform-independent vehicle core now includes a reusable recovery record that accepts only finite vehicle states within a configured clearance above sampled ground. If the runtime detects that the car has fallen below its recovery plane or its height becomes invalid, it restores the latest accepted safe position and heading and clears speed; suspension state is reset at recovery. Unit tests cover accepted safe states, rejected unsafe samples, recovery, and speed reset. The native runtime currently uses a provisional arena recovery plane and terrain sampler; a streamed open-world safe-location policy and collision-aware recovery placement remain future work.
+
+
+### Rectangular vehicle collision foundation
+
+The deterministic core collision world now supports a rectangular vehicle footprint in addition to the existing circular character footprint. Vehicle movement uses separate width and length extents, bounded substeps, axis-separated resolution, and binary refinement at obstacle boundaries. The native driving prototype now resolves its horizontal movement through this vehicle footprint and stops the current speed when a collision blocks movement. This is still an axis-aligned approximation: it does not yet rotate the footprint with vehicle heading, model suspension/wheel contact, or provide streamed open-world collision chunks. The current runtime also uses the arena collision world, so this is a tested foundation rather than open-world collision coverage.
