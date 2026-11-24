@@ -176,7 +176,6 @@ impl VehicleState {
     }
 }
 
-
 /// Tunable four-corner spring approximation for visual chassis response.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SuspensionConfig {
@@ -239,7 +238,9 @@ impl SuspensionState {
         if !delta_seconds.is_finite()
             || delta_seconds <= 0.0
             || !chassis_height.is_finite()
-            || wheel_ground_heights.iter().any(|height| !height.is_finite())
+            || wheel_ground_heights
+                .iter()
+                .any(|height| !height.is_finite())
             || !config.max_travel.is_finite()
             || !config.spring_strength.is_finite()
             || !config.damping.is_finite()
@@ -258,17 +259,15 @@ impl SuspensionState {
 
         let dt = delta_seconds.min(0.1);
         for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
-            let target = (ground_height + config.rest_length - chassis_height)
-                .clamp(0.0, config.max_travel);
+            let target =
+                (ground_height + config.rest_length - chassis_height).clamp(0.0, config.max_travel);
             let acceleration = (target - self.compression[index]) * config.spring_strength
                 - self.compression_velocity[index] * config.damping;
             self.compression_velocity[index] += acceleration * dt;
             self.compression[index] = (self.compression[index]
                 + self.compression_velocity[index] * dt)
                 .clamp(0.0, config.max_travel);
-            if self.compression[index] == 0.0
-                || self.compression[index] == config.max_travel
-            {
+            if self.compression[index] == 0.0 || self.compression[index] == config.max_travel {
                 self.compression_velocity[index] = 0.0;
             }
         }
@@ -293,7 +292,6 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn suspension_compresses_over_a_bump_and_returns_a_finite_pose() {
@@ -400,7 +398,6 @@ mod tests {
         assert_eq!(vehicle, VehicleState::default());
     }
 
-
     #[test]
     fn reverse_steering_uses_reverse_speed_scale() {
         let mut vehicle = VehicleState {
@@ -417,7 +414,8 @@ mod tests {
             0.1,
         );
         let config = VehicleConfig::default();
-        let expected = -config.steering_rate * (vehicle.speed.abs() / config.max_reverse_speed) * 0.1;
+        let expected =
+            -config.steering_rate * (vehicle.speed.abs() / config.max_reverse_speed) * 0.1;
         assert!((vehicle.heading - expected).abs() < 0.0001);
     }
 
