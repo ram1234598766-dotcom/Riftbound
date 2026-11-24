@@ -380,7 +380,8 @@ impl Renderer {
                 pass.draw_indexed(0..mesh.index_count(), 0, 0..batch.instance_count);
             }
         }
-        let hud_vertices = hud::build_vertices(&self.hud_data, self.config.width, self.config.height);
+        let hud_vertices =
+            hud::build_vertices(&self.hud_data, self.config.width, self.config.height);
         if !hud_vertices.is_empty() {
             let mut bytes = Vec::with_capacity(hud_vertices.len() * 24);
             for vertex in &hud_vertices {
@@ -388,11 +389,13 @@ impl Renderer {
                     bytes.extend_from_slice(&value.to_ne_bytes());
                 }
             }
-            let hud_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("riftbound-hud-vertices"),
-                contents: &bytes,
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let hud_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("riftbound-hud-vertices"),
+                    contents: &bytes,
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("riftbound-hud-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
