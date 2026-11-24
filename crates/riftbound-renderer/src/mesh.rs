@@ -88,6 +88,13 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-pyramid-mesh")
     }
 
+    /// Creates a faceted octahedral crystal mesh with alternating cyan facets.
+    #[must_use]
+    pub fn crystal(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = crystal_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-crystal-mesh")
+    }
+
     /// Returns the GPU vertex buffer.
     #[must_use]
     pub const fn vertex_buffer(&self) -> &wgpu::Buffer {
@@ -139,6 +146,19 @@ fn pyramid_data() -> (Vec<MeshVertex>, Vec<u16>) {
         },
     ];
     let indices = vec![0, 2, 1, 0, 3, 2, 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4];
+    (vertices, indices)
+}
+
+fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let vertices = vec![
+        MeshVertex { position: [0.0, 1.0, 0.0], color: [0.18, 0.92, 1.0] },
+        MeshVertex { position: [0.0, -1.0, 0.0], color: [0.08, 0.35, 0.88] },
+        MeshVertex { position: [1.0, 0.0, 0.0], color: [0.22, 0.72, 1.0] },
+        MeshVertex { position: [0.0, 0.0, 1.0], color: [0.12, 0.58, 0.96] },
+        MeshVertex { position: [-1.0, 0.0, 0.0], color: [0.32, 0.86, 1.0] },
+        MeshVertex { position: [0.0, 0.0, -1.0], color: [0.10, 0.48, 0.90] },
+    ];
+    let indices = vec![0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2, 1, 3, 2, 1, 4, 3, 1, 5, 4, 1, 2, 5];
     (vertices, indices)
 }
 
@@ -222,6 +242,15 @@ mod tests {
         assert_eq!(vertices.len(), 5);
         assert_eq!(indices.len(), 18);
         assert!(valid_index_data(vertices.len(), &indices));
+    }
+
+    #[test]
+    fn crystal_has_eight_valid_facets() {
+        let (vertices, indices) = crystal_data();
+        assert_eq!(vertices.len(), 6);
+        assert_eq!(indices.len(), 24);
+        assert!(valid_index_data(vertices.len(), &indices));
+        assert!(vertices.iter().all(|vertex| vertex.position.iter().all(|v| v.is_finite())));
     }
 
     #[test]
