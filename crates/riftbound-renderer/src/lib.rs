@@ -288,7 +288,11 @@ impl Renderer {
         affected_meshes: &[bool],
     ) -> Result<(), std::num::TryFromIntError> {
         for batch in &mut self.mesh_batches {
-            if !affected_meshes.get(batch.mesh_index).copied().unwrap_or(false) {
+            if !affected_meshes
+                .get(batch.mesh_index)
+                .copied()
+                .unwrap_or(false)
+            {
                 continue;
             }
             batch.instance_staging.clear();
