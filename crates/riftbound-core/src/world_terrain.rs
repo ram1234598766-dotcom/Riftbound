@@ -55,29 +55,40 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     WorldTerrainSample { height, surface }
 }
 
-fn value_noise(x: f32, z: f32) -> f32 {
-    let x0 = x.floor() as i32;
-    let z0 = z.floor() as i32;
-    let tx = smoothstep(x - x.floor());
-    let tz = smoothstep(z - z.floor());
+// Input coordinates are bounded by world_terrain_sample before reaching this helper.
+#[allow(clippy::cast_possible_truncation)]
+fn value_noise(sample_x: f32, sample_z: f32) -> f32 {
+    let grid_x = sample_x.floor() as i32;
+    let grid_z = sample_z.floor() as i32;
+    let fraction_x = smoothstep(sample_x - sample_x.floor());
+    let fraction_z = smoothstep(sample_z - sample_z.floor());
 
-    let a = lattice_value(x0, z0);
-    let b = lattice_value(x0.saturating_add(1), z0);
-    let c = lattice_value(x0, z0.saturating_add(1));
-    let d = lattice_value(x0.saturating_add(1), z0.saturating_add(1));
+    let northwest = lattice_value(grid_x, grid_z);
+    let northeast = lattice_value(grid_x.saturating_add(1), grid_z);
+    let southwest = lattice_value(grid_x, grid_z.saturating_add(1));
+    let southeast = lattice_value(grid_x.saturating_add(1), grid_z.saturating_add(1));
 
-    lerp(lerp(a, b, tx), lerp(c, d, tx), tz)
+    lerp(
+        lerp(northwest, northeast, fraction_x),
+        lerp(southwest, southeast, fraction_x),
+        fraction_z,
+    )
 }
 
-fn lattice_value(x: i32, z: i32) -> f32 {
-    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9);
-    hash ^= (z as u32).wrapping_mul(0x85EB_CA6B);
+fn lattice_value(grid_x: i32, grid_z: i32) -> f32 {
+    let mut hash = grid_x.cast_unsigned().wrapping_mul(0x9E37_79B9);
+    hash ^= grid_z.cast_unsigned().wrapping_mul(0x85EB_CA6B);
     hash ^= hash >> 16;
     hash = hash.wrapping_mul(0x7FEB_352D);
     hash ^= hash >> 15;
     hash = hash.wrapping_mul(0x846C_A68B);
     hash ^= hash >> 16;
-    (hash as f32 / u32::MAX as f32) * 2.0 - 1.0
+
+    // Split into 16-bit pieces so each integer-to-float conversion is exact.
+    let high = u16::try_from(hash >> 16).expect("upper hash half fits u16");
+    let low = u16::try_from(hash & 0xFFFF).expect("lower hash half fits u16");
+    let normalized = (f32::from(high) * 65_536.0 + f32::from(low)) / 4_294_967_295.0;
+    normalized * 2.0 - 1.0
 }
 
 fn smoothstep(value: f32) -> f32 {
