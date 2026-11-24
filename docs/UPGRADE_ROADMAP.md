@@ -195,3 +195,8 @@ The native runtime now spawns an explicitly prototype-grade blockout vehicle wit
 ### Terrain-sampled suspension runtime integration
 
 The native driving prototype now samples the existing shared arena terrain at all four wheel contact positions, advances the allocation-free spring/damper state, adjusts wheel heights to the sampled ground, and applies suspension-derived chassis pitch and roll. This connects the earlier suspension simulation to visible runtime transforms. The current terrain is still the small arena height field, not the planned open-world biome system; vehicle collision, surface classification, wheel-ground collision resolution, and physical validation remain future work.
+
+
+### Vehicle fall recovery foundation
+
+The platform-independent vehicle core now includes a reusable recovery record that accepts only finite vehicle states within a configured clearance above sampled ground. If the runtime detects that the car has fallen below its recovery plane or its height becomes invalid, it restores the latest accepted safe position and heading and clears speed; suspension state is reset at recovery. Unit tests cover accepted safe states, rejected unsafe samples, recovery, and speed reset. The native runtime currently uses a provisional arena recovery plane and terrain sampler; a streamed open-world safe-location policy and collision-aware recovery placement remain future work.
