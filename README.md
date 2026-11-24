@@ -1,12 +1,12 @@
 # Riftbound
 
-A custom Rust engine project with a playable browser mission while the engine is developed.
+Riftbound is being developed as an open-world driving RPG using a custom Rust engine. The current arena and browser mission are early prototypes; the long-term game centers on exploration, terrain-aware driving, vehicles, quests, and RPG progression.
 
 ## Play the current build
 
 Open [index.html](./index.html) from the repository in a modern browser, or serve the repository root with any static file server. The game has no external runtime dependencies.
 
-**Mission: The Shardfall**
+**Current prototype: The Shardfall arena**
 - Recover all five rift shards.
 - Avoid or phase-dash through sentinel enemies.
 - Return to the extraction beacon after collecting every shard.
@@ -14,7 +14,7 @@ Open [index.html](./index.html) from the repository in a modern browser, or serv
 - Touch: on-screen directional pad and Phase button.
 - Press R after a result screen to restart.
 
-The browser mission is an early playable vertical slice, not the final open-world game.
+The browser mission is an early arena prototype, not the open-world driving RPG. The native runtime currently contains a small arena and experimental gameplay systems. Open-world regions, playable cars, terrain-specific routes, quests, garages, and RPG progression are planned and not yet implemented.
 
 ## PC-hosted LAN play and browser multiplayer
 
@@ -63,3 +63,8 @@ GitHub Actions runs these checks on pushes and pull requests.
 - Small modules, explicit APIs, deterministic tests where practical.
 - Third-party crates are infrastructure dependencies, not a substitute game engine.
 - Keep assets licensed, documented, and reproducible.
+
+
+## Open-world driving RPG direction
+
+The product direction is an explorable connected world where driving is a primary activity. Roads and off-road surfaces (asphalt, gravel, mud, sand, snow, and rock) will affect vehicle handling. RPG systems will add quests, NPCs, rewards, vehicle unlocks/upgrades, garages, and exploration activities. The implementation roadmap is in [docs/UPGRADE_ROADMAP.md](./docs/UPGRADE_ROADMAP.md).
