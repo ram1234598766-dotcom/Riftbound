@@ -295,7 +295,11 @@ fn starter_scene() -> Scene {
         ),
     ];
     for (index, transform) in objects.into_iter().enumerate() {
-        let mesh = if index == 1 { MeshId::PYRAMID } else { MeshId::CUBE };
+        let mesh = if index == 1 {
+            MeshId::PYRAMID
+        } else {
+            MeshId::CUBE
+        };
         scene
             .spawn_with_mesh(transform, mesh)
             .expect("starter scene entity ID space available");
@@ -338,7 +342,11 @@ fn create_mesh_batches(
             contents: &bytes,
             usage: wgpu::BufferUsages::VERTEX,
         });
-        batches.push(MeshBatch { mesh_index, instance_buffer, instance_count });
+        batches.push(MeshBatch {
+            mesh_index,
+            instance_buffer,
+            instance_count,
+        });
     }
     Ok(batches)
 }
@@ -538,9 +546,11 @@ mod tests {
         let instances = groups.iter().flatten().collect::<Vec<_>>();
         assert_eq!(instances.len(), 3);
         assert_ne!(instances[0].model, instances[1].model);
-        assert!(instances.iter().all(|instance| {
-            instance.model.iter().all(|component| component.is_finite())
-        }));
+        assert!(
+            instances
+                .iter()
+                .all(|instance| { instance.model.iter().all(|component| component.is_finite()) })
+        );
         assert_eq!(instance_bytes(&groups[0]).len(), groups[0].len() * 64);
     }
 
