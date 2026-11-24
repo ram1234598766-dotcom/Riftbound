@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EnemyBrain,
-    EnemyConfig, EnemyEvent, EnemyState, EntityId, ExtractionZone, InputState, MaterialId, MeshId,
+    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EnemyArchetype, EnemyBrain,
+    EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId, ExtractionZone, InputState, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, Scene, Transform3, Vec3, terrain_height,
 };
@@ -836,7 +836,10 @@ fn build_sentinel(scene: &mut Scene) -> (EntityId, EntityId, EnemyBrain) {
     (
         sentinel,
         effect,
-        EnemyBrain::new(home, EnemyConfig::default()),
+        EnemyBrain::new(
+            home,
+            EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard),
+        ),
     )
 }
 
