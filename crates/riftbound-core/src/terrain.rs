@@ -12,8 +12,7 @@ pub fn terrain_height(world_x: f32, world_z: f32) -> f32 {
         return 0.0;
     }
     let edge_fade = (std::f32::consts::PI * u).sin() * (std::f32::consts::PI * v).sin();
-    let ridges = (u * std::f32::consts::TAU * 2.0).sin()
-        * (v * std::f32::consts::TAU * 1.5).cos();
+    let ridges = (u * std::f32::consts::TAU * 2.0).sin() * (v * std::f32::consts::TAU * 1.5).cos();
     edge_fade * ridges * 0.075
 }
 
