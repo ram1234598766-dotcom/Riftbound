@@ -246,3 +246,7 @@ World-scale detailed and distant chunks now add a bounded vertical skirt along a
 ### Reusable renderer slot allocation for streamed chunks
 
 Added a fixed-capacity `WorldChunkSlotMap` alongside the CPU chunk planner. It retains a stable slot for chunks that remain active, preserves that slot when only the LOD changes, releases slots for evicted coordinates, and reuses released slots for incoming chunks. Change application validates removals, updates, duplicate additions, and capacity before mutation so an invalid delta cannot partially corrupt the mapping. The default 5×5 window reserves exactly 25 slots. This is the renderer-facing allocation contract; GPU mesh creation, replacement, eviction, and native runtime wiring are still pending.
+
+### Four-wheel world-terrain surface query
+
+The world terrain module now exposes `world_terrain_vehicle_surface`, which samples the same deterministic absolute-coordinate terrain function at all four tyre contact points using vehicle heading, track width, and wheelbase. Its dominant surface result is ready to drive the vehicle's existing grip, speed, and rolling-resistance model when runtime terrain sampling is switched to world coordinates. Centre-surface tie-breaking prevents unstable handling at biome and road edges, and invalid inputs fall back safely to rock. Unit tests cover sand, mud, snow, edge ties, and invalid dimensions. The native runtime has not switched to this query yet; arena height sampling, collision bounds, and streamed world chunks must be integrated as one coherent transition.
