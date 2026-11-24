@@ -20,7 +20,7 @@ The browser mission is an early playable vertical slice, not the final open-worl
 
 The custom engine foundation lives in crates/riftbound-core. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, and 3D transforms.
 
-The native application shell lives in crates/riftbound-runtime; GPU surface setup and frame presentation are isolated in crates/riftbound-renderer. The native runtime currently opens a window and clears/presents a GPU frame. It is a renderer bootstrap, not yet a 3D game renderer. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
+The native application shell lives in crates/riftbound-runtime; GPU surface setup and frame presentation are isolated in crates/riftbound-renderer. The native runtime opens a window and presents a shader-generated 3D cube with perspective projection and depth testing. This is the first geometry milestone, not yet a complete world renderer or playable 3D game. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
 
 See [the engine architecture](./docs/ENGINE_ARCHITECTURE.md) for module boundaries and the delivery sequence.
 
