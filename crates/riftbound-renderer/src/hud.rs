@@ -39,8 +39,8 @@ impl HudVertex {
 
 /// Builds screen-space triangles for the current mission HUD.
 pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex> {
-    let width = width.max(1) as f32;
-    let height = height.max(1) as f32;
+    let width = f32::from(u16::try_from(width.max(1)).unwrap_or(u16::MAX));
+    let height = f32::from(u16::try_from(height.max(1)).unwrap_or(u16::MAX));
     let mut out = Vec::new();
     let cyan = [0.25, 0.88, 1.0, 1.0];
     let white = [0.86, 0.93, 1.0, 1.0];
