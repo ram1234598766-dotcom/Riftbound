@@ -46,7 +46,10 @@ impl Mesh {
         if vertices.is_empty() || indices.is_empty() || indices.len() % 3 != 0 {
             return None;
         }
-        if indices.iter().any(|index| usize::from(*index) >= vertices.len()) {
+        if indices
+            .iter()
+            .any(|index| usize::from(*index) >= vertices.len())
+        {
             return None;
         }
         let index_count = u32::try_from(indices.len()).ok()?;
@@ -168,14 +171,7 @@ fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
             vertices.push(MeshVertex { position, color });
         }
         let base = u16::try_from(face_index * 4).expect("cube vertex offset fits u16");
-        indices.extend_from_slice(&[
-            base,
-            base + 1,
-            base + 2,
-            base,
-            base + 2,
-            base + 3,
-        ]);
+        indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
     }
     (vertices, indices)
 }
@@ -190,7 +186,11 @@ mod tests {
         assert_eq!(vertices.len(), 24);
         assert_eq!(indices.len(), 36);
         assert_eq!(indices.len() % 3, 0);
-        assert!(indices.iter().all(|index| usize::from(*index) < vertices.len()));
+        assert!(
+            indices
+                .iter()
+                .all(|index| usize::from(*index) < vertices.len())
+        );
         assert!(vertices.iter().all(|vertex| {
             vertex
                 .position
