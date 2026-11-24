@@ -408,6 +408,29 @@ fn world_terrain_chunk_data(
             ]);
         }
     }
+
+    // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
+    // chunk. Each edge is generated from that chunk's own border samples, so
+    // the overlap remains valid even when the two edge profiles differ.
+    const SKIRT_DEPTH: f32 = 12.0;
+    let mut append_skirt = |edge: Vec<usize>| -> Option<()> {
+        for pair in edge.windows(2) {
+            let top_a = *vertices.get(pair[0])?;
+            let top_b = *vertices.get(pair[1])?;
+            let base = u16::try_from(vertices.len()).ok()?;
+            let mut bottom_a = top_a;
+            bottom_a.position[1] -= SKIRT_DEPTH;
+            let mut bottom_b = top_b;
+            bottom_b.position[1] -= SKIRT_DEPTH;
+            vertices.extend_from_slice(&[top_a, bottom_a, top_b, bottom_b]);
+            indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 1, base + 3]);
+        }
+        Some(())
+    };
+    append_skirt((0..side).collect())?;
+    append_skirt((0..side).map(|z| z * side + side - 1).collect())?;
+    append_skirt(((side - 1) * side..side * side).collect())?;
+    append_skirt((0..side).rev().map(|z| z * side).collect())?;
     Some((vertices, indices))
 }
 
@@ -585,10 +608,22 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81);
-        assert_eq!(distant.0.len(), 25);
-        assert_eq!(detailed.1.len(), 384);
-        assert_eq!(distant.1.len(), 96);
+        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4);
+        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4);
+        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6);
+        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6);
+        assert!(valid_index_data(detailed.0.len(), &detailed.1));
+        assert!(valid_index_data(distant.0.len(), &distant.1));
+        for (vertices, _) in [&detailed, &distant] {
+            assert!(vertices.iter().all(|vertex| {
+                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            }));
+        }
+        let base_vertex_count = 25;
+        assert!(distant.0[base_vertex_count..].chunks_exact(4).all(|skirt| {
+            (skirt[0].position[1] - skirt[1].position[1] - 12.0).abs() < f32::EPSILON
+                && (skirt[2].position[1] - skirt[3].position[1] - 12.0).abs() < f32::EPSILON
+        }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
     }
