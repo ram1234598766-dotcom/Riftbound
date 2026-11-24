@@ -272,8 +272,7 @@ impl Renderer {
                     .scene
                     .world_matrix(object.id)
                     .expect("iterated scene objects must have valid hierarchy");
-                let instance =
-                    InstanceRaw::from_matrix(world, material_tint(object.material));
+                let instance = InstanceRaw::from_matrix(world, material_tint(object.material));
                 append_instance_bytes(&mut batch.instance_staging, &instance);
                 instance_count += 1;
             }
