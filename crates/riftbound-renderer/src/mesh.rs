@@ -374,14 +374,14 @@ fn world_terrain_chunk_data(
     let origin_x = f32::from(chunk_x) * 64.0;
     let origin_z = f32::from(chunk_z) * 64.0;
     let cells = side - 1;
-    let step = 64.0 / cells as f32;
+    let step = 64.0 / f32::from(u8::try_from(cells).ok()?);
     let mut vertices = Vec::with_capacity(side * side);
     let mut indices = Vec::with_capacity(cells * cells * 6);
 
     for z in 0..side {
         for x in 0..side {
-            let local_x = -32.0 + x as f32 * step;
-            let local_z = -32.0 + z as f32 * step;
+            let local_x = -32.0 + f32::from(u8::try_from(x).ok()?) * step;
+            let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
             let sample = world_terrain_sample(origin_x + local_x, origin_z + local_z);
             let base = terrain_surface_color(sample.surface);
             let elevation_tint = sample.height.max(0.0) * 0.012;
