@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#080d18"><title>RIFTBOUND — The Shardfall</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080d18;color:#eaf3ff}body{touch-action:none}canvas{display:block;width:100%;height:100%;cursor:crosshair}.hud{position:fixed;inset:0;pointer-events:none;padding:clamp(12px,2vw,26px);display:flex;flex-direction:column;justify-content:space-between}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.brand{font-size:12px;letter-spacing:.24em;color:#9fb4d0;font-weight:800}.brand strong{display:block;font-size:clamp(18px,2.5vw,27px);letter-spacing:.12em;color:#f4f8ff;margin-top:4px}.panel{background:linear-gradient(135deg,#101d30dd,#0a1220dd);border:1px solid #6b8fb544;box-shadow:0 10px 36px #0008,inset 0 1px #ffffff10;border-radius:13px;padding:11px 14px;backdrop-filter:blur(10px)}.stats{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}.stat{min-width:82px}.label{font-size:9px;letter-spacing:.18em;color:#8ca6c8;text-transform:uppercase}.value{font-size:19px;font-weight:750;margin-top:2px;font-variant-numeric:tabular-nums}.bottom{display:flex;justify-content:space-between;align-items:end;gap:12px}.objective{max-width:390px}.objective h2{font-size:11px;letter-spacing:.2em;color:#78e7f1;margin:0 0 5px}.objective p{font-size:13px;color:#d2dfef;margin:0;line-height:1.45}.bar{height:5px;background:#1b2a3d;border-radius:8px;overflow:hidden;margin-top:9px}.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#36d6e5,#8b8cff);transition:width .15s}.hint{font-size:11px;color:#9ab0cc;text-align:right}.overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at center,#0c1a2cbb,#050914ed);z-index:5;padding:20px}.dialog{width:min(510px,100%);padding:clamp(22px,5vw,42px);border:1px solid #74dce655;border-radius:20px;background:linear-gradient(145deg,#13243a,#0a1120);box-shadow:0 30px 100px #000b}.eyebrow{font-size:10px;letter-spacing:.28em;color:#71e8f2;font-weight:800}.dialog h1{font-size:clamp(34px,8vw,56px);line-height:.98;letter-spacing:-.055em;margin:13px 0}.dialog p{color:#b8c9df;line-height:1.6;font-size:14px}.btn{pointer-events:auto;border:0;border-radius:9px;padding:13px 19px;background:linear-gradient(100deg,#38d7e4,#8e9cff);color:#07111e;font-weight:850;letter-spacing:.08em;cursor:pointer;margin-top:12px}.btn:hover{filter:brightness(1.12)}.small{font-size:11px!important;color:#8098b6!important}.touch{position:fixed;bottom:24px;left:18px;display:none;gap:7px;pointer-events:auto}.touch button,.dash{width:46px;height:46px;border-radius:12px;border:1px solid #8baac855;background:#12243bcc;color:#e8f7ff;font-size:17px}.touch .cluster{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,46px);gap:5px}.touch button[data-k="w"]{grid-column:2}.touch button[data-k="a"]{grid-column:1;grid-row:2}.touch button[data-k="s"]{grid-column:2;grid-row:2}.touch button[data-k="d"]{grid-column:3;grid-row:2}.dash{position:fixed;right:20px;bottom:34px;width:72px;height:72px;border-radius:50%;display:none;pointer-events:auto;color:#7df2f2;font-size:10px;font-weight:800;letter-spacing:.1em}@media(max-width:700px){.touch,.dash{display:block}.bottom{align-items:start}.hint{display:none}.stats .panel{min-width:68px;padding:8px}.value{font-size:15px}.objective{max-width:230px}.objective p{font-size:11px}}
+</style></head>
+<body>
+<canvas id="game" aria-label="Riftbound game canvas"></canvas>
+<div class="hud">
+ <div class="top"><div class="brand">ANOMALY DIVISION<strong>RIFTBOUND</strong></div><div class="stats">
+  <div class="panel stat"><div class="label">Integrity</div><div class="value" id="hp">100%</div><div class="bar"><i id="hpbar"></i></div></div>
+  <div class="panel stat"><div class="label">Shards</div><div class="value" id="shards">0 / 5</div></div>
+  <div class="panel stat"><div class="label">Sector</div><div class="value">01</div></div>
+ </div></div>
+ <div class="bottom"><div class="panel objective"><h2>FIELD DIRECTIVE // SHARDFALL</h2><p id="objective">Recover five unstable rift shards. Avoid the sentinels. Reach the extraction beacon.</p></div><div class="hint">WASD / ARROWS · MOVE &nbsp; SPACE · PHASE DASH<br>Collect 5 shards, then enter the cyan extraction ring.</div></div>
+</div>
+<div class="overlay" id="screen"><div class="dialog"><div class="eyebrow">FIELD OPERATION 001 — LIVE BUILD</div><h1>THE<br>SHARDFALL</h1><p>A research outpost has collapsed into a fractured dimension. Recover the five scattered rift shards and reach the extraction beacon. Sentinels are active.</p><p><b>Controls</b> — WASD / arrow keys to move, Space to phase-dash. On touchscreens use the directional pad and DASH.</p><button class="btn" id="start">DEPLOY INTO THE RIFT →</button><p class="small">Playable prototype · Keyboard + touch controls · Progress resets on restart</p></div></div>
+<div class="touch"><div class="cluster"><button data-k="w">▲</button><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div></div><button class="dash" id="dash">PHASE</button>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),screen=document.getElementById('screen');
+const hpEl=document.getElementById('hp'),hpbar=document.getElementById('hpbar'),shardEl=document.getElementById('shards'),objective=document.getElementById('objective');
+let W=0,H=0,DPR=1,last=0,running=false,won=false,lost=false,time=0,shake=0;
+const keys=new Set(),touch=new Set();
+const world={w:2200,h:1500};
+const player={x:1100,y:750,vx:0,vy:0,r:15,hp:100,inv:0,dash:0,dashCd:0,face:0};
+const shards=[{x:380,y:330},{x:1780,y:360},{x:430,y:1190},{x:1780,y:1150},{x:1100,y:250}].map(s=>({...s,taken:false,phase:Math.random()*6}));
+const enemies=[{x:700,y:500,phase:0},{x:1500,y:700,phase:2},{x:900,y:1080,phase:4},{x:1840,y:930,phase:1}].map(e=>({...e,hp:2,r:17,stun:0}));
+const walls=[
+{x:0,y:0,w:world.w,h:35},{x:0,y:world.h-35,w:world.w,h:35},{x:0,y:0,w:35,h:world.h},{x:world.w-35,y:0,w:35,h:world.h},
+{x:650,y:170,w:42,h:350},{x:650,y:520,w:320,h:42},{x:1450,y:180,w:42,h:340},{x:1450,y:520,w:330,h:42},
+{x:250,y:700,w:370,h:42},{x:1580,y:820,w:370,h:42},{x:780,y:980,w:42,h:300},{x:1380,y:980,w:42,h:300},
+{x:960,y:580,w:280,h:36},{x:960,y:900,w:280,h:36},{x:1060,y:620,w:36,h:280}
+];
+const beacon={x:1100,y:750,r:52};
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*DPR);canvas.height=Math.floor(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function circleRect(x,y,r,b){const qx=clamp(x,b.x,b.x+b.w),qy=clamp(y,b.y,b.y+b.h),dx=x-qx,dy=y-qy;return dx*dx+dy*dy<r*r}
+function moveBody(o,dx,dy){o.x+=dx;for(const b of walls)if(circleRect(o.x,o.y,o.r,b)){o.x-=dx;o.vx=0;break}o.y+=dy;for(const b of walls)if(circleRect(o.x,o.y,o.r,b)){o.y-=dy;o.vy=0;break}o.x=clamp(o.x,o.r,world.w-o.r);o.y=clamp(o.y,o.r,world.h-o.r)}
+function start(){screen.style.display='none';running=true;last=performance.now();requestAnimationFrame(loop)}
+document.getElementById('start').onclick=start;
+function dash(){if(player.dashCd>0||!running)return;let dx=(keys.has('d')||keys.has('ArrowRight')||touch.has('d')?1:0)-(keys.has('a')||keys.has('ArrowLeft')||touch.has('a')?1:0),dy=(keys.has('s')||keys.has('ArrowDown')||touch.has('s')?1:0)-(keys.has('w')||keys.has('ArrowUp')||touch.has('w')?1:0);if(!dx&&!dy){dx=Math.cos(player.face);dy=Math.sin(player.face)}const l=Math.hypot(dx,dy)||1;player.vx=dx/l*650;player.vy=dy/l*650;player.dash=.19;player.dashCd=1.1;player.inv=.25;shake=8}
+document.getElementById('dash').onclick=dash;
+addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();keys.add(e.key===' '? 'Space':e.key);if(e.key===' '&&!e.repeat)dash();if(e.key.toLowerCase()==='r'&&(won||lost))location.reload()});
+addEventListener('keyup',e=>keys.delete(e.key===' '?'Space':e.key));
+document.querySelectorAll('[data-k]').forEach(b=>{const k=b.dataset.k;b.addEventListener('pointerdown',e=>{e.preventDefault();touch.add(k);b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>touch.delete(k)))});
+function update(dt){time+=dt;player.inv=Math.max(0,player.inv-dt);player.dash=Math.max(0,player.dash-dt);player.dashCd=Math.max(0,player.dashCd-dt);let dx=(keys.has('d')||keys.has('ArrowRight')||touch.has('d')?1:0)-(keys.has('a')||keys.has('ArrowLeft')||touch.has('a')?1:0),dy=(keys.has('s')||keys.has('ArrowDown')||touch.has('s')?1:0)-(keys.has('w')||keys.has('ArrowUp')||touch.has('w')?1:0),len=Math.hypot(dx,dy)||1;if(dx||dy){player.face=Math.atan2(dy,dx);if(!player.dash){player.vx+=(dx/len*230-player.vx)*Math.min(1,dt*11);player.vy+=(dy/len*230-player.vy)*Math.min(1,dt*11)}}else if(!player.dash){player.vx*=Math.pow(.001,dt);player.vy*=Math.pow(.001,dt)}
+moveBody(player,player.vx*dt,player.vy*dt);
+for(const s of shards)if(!s.taken&&Math.hypot(player.x-s.x,player.y-s.y)<player.r+20){s.taken=true;player.hp=Math.min(100,player.hp+5);shardEl.textContent=shards.filter(x=>x.taken).length+' / 5'}
+for(const e of enemies){e.phase+=dt;e.stun=Math.max(0,e.stun-dt);const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<430&&e.stun<=0){const speed=d>100?85:0;e.vx=(player.x-e.x)/(d||1)*speed;e.vy=(player.y-e.y)/(d||1)*speed;moveBody(e,e.vx*dt,e.vy*dt)}else{e.vx=Math.sin(e.phase*.8)*22;e.vy=Math.cos(e.phase*.7)*22;moveBody(e,e.vx*dt,e.vy*dt)}if(d<player.r+e.r+3&&player.inv<=0&&player.dash<=0){player.hp-=18;player.inv=.9;shake=12;if(player.hp<=0){player.hp=0;finish(false)}}if(player.dash>0&&d<player.r+e.r+12){e.hp--;e.stun=.9;e.x+=Math.cos(player.face)*35;e.y+=Math.sin(player.face)*35;if(e.hp<=0)e.dead=true}}
+for(let i=enemies.length-1;i>=0;i--)if(enemies[i].dead)enemies.splice(i,1);
+if(shards.every(s=>s.taken)&&Math.hypot(player.x-beacon.x,player.y-beacon.y)<beacon.r+player.r)finish(true);
+hpEl.textContent=Math.ceil(player.hp)+'%';hpbar.style.width=player.hp+'%';}
+function finish(win){if(won||lost)return;won=win;lost=!win;running=false;screen.style.display='grid';screen.querySelector('.eyebrow').textContent=win?'EXTRACTION CONFIRMED':'SIGNAL LOST';screen.querySelector('h1').innerHTML=win?'RIFT<br>STABILIZED':'MISSION<br>FAILED';screen.querySelector('p').textContent=win?'All five shards secured. The extraction beacon has synchronized. Sector 01 cleared.':'Your integrity reached zero. The outpost is still waiting. Regroup and try again.';document.getElementById('start').textContent='REDEPLOY →';document.getElementById('start').onclick=()=>location.reload()}
+function draw(){const camX=clamp(player.x-W/2,0,world.w-W),camY=clamp(player.y-H/2,0,world.h-H);ctx.save();if(shake>0){ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);shake*=.85}ctx.fillStyle='#080f1c';ctx.fillRect(0,0,W,H);ctx.translate(-camX,-camY);
+const grd=ctx.createLinearGradient(0,0,world.w,world.h);grd.addColorStop(0,'#101d2c');grd.addColorStop(1,'#0a1422');ctx.fillStyle=grd;ctx.fillRect(0,0,world.w,world.h);
+ctx.strokeStyle='#29405755';ctx.lineWidth=1;for(let x=0;x<world.w;x+=64){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,world.h);ctx.stroke()}for(let y=0;y<world.h;y+=64){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(world.w,y);ctx.stroke()}
+for(let i=0;i<34;i++){const x=(i*197+83)%world.w,y=(i*311+41)%world.h;ctx.fillStyle='#4c779022';ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill()}
+for(const b of walls){ctx.fillStyle='#172b3c';ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle='#45677b';ctx.lineWidth=2;ctx.strokeRect(b.x+1,b.y+1,b.w-2,b.h-2);ctx.fillStyle='#a2c6d21a';ctx.fillRect(b.x+5,b.y+5,Math.max(0,b.w-10),3)}
+ctx.save();ctx.translate(beacon.x,beacon.y);const active=shards.every(s=>s.taken);ctx.strokeStyle=active?'#5df4ed':'#3a7182';ctx.lineWidth=3;ctx.shadowBlur=active?24:12;ctx.shadowColor='#45e8e8';ctx.beginPath();ctx.arc(0,0,beacon.r+Math.sin(time*2)*5,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,beacon.r-12,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#5ce8e822';ctx.beginPath();ctx.arc(0,0,beacon.r-16,0,Math.PI*2);ctx.fill();ctx.restore();
+for(const s of shards)if(!s.taken){ctx.save();ctx.translate(s.x,s.y+Math.sin(time*2+s.phase)*5);ctx.rotate(time*.8+s.phase);ctx.shadowBlur=24;ctx.shadowColor='#64efff';ctx.fillStyle='#75efff';ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(12,0);ctx.lineTo(0,17);ctx.lineTo(-12,0);ctx.closePath();ctx.fill();ctx.restore()}
+for(const e of enemies){ctx.save();ctx.translate(e.x,e.y);ctx.shadowBlur=20;ctx.shadowColor='#ff5577';ctx.fillStyle=e.stun>0?'#ffb1c0':'#b6385b';ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ffd0da';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#1b0e1b';ctx.fillRect(-7,-3,14,6);ctx.fillStyle='#fff';ctx.fillRect(-5,-2,3,3);ctx.fillRect(3,-2,3,3);ctx.restore()}
+ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.face);if(player.dash>0){ctx.strokeStyle='#75f8ff';ctx.lineWidth=5;ctx.shadowBlur=28;ctx.shadowColor='#56f5ff';ctx.beginPath();ctx.moveTo(-42,0);ctx.lineTo(-12,0);ctx.stroke()}ctx.globalAlpha=player.inv>0&&Math.floor(time*18)%2===0?.35:1;ctx.shadowBlur=22;ctx.shadowColor='#5cecff';ctx.fillStyle='#d8faff';ctx.beginPath();ctx.arc(0,0,player.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#4ae2ed';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#1d7184';ctx.beginPath();ctx.moveTo(4,-7);ctx.lineTo(15,0);ctx.lineTo(4,7);ctx.closePath();ctx.fill();ctx.restore();ctx.restore();
+const vignette=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.25,W/2,H/2,Math.max(W,H)*.72);vignette.addColorStop(0,'#0000');vignette.addColorStop(1,'#02071299');ctx.fillStyle=vignette;ctx.fillRect(0,0,W,H);
+}
+function loop(now){if(!running)return;const dt=Math.min((now-last)/1000,.033);last=now;update(dt);draw();requestAnimationFrame(loop)}
+draw();
+})();
+</script></body></html>
