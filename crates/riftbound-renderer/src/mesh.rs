@@ -1,6 +1,6 @@
 //! CPU mesh descriptions and their GPU vertex/index-buffer representation.
 
-use riftbound_core::{VehicleSurface, terrain_height, terrain_surface};
+use riftbound_core::{VehicleSurface, terrain_height, terrain_surface, world_terrain_sample};
 use wgpu::util::DeviceExt;
 
 /// One position-and-color vertex in the renderer's standard mesh format.
@@ -119,6 +119,40 @@ impl Mesh {
             &vertices,
             &indices,
             "riftbound-terrain-chunk-lod-mesh",
+        )
+    }
+
+    /// Creates a detailed world-scale chunk from deterministic absolute coordinates.
+    ///
+    /// Chunks are 64 world units wide. Adjacent chunks sample identical border coordinates.
+    #[must_use]
+    pub fn world_terrain_chunk(
+        device: &wgpu::Device,
+        chunk_x: i32,
+        chunk_z: i32,
+    ) -> Option<Self> {
+        let (vertices, indices) = world_terrain_chunk_data(chunk_x, chunk_z, 9)?;
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-world-terrain-chunk-mesh",
+        )
+    }
+
+    /// Creates a compact 5x5 world chunk for distant terrain.
+    #[must_use]
+    pub fn world_terrain_chunk_lod(
+        device: &wgpu::Device,
+        chunk_x: i32,
+        chunk_z: i32,
+    ) -> Option<Self> {
+        let (vertices, indices) = world_terrain_chunk_data(chunk_x, chunk_z, 5)?;
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-world-terrain-chunk-lod-mesh",
         )
     }
 
@@ -325,6 +359,62 @@ fn terrain_chunk_data(
     Some((vertices, indices))
 }
 
+/// Generates a world chunk in local mesh space from stable absolute terrain samples.
+fn world_terrain_chunk_data(
+    chunk_x: i32,
+    chunk_z: i32,
+    side: usize,
+) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
+    if ![5, 9].contains(&side) {
+        return None;
+    }
+    // Keep world coordinates inside the sampler's documented precision range.
+    let chunk_x = i16::try_from(chunk_x).ok()?;
+    let chunk_z = i16::try_from(chunk_z).ok()?;
+    let origin_x = f32::from(chunk_x) * 64.0;
+    let origin_z = f32::from(chunk_z) * 64.0;
+    let cells = side - 1;
+    let step = 64.0 / cells as f32;
+    let mut vertices = Vec::with_capacity(side * side);
+    let mut indices = Vec::with_capacity(cells * cells * 6);
+
+    for z in 0..side {
+        for x in 0..side {
+            let local_x = -32.0 + x as f32 * step;
+            let local_z = -32.0 + z as f32 * step;
+            let sample = world_terrain_sample(origin_x + local_x, origin_z + local_z);
+            let base = terrain_surface_color(sample.surface);
+            let elevation_tint = sample.height.max(0.0) * 0.012;
+            vertices.push(MeshVertex {
+                position: [local_x, sample.height, local_z],
+                color: [
+                    (base[0] + elevation_tint).min(1.0),
+                    (base[1] + elevation_tint).min(1.0),
+                    (base[2] + elevation_tint).min(1.0),
+                ],
+            });
+        }
+    }
+
+    for z in 0..cells {
+        for x in 0..cells {
+            let top_left = u16::try_from(z * side + x).ok()?;
+            let top_right = top_left + 1;
+            let bottom_left = top_left + u16::try_from(side).ok()?;
+            let bottom_right = bottom_left + 1;
+            indices.extend_from_slice(&[
+                top_left,
+                bottom_left,
+                top_right,
+                top_right,
+                bottom_left,
+                bottom_right,
+            ]);
+        }
+    }
+    Some((vertices, indices))
+}
+
 fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let faces = [
         (
@@ -433,6 +523,48 @@ mod tests {
                 .iter()
                 .all(|vertex| vertex.position.iter().all(|v| v.is_finite()))
         );
+    }
+
+    #[test]
+    fn world_chunks_share_edges_across_positive_and_negative_coordinates() {
+        let northwest = world_terrain_chunk_data(-3, 2, 9).expect("northwest world chunk");
+        let northeast = world_terrain_chunk_data(-2, 2, 9).expect("northeast world chunk");
+        let southwest = world_terrain_chunk_data(-3, 3, 9).expect("southwest world chunk");
+        let southeast = world_terrain_chunk_data(-2, 3, 9).expect("southeast world chunk");
+
+        let east_edge = |vertices: &[MeshVertex]| {
+            (0..9)
+                .map(|row| vertices[row * 9 + 8])
+                .collect::<Vec<_>>()
+        };
+        let west_edge = |vertices: &[MeshVertex]| {
+            (0..9)
+                .map(|row| vertices[row * 9])
+                .collect::<Vec<_>>()
+        };
+        let south_edge = |vertices: &[MeshVertex]| {
+            vertices[72..81].to_vec()
+        };
+        let north_edge = |vertices: &[MeshVertex]| {
+            vertices[0..9].to_vec()
+        };
+
+        assert_eq!(east_edge(&northwest.0), west_edge(&northeast.0));
+        assert_eq!(east_edge(&southwest.0), west_edge(&southeast.0));
+        assert_eq!(south_edge(&northwest.0), north_edge(&southwest.0));
+        assert_eq!(south_edge(&northeast.0), north_edge(&southeast.0));
+    }
+
+    #[test]
+    fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
+        let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
+        let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
+        assert_eq!(detailed.0.len(), 81);
+        assert_eq!(distant.0.len(), 25);
+        assert_eq!(detailed.1.len(), 384);
+        assert_eq!(distant.1.len(), 96);
+        assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
+        assert!(world_terrain_chunk_data(0, 0, 7).is_none());
     }
 
     #[test]
