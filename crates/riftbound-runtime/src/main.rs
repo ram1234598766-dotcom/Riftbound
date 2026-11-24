@@ -630,14 +630,21 @@ fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialI
 // Keep the arena layout together so its geometry can be tuned as one authored level.
 #[allow(clippy::too_many_lines)]
 fn build_arena(scene: &mut Scene) {
-    // A subdivided vertex-coloured surface forms the walkable arena floor.
-    let terrain = Transform3::new(
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(10.0, 1.0, 10.0),
-    );
-    if let Some(ground) = scene.spawn_with_mesh(terrain, MeshId::TERRAIN) {
-        scene.set_material(ground, MaterialId::DEFAULT);
+    // Four independently culled quadrants cover the same 20x20 walkable arena.
+    for (mesh, center_x, center_z) in [
+        (MeshId::TERRAIN_NW, -5.0, -5.0),
+        (MeshId::TERRAIN_NE, 5.0, -5.0),
+        (MeshId::TERRAIN_SW, -5.0, 5.0),
+        (MeshId::TERRAIN_SE, 5.0, 5.0),
+    ] {
+        let terrain = Transform3::new(
+            Vec3::new(center_x, 0.0, center_z),
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(5.0, 1.0, 5.0),
+        );
+        if let Some(ground) = scene.spawn_with_mesh(terrain, mesh) {
+            scene.set_material(ground, MaterialId::DEFAULT);
+        }
     }
 
     // Four perimeter walls visually match the collision world's inner boundary.
