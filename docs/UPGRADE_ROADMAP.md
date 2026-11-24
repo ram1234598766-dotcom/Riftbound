@@ -250,3 +250,7 @@ Added a fixed-capacity `WorldChunkSlotMap` alongside the CPU chunk planner. It r
 ### Four-wheel world-terrain surface query
 
 The world terrain module now exposes `world_terrain_vehicle_surface`, which samples the same deterministic absolute-coordinate terrain function at all four tyre contact points using vehicle heading, track width, and wheelbase. Its dominant surface result is ready to drive the vehicle's existing grip, speed, and rolling-resistance model when runtime terrain sampling is switched to world coordinates. Centre-surface tie-breaking prevents unstable handling at biome and road edges, and invalid inputs fall back safely to rock. Unit tests cover sand, mud, snow, edge ties, and invalid dimensions. The native runtime has not switched to this query yet; arena height sampling, collision bounds, and streamed world chunks must be integrated as one coherent transition.
+
+### Four-wheel world-terrain elevation query
+
+Added `world_terrain_vehicle_ground_heights`, returning the four absolute world terrain heights in the suspension system's front-left, front-right, rear-left, rear-right order. It uses the same heading transform as the existing arena suspension and returns `None` for invalid geometry, so callers can avoid replacing a valid suspension pose with bad samples. Tests cover rotated wheel layouts, finite samples, and invalid dimensions. This is a core sampling API only: the native runtime still uses arena height and collision queries until world collision and streamed terrain activation are ready to change together.
