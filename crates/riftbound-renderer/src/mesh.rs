@@ -195,9 +195,11 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut indices = Vec::with_capacity((SIDE - 1) * (SIDE - 1) * 6);
     for z in 0..SIDE {
         for x in 0..SIDE {
-            let u = x as f32 / (SIDE - 1) as f32;
-            let v = z as f32 / (SIDE - 1) as f32;
-            let variation = ((x * 13 + z * 7) % 5) as f32 * 0.012;
+            let u = f32::from(u8::try_from(x).expect("terrain x fits u8")) / 16.0;
+            let v = f32::from(u8::try_from(z).expect("terrain z fits u8")) / 16.0;
+            let variation = f32::from(
+                u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"),
+            ) * 0.012;
             vertices.push(MeshVertex {
                 position: [u * 2.0 - 1.0, 0.0, v * 2.0 - 1.0],
                 color: [0.055 + variation, 0.13 + variation, 0.22 + variation * 1.5],
@@ -206,9 +208,9 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
     }
     for z in 0..(SIDE - 1) {
         for x in 0..(SIDE - 1) {
-            let top_left = (z * SIDE + x) as u16;
+            let top_left = u16::try_from(z * SIDE + x).expect("terrain vertex index fits u16");
             let top_right = top_left + 1;
-            let bottom_left = top_left + SIDE as u16;
+            let bottom_left = top_left + u16::try_from(SIDE).expect("terrain side fits u16");
             let bottom_right = bottom_left + 1;
             indices.extend_from_slice(&[
                 top_left,
@@ -334,7 +336,7 @@ mod tests {
         assert!(
             vertices
                 .iter()
-                .any(|vertex| vertex.color != vertices[0].color)
+                .any(|vertex| vertex.color.map(f32::to_bits) != vertices[0].color.map(f32::to_bits))
         );
     }
 
