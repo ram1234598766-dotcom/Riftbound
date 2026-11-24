@@ -176,7 +176,6 @@ impl VehicleState {
     }
 }
 
-
 /// Stores the most recent traversable vehicle state for fall recovery.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VehicleRecovery {
@@ -193,7 +192,9 @@ impl VehicleRecovery {
     /// Creates recovery state from the vehicle's initial spawn.
     #[must_use]
     pub const fn new(initial_state: VehicleState) -> Self {
-        Self { last_safe_state: initial_state }
+        Self {
+            last_safe_state: initial_state,
+        }
     }
 
     /// Records a state only when it is within the allowed clearance above ground.
@@ -357,6 +358,7 @@ impl SuspensionState {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn vehicle_recovery_restores_last_safe_state_and_resets_speed() {
         let initial = VehicleState {
@@ -401,8 +403,6 @@ mod tests {
         assert_eq!(recovery.last_safe_state(), initial);
     }
 
-
-    use super::*;
 
     #[test]
     fn suspension_compresses_over_a_bump_and_returns_a_finite_pose() {
