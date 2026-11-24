@@ -6,8 +6,8 @@ use riftbound_renderer::Renderer;
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -78,9 +78,7 @@ impl ApplicationHandler for RiftboundApp {
                     window.request_redraw();
                 }
             }
-            WindowEvent::KeyboardInput { event, .. }
-                if event.state == ElementState::Pressed =>
-            {
+            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 let delta = match event.physical_key {
                     PhysicalKey::Code(KeyCode::ArrowLeft) => Some((-0.25, 0.0)),
                     PhysicalKey::Code(KeyCode::ArrowRight) => Some((0.25, 0.0)),
