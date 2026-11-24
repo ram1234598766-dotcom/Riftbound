@@ -61,6 +61,7 @@ struct RiftboundApp {
 }
 
 impl ApplicationHandler for RiftboundApp {
+    #[allow(clippy::too_many_lines)]
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.lan_server_started {
             self.lan_server_started = true;
