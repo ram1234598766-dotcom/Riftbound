@@ -197,9 +197,9 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
         for x in 0..SIDE {
             let u = f32::from(u8::try_from(x).expect("terrain x fits u8")) / 16.0;
             let v = f32::from(u8::try_from(z).expect("terrain z fits u8")) / 16.0;
-            let variation = f32::from(
-                u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"),
-            ) * 0.012;
+            let variation =
+                f32::from(u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"))
+                    * 0.012;
             vertices.push(MeshVertex {
                 position: [u * 2.0 - 1.0, 0.0, v * 2.0 - 1.0],
                 color: [0.055 + variation, 0.13 + variation, 0.22 + variation * 1.5],
