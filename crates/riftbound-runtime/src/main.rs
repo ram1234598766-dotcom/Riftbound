@@ -39,6 +39,7 @@ struct RiftboundApp {
     camera_target: Vec3,
     pickups: PickupTracker,
     pickup_entities: Vec<EntityId>,
+    animated_transforms: Vec<(EntityId, Transform3)>,
     extraction: Option<ExtractionZone>,
     beacon_entity: Option<EntityId>,
     animation_time: f32,
@@ -103,6 +104,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
                 self.pickup_entities = pickup_entities;
+                self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
                 self.extraction = Some(extraction);
                 self.beacon_entity = Some(beacon_entity);
                 self.animation_time = 0.0;
@@ -124,6 +126,7 @@ impl ApplicationHandler for RiftboundApp {
         self.collision = None;
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
+        self.animated_transforms.clear();
         self.extraction = None;
         self.beacon_entity = None;
         self.animation_time = 0.0;
@@ -225,7 +228,8 @@ impl ApplicationHandler for RiftboundApp {
                     );
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
-                    let mut animated_transforms = vec![(player, transform)];
+                    self.animated_transforms.clear();
+                    self.animated_transforms.push((player, transform));
                     if let Some(parts) = self.player_parts {
                         let movement = ((horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
@@ -236,7 +240,7 @@ impl ApplicationHandler for RiftboundApp {
                         let leg_swing = gait.sin() * 0.72 * movement;
                         let arm_swing = -leg_swing * 0.78;
                         let bob = gait.mul_add(2.0, 0.0).sin() * 0.045 * movement;
-                        animated_transforms.extend([
+                        self.animated_transforms.extend([
                             (
                                 parts.torso,
                                 character_part_transform(
@@ -319,11 +323,11 @@ impl ApplicationHandler for RiftboundApp {
                             Vec3::new(0.0, self.animation_time * 1.35 + PICKUP_PHASES[index], 0.0),
                             Vec3::new(0.28, 0.42, 0.28),
                         );
-                        animated_transforms.push((*entity, animated));
+                        self.animated_transforms.push((*entity, animated));
                     }
                     if let Some(beacon) = self.beacon_entity {
                         let pulse = 1.0 + (self.animation_time * 2.0).sin() * 0.06;
-                        animated_transforms.push((
+                        self.animated_transforms.push((
                             beacon,
                             Transform3::new(
                                 Vec3::new(0.0, 0.55, -8.0),
@@ -332,7 +336,7 @@ impl ApplicationHandler for RiftboundApp {
                             ),
                         ));
                     }
-                    match renderer.set_object_transforms(&animated_transforms) {
+                    match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
                             self.camera_target.x +=
