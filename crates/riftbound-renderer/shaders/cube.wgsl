@@ -12,11 +12,13 @@ struct VertexInput {
     @location(3) model_1: vec4<f32>,
     @location(4) model_2: vec4<f32>,
     @location(5) model_3: vec4<f32>,
+    @location(6) material_tint: vec4<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec3<f32>,
+    @location(1) world_position: vec3<f32>,
 };
 
 @vertex
@@ -28,12 +30,19 @@ fn vs_main(input: VertexInput) -> VertexOutput {
         input.model_2,
         input.model_3,
     );
-    output.clip_position = camera.view_projection * model * vec4<f32>(input.position, 1.0);
-    output.color = input.color;
+    let world_position = model * vec4<f32>(input.position, 1.0);
+    output.clip_position = camera.view_projection * world_position;
+    output.world_position = world_position.xyz;
+    output.color = input.color * input.material_tint.rgb;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(input.color, 1.0);
+    let world_normal = normalize(cross(dpdx(input.world_position), dpdy(input.world_position)));
+    let light_direction = normalize(vec3<f32>(-0.45, 0.82, 0.35));
+    let diffuse = abs(dot(world_normal, light_direction));
+    let ambient = 0.28;
+    let lighting = ambient + (1.0 - ambient) * diffuse;
+    return vec4<f32>(input.color * lighting, 1.0);
 }
