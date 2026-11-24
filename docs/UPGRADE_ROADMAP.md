@@ -111,6 +111,8 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ### 3. Gameplay depth and vehicle-first RPG
 - [x] Add a deterministic, allocation-free vehicle handling model with throttle, braking, steering, reverse, speed caps, bounded timestep, and terrain-specific grip/rolling resistance.
+- [x] Add a four-corner spring/damper suspension approximation with chassis pitch/roll output and invalid-sample guards.
+- [ ] Integrate vehicle suspension and wheel transforms into the native renderer/runtime.
 - [ ] Integrate a drivable car entity into the native runtime with third-person vehicle camera and vehicle HUD.
 - [ ] Add ground contact, suspension approximation, vehicle collision, and safe recovery.
 - [ ] Connect terrain surface regions to vehicle physics and renderer queries.
@@ -182,4 +184,4 @@ The native arena now spawns the Skirmisher and Warden profiles alongside the ori
 
 ## Current vehicle milestone
 
-The platform-independent core now includes `VehicleState`, `VehicleInput`, `VehicleConfig`, and `VehicleSurface`. It models throttle, braking, steering, reverse, speed caps, bounded frame delta, and surface-specific grip/rolling resistance without per-frame allocation. Unit tests cover acceleration, braking, steering, terrain response, and invalid inputs. This is not yet a playable car: runtime entity integration, terrain contact, suspension, collision, camera, input mapping, and vehicle HUD remain outstanding.
+The platform-independent core now includes `VehicleState`, `VehicleInput`, `VehicleConfig`, and `VehicleSurface`. It also includes `SuspensionState`, `SuspensionConfig`, and `SuspensionPose`, a four-corner spring/damper approximation that derives average compression plus chassis pitch and roll from wheel-ground samples. The suspension model is allocation-free and rejects invalid samples, but is not yet connected to runtime terrain sampling or rendered wheel assemblies. It models throttle, braking, steering, reverse, speed caps, bounded frame delta, and surface-specific grip/rolling resistance without per-frame allocation. Unit tests cover acceleration, braking, steering, terrain response, and invalid inputs. This is not yet a playable car: runtime entity integration, terrain contact, suspension, collision, camera, input mapping, and vehicle HUD remain outstanding.
