@@ -354,7 +354,15 @@ impl ApplicationHandler for RiftboundApp {
                             0.0
                         };
                         self.vehicle_state.update(
-                            VehicleInput { throttle, brake: if self.input.is_held(Button::Jump) { 1.0 } else { 0.0 }, steering },
+                            VehicleInput {
+                                throttle,
+                                brake: if self.input.is_held(Button::Jump) {
+                                    1.0
+                                } else {
+                                    0.0
+                                },
+                                steering,
+                            },
                             VehicleSurface::Asphalt,
                             VehicleConfig::default(),
                             delta,
@@ -374,11 +382,14 @@ impl ApplicationHandler for RiftboundApp {
                                 let side = if index % 2 == 0 { -1.0 } else { 1.0 };
                                 let z = if front { -0.95 } else { 0.95 };
                                 let steer = if front { steering * 0.35 } else { 0.0 };
-                                self.animated_transforms.push((*wheel, Transform3::new(
-                                    Vec3::new(side * 0.95, -0.30, z),
-                                    Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
-                                    Vec3::new(0.34, 0.68, 0.68),
-                                )));
+                                self.animated_transforms.push((
+                                    *wheel,
+                                    Transform3::new(
+                                        Vec3::new(side * 0.95, -0.30, z),
+                                        Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
+                                        Vec3::new(0.34, 0.68, 0.68),
+                                    ),
+                                ));
                             }
                         }
                     }
