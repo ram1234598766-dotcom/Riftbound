@@ -85,15 +85,45 @@ impl WorldChunkConfig {
     }
 }
 
-/// CPU-side active chunk window with retained capacity and center-cell updates.
+/// Bounded differences produced by the most recent successful focus update.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WorldChunkChanges {
+    added: Vec<WorldChunkRequest>,
+    removed: Vec<WorldChunkCoord>,
+    updated: Vec<WorldChunkRequest>,
+}
+
+impl WorldChunkChanges {
+    /// Chunks that entered the active window.
+    #[must_use]
+    pub fn added(&self) -> &[WorldChunkRequest] { &self.added }
+
+    /// Chunk coordinates that left the active window.
+    #[must_use]
+    pub fn removed(&self) -> &[WorldChunkCoord] { &self.removed }
+
+    /// Existing chunks whose requested LOD changed.
+    #[must_use]
+    pub fn updated(&self) -> &[WorldChunkRequest] { &self.updated }
+
+    /// Returns true when no GPU-side chunk changes are required.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.updated.is_empty()
+    }
+}
+
+/// CPU-side active chunk window with retained capacity and incremental change tracking.
 ///
-/// Call `update_focus` when the player or vehicle moves. If the focus remains in
-/// the same chunk, the method returns `false` and leaves the active window intact.
-/// The vector is allocated once to its configured maximum and reused thereafter.
+/// Call update_focus when the player or vehicle moves. If the focus remains in
+/// the same chunk, the method returns false and leaves the active window intact.
+/// All active and change vectors reserve their maximum capacity at construction.
 pub struct WorldChunkStreamer {
     config: WorldChunkConfig,
     focus: Option<WorldChunkCoord>,
     active: Vec<WorldChunkRequest>,
+    previous: Vec<WorldChunkRequest>,
+    changes: WorldChunkChanges,
 }
 
 impl WorldChunkStreamer {
@@ -102,12 +132,17 @@ impl WorldChunkStreamer {
     pub fn new(config: WorldChunkConfig) -> Self {
         let config =
             WorldChunkConfig::new(config.detailed_radius, config.active_radius).unwrap_or_default();
-        let mut active = Vec::with_capacity(config.max_active_chunks());
-        active.clear();
+        let capacity = config.max_active_chunks();
         Self {
             config,
             focus: None,
-            active,
+            active: Vec::with_capacity(capacity),
+            previous: Vec::with_capacity(capacity),
+            changes: WorldChunkChanges {
+                added: Vec::with_capacity(capacity),
+                removed: Vec::with_capacity(capacity),
+                updated: Vec::with_capacity(capacity),
+            },
         }
     }
 
@@ -127,6 +162,12 @@ impl WorldChunkStreamer {
     #[must_use]
     pub const fn focus_chunk(&self) -> Option<WorldChunkCoord> {
         self.focus
+    }
+
+    /// Returns the incremental chunk changes from the last successful update.
+    #[must_use]
+    pub const fn changes(&self) -> &WorldChunkChanges {
+        &self.changes
     }
 
     /// Rebuilds the bounded window when the focus crosses a chunk boundary.
@@ -158,6 +199,11 @@ impl WorldChunkStreamer {
             return false;
         }
 
+        self.previous.clear();
+        self.previous.extend_from_slice(&self.active);
+        self.changes.added.clear();
+        self.changes.removed.clear();
+        self.changes.updated.clear();
         self.focus = Some(focus);
         self.active.clear();
         let radius = self.config.active_radius;
@@ -182,6 +228,20 @@ impl WorldChunkStreamer {
         self.active.sort_unstable_by_key(|request| {
             (request.distance_squared, request.coord.z, request.coord.x)
         });
+        for request in &self.active {
+            if let Some(previous) = self.previous.iter().find(|old| old.coord == request.coord) {
+                if previous.lod != request.lod {
+                    self.changes.updated.push(*request);
+                }
+            } else {
+                self.changes.added.push(*request);
+            }
+        }
+        for previous in &self.previous {
+            if !self.active.iter().any(|request| request.coord == previous.coord) {
+                self.changes.removed.push(previous.coord);
+            }
+        }
         true
     }
 }
@@ -247,6 +307,24 @@ mod tests {
         let before = chunks.to_vec();
         assert!(!streamer.update_focus(f32::from(i16::try_from(MAX_SAMPLED_CHUNK).unwrap_or_default()) * WORLD_CHUNK_SIZE, 0.0));
         assert_eq!(streamer.active_chunks(), before);
+    }
+
+    #[test]
+    fn focus_updates_report_incremental_chunk_changes() {
+        let mut streamer = WorldChunkStreamer::standard();
+        assert!(streamer.update_focus(0.0, 0.0));
+        assert_eq!(streamer.changes().added().len(), 25);
+        assert!(streamer.changes().removed().is_empty());
+
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
+        let changes = streamer.changes().clone();
+        assert_eq!(changes.added().len(), 5);
+        assert_eq!(changes.removed().len(), 5);
+        assert!(!changes.updated().is_empty());
+        assert_eq!(streamer.active_chunks().len(), 25);
+
+        assert!(!streamer.update_focus(WORLD_CHUNK_SIZE + 1.0, 0.0));
+        assert_eq!(streamer.changes(), &changes);
     }
 
     #[test]
