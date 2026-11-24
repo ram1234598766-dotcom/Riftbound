@@ -147,12 +147,6 @@ impl VehicleState {
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
         let grip = surface.grip();
-        let speed_limit = if throttle < 0.0 && self.speed <= 0.0 {
-            config.max_reverse_speed
-        } else {
-            config.max_forward_speed
-        } * surface.speed_factor();
-
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
             let reduction = config.braking * brake * dt;
@@ -171,7 +165,6 @@ impl VehicleState {
 
         let speed_fraction = (self.speed.abs() / config.max_forward_speed).clamp(0.0, 1.0);
         self.heading += steering * config.steering_rate * grip * speed_fraction * self.speed.signum() * dt;
-        let _ = speed_limit;
         self.position.x += self.heading.sin() * self.speed * dt;
         self.position.z -= self.heading.cos() * self.speed * dt;
     }
