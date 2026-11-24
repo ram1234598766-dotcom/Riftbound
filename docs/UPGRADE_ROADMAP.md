@@ -1,5 +1,36 @@
 # Riftbound Upgrade Roadmap
 
+## Product vision — locked direction
+
+**Riftbound is an open-world driving RPG.** The arena, shards, and sentinel encounter are technology/gameplay prototypes, not the final product structure. Future work must move the project toward a connected explorable world where driving is a primary activity and RPG progression gives exploration a purpose.
+
+### Pillars
+1. **Open world:** connected regions, roads, trails, settlements, garages, landmarks, secrets, and discoverable activities. Stream world cells around the player instead of loading the entire world at once.
+2. **Driving first:** responsive vehicle handling, camera follow, suspension/ground contact, collision, braking, reverse, handbrake, and distinct vehicle classes. Walking remains useful for exploration and interactions.
+3. **Terrain matters:** asphalt, gravel, mud, sand, snow, and rock must change grip, acceleration, braking, rolling resistance, and traversal difficulty. Terrain must be shared by rendering, physics, and world queries.
+4. **RPG progression:** quests, NPCs, dialogue, reputation/factions, rewards, inventory, skills/perks, and choices. Missions should naturally send players across the world.
+5. **Vehicles and economy:** unlockable vehicle classes, garages, repairs, upgrades, tuning, and cosmetic customization.
+6. **World activities:** races, deliveries, exploration challenges, recovery jobs, optional combat encounters, and hidden rewards. Combat supports the adventure; it does not replace driving/exploration.
+7. **Accessible performance:** scalable world detail, LOD, culling, chunk streaming, pooled entities, bounded memory, and touch/gamepad/keyboard controls.
+
+### Non-negotiable project rules
+- Do not expand the small arena into the main game. Keep it as a combat/AI test location or repurpose its systems as isolated prototypes.
+- Prioritize a playable driving loop and a traversable multi-surface region before adding more enemy types.
+- Keep the browser multiplayer prototype and native Rust runtime distinctions explicit; do not claim feature parity.
+- Build the world in streamed chunks with explicit memory budgets. Never attempt to keep a huge open world fully resident.
+- Treat the current vehicle model as a physics foundation, not finished driving gameplay. Integrate collision, terrain sampling, suspension, vehicle visuals, camera, input and HUD before calling the car playable.
+- Do not claim low-end compatibility or performance targets until representative hardware has been measured.
+
+### Open-world implementation sequence
+1. **Vehicle foundation:** deterministic vehicle state, throttle/brake/steering, reverse, speed limits, surface response and unit tests.
+2. **Playable driving slice:** controllable car entity, third-person vehicle camera, terrain contact, collision, vehicle HUD and keyboard/touch/gamepad input.
+3. **Terrain system:** data-driven surface regions and height sampling used consistently by renderer and physics; first road, gravel, mud and sand route.
+4. **First explorable region:** a compact connected landscape with road network, off-road route, landmark, garage and a discoverable activity.
+5. **RPG loop:** quest definitions, NPC interaction, rewards, inventory/upgrades, save/load and progression UI.
+6. **World scale:** chunk streaming, asynchronous asset preparation, LOD/culling, region transitions and memory budgets.
+7. **Content expansion:** more biomes, vehicles, races, deliveries, side quests and optional encounters.
+8. **Multiplayer/release:** only after the single-player driving/RPG loop is cohesive; then authoritative world state, persistence, profiling and packaging.
+
 ## Product goals
 
 Riftbound should feel responsive, cohesive, and polished while keeping memory use and frame cost predictable. The native Rust renderer and browser multiplayer prototype are separate targets; features must be implemented and tested in the correct runtime rather than assumed to transfer between them.
@@ -36,7 +67,15 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [ ] Add bounded ambient effects with quality-scalable density.
 - [ ] Add asset/mesh validation and graceful fallback for missing resources.
 
-### 3. Gameplay depth
+### 3. Gameplay depth and vehicle-first RPG
+- [x] Add a deterministic, allocation-free vehicle handling model with throttle, braking, steering, reverse, speed caps, bounded timestep, and terrain-specific grip/rolling resistance.
+- [ ] Integrate a drivable car entity into the native runtime with third-person vehicle camera and vehicle HUD.
+- [ ] Add ground contact, suspension approximation, vehicle collision, and safe recovery.
+- [ ] Connect terrain surface regions to vehicle physics and renderer queries.
+- [ ] Build a first road-to-off-road driving route with asphalt, gravel, mud, sand, snow, and rock handling.
+- [ ] Add RPG quest, NPC interaction, reward, inventory, and vehicle upgrade foundations.
+- [ ] Add save/load for player, vehicle, quest, and world progression.
+- [ ] Keep the arena enemy/mission prototype as optional encounter content rather than the main game loop.
 - [ ] Improve movement responsiveness, camera follow smoothing, and collision edge cases.
 - [x] Add an allocation-free deterministic enemy brain with patrol, chase, telegraph, recovery, and return states; validate inputs and expose transition events.
 - [x] Spawn a native arena sentinel and connect its deterministic brain to the scene transform update loop.
@@ -97,3 +136,8 @@ Enemy encounter authoring now has three lightweight behaviour profiles: Sentinel
 
 
 The native arena now spawns the Skirmisher and Warden profiles alongside the original Sentinel. Each support enemy owns an independent, allocation-free EnemyBrain state and a compact ground telegraph marker. Their pulses apply a lower 15-point hit than the Sentinel's 25-point pulse and use the same player protection window. Support enemy state is stored in a pre-sized vector and updated in place; this is an initial three-enemy encounter, not yet a scalable crowd/AI scheduler. The support enemies are not yet individually disableable through the interaction objective.
+
+
+## Current vehicle milestone
+
+The platform-independent core now includes `VehicleState`, `VehicleInput`, `VehicleConfig`, and `VehicleSurface`. It models throttle, braking, steering, reverse, speed caps, bounded frame delta, and surface-specific grip/rolling resistance without per-frame allocation. Unit tests cover acceleration, braking, steering, terrain response, and invalid inputs. This is not yet a playable car: runtime entity integration, terrain contact, suspension, collision, camera, input mapping, and vehicle HUD remain outstanding.
