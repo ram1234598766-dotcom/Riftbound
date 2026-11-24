@@ -231,10 +231,7 @@ mod tests {
                 && (i16::MIN..=i16::MAX).contains(&chunk.coord.z)
         }));
         let before = chunks.to_vec();
-        assert!(!streamer.update_focus(
-            f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE,
-            0.0
-        ));
+        assert!(!streamer.update_focus(f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE, 0.0));
         assert_eq!(streamer.active_chunks(), before);
     }
 
