@@ -127,8 +127,14 @@ impl ExtractionZone {
 
     /// Whether an interaction at this position can complete the mission.
     #[must_use]
-    pub fn can_extract(self, position: Vec3, interact_pressed: bool, prerequisites_met: bool) -> bool {
-        if !interact_pressed || !prerequisites_met
+    pub fn can_extract(
+        self,
+        position: Vec3,
+        interact_pressed: bool,
+        prerequisites_met: bool,
+    ) -> bool {
+        if !interact_pressed
+            || !prerequisites_met
             || !position.x.is_finite()
             || !position.y.is_finite()
             || !position.z.is_finite()
