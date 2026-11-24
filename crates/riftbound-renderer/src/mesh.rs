@@ -355,8 +355,8 @@ mod tests {
         assert!(
             vertices
                 .iter()
-                .filter(|vertex| vertex.position[0].abs() == 1.0 || vertex.position[2].abs() == 1.0)
-                .all(|vertex| vertex.position[1] == 0.0)
+                .filter(|vertex| (vertex.position[0].abs() - 1.0).abs() < 0.000_001 || (vertex.position[2].abs() - 1.0).abs() < 0.000_001)
+                .all(|vertex| vertex.position[1].abs() < 0.000_001)
         );
     }
 
