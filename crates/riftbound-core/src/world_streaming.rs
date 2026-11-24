@@ -75,9 +75,9 @@ impl WorldChunkConfig {
 
     /// Maximum number of chunks in the square active window.
     #[must_use]
+    #[allow(clippy::cast_sign_loss)] // Constructor guarantees a non-negative radius.
     pub const fn max_active_chunks(self) -> usize {
-        let side = usize::try_from(self.active_radius * 2 + 1)
-            .expect("validated chunk radius always fits usize");
+        let side = (self.active_radius * 2 + 1) as usize;
         side * side
     }
 }
