@@ -18,9 +18,9 @@ The browser mission is an early playable vertical slice, not the final open-worl
 
 ## Rust engine
 
-The custom engine foundation lives in crates/riftbound-core. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, and 3D transforms.
+The custom engine foundation lives in crates/riftbound-core. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, 3D transforms, and a scene object store with safe spawn/despawn and transform access.
 
-The native application shell lives in crates/riftbound-runtime; GPU surface setup and frame presentation are isolated in crates/riftbound-renderer. The native runtime opens a window and renders three transformed instances of an indexed 3D cube mesh. Mesh vertices and 16-bit triangle indices are uploaded to reusable GPU buffers; per-instance model transforms are supplied through an instance buffer. The renderer includes a perspective camera, depth testing, and arrow-key camera panning across the horizontal world plane. This is an early scene-rendering milestone, not yet a complete world renderer or playable 3D game. In the native window, use the arrow keys to pan the camera. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
+The native application shell lives in crates/riftbound-runtime; GPU surface setup and frame presentation are isolated in crates/riftbound-renderer. The native runtime opens a window and renders three scene-managed instances of an indexed 3D cube mesh. Scene objects have generational IDs and editable position, Euler rotation, and per-axis scale; replacing the renderer scene uploads the current transforms to the GPU. Mesh vertices and 16-bit triangle indices are uploaded to reusable GPU buffers; per-instance model transforms are supplied through an instance buffer. The renderer includes a perspective camera, depth testing, and arrow-key camera panning across the horizontal world plane. This is an early scene-rendering milestone, not yet a complete world renderer or playable 3D game. In the native window, use the arrow keys to pan the camera. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
 
 See [the engine architecture](./docs/ENGINE_ARCHITECTURE.md) for module boundaries and the delivery sequence.
 
@@ -40,7 +40,7 @@ GitHub Actions runs these checks on pushes and pull requests.
 
 1. Complete core simulation contracts and integration tests.
 2. Expand the native shell with platform input and lifecycle handling.
-3. Expand the project-owned renderer: scene mesh handles, materials, lighting, and shader management.
+3. Expand the project-owned renderer: reusable scene mesh handles, materials, lighting, and shader management.
 4. Port the player controller and Shardfall mission into the Rust runtime.
 5. Expand traversal, vehicles, larger environments, audio, save data, and multiplayer after the single-player foundation is stable.
 
