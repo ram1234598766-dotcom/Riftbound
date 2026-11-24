@@ -53,12 +53,7 @@ impl CharacterController {
     }
 
     /// Advances movement by a bounded time step and updates the transform.
-    pub fn update(
-        &mut self,
-        transform: &mut Transform3,
-        input: &InputState,
-        delta_seconds: f32,
-    ) {
+    pub fn update(&mut self, transform: &mut Transform3, input: &InputState, delta_seconds: f32) {
         if !delta_seconds.is_finite() || delta_seconds <= 0.0 {
             return;
         }
