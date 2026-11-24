@@ -20,24 +20,43 @@ pub struct FixedClock {
 }
 
 impl FixedClock {
-    /// Creates a clock. step_seconds must be finite and positive.
+    /// Creates a clock. `step_seconds` must be finite and positive.
+    ///
+    /// # Panics
     ///
     /// Panics if the step is not finite and positive, or the step cap is zero.
     #[must_use]
     pub fn new(step_seconds: f64, max_steps_per_advance: u32) -> Self {
-        assert!(step_seconds.is_finite() && step_seconds > 0.0, "step must be finite and positive");
+        assert!(
+            step_seconds.is_finite() && step_seconds > 0.0,
+            "step must be finite and positive"
+        );
         assert!(max_steps_per_advance > 0, "step cap must be nonzero");
-        Self { step_seconds, accumulator: 0.0, max_steps_per_advance }
+        Self {
+            step_seconds,
+            accumulator: 0.0,
+            max_steps_per_advance,
+        }
     }
 
     /// Adds elapsed wall time and returns bounded simulation work for this frame.
-    /// Invalid or negative elapsed values are treated as zero.
+    ///
+    /// Invalid or negative elapsed values are treated as zero. If the catch-up
+    /// limit is reached, excess whole steps are discarded while the fractional
+    /// remainder is retained.
     pub fn advance(&mut self, elapsed_seconds: f64) -> TickBatch {
-        let elapsed = if elapsed_seconds.is_finite() && elapsed_seconds > 0.0 { elapsed_seconds } else { 0.0 };
+        let elapsed = if elapsed_seconds.is_finite() && elapsed_seconds > 0.0 {
+            elapsed_seconds
+        } else {
+            0.0
+        };
         self.accumulator += elapsed;
-        let available = (self.accumulator / self.step_seconds).floor() as u64;
-        let steps = available.min(u64::from(self.max_steps_per_advance)) as u32;
-        self.accumulator -= f64::from(steps) * self.step_seconds;
+
+        let mut steps = 0;
+        while steps < self.max_steps_per_advance && self.accumulator >= self.step_seconds {
+            self.accumulator -= self.step_seconds;
+            steps += 1;
+        }
 
         let mut dropped_seconds = 0.0;
         if self.accumulator >= self.step_seconds {
@@ -46,12 +65,18 @@ impl FixedClock {
             self.accumulator = retained;
         }
 
-        TickBatch { steps, alpha: self.accumulator / self.step_seconds, dropped_seconds }
+        TickBatch {
+            steps,
+            alpha: self.accumulator / self.step_seconds,
+            dropped_seconds,
+        }
     }
 
     /// The fixed simulation step in seconds.
     #[must_use]
-    pub const fn step_seconds(&self) -> f64 { self.step_seconds }
+    pub const fn step_seconds(&self) -> f64 {
+        self.step_seconds
+    }
 }
 
 #[cfg(test)]
@@ -76,5 +101,14 @@ mod tests {
         let mut clock = FixedClock::new(1.0 / 60.0, 4);
         assert_eq!(clock.advance(f64::NAN).steps, 0);
         assert_eq!(clock.advance(-1.0).steps, 0);
+    }
+
+    #[test]
+    fn reports_no_dropped_time_when_within_the_step_budget() {
+        let mut clock = FixedClock::new(0.25, 4);
+        let batch = clock.advance(0.6);
+        assert_eq!(batch.steps, 2);
+        assert_eq!(batch.dropped_seconds, 0.0);
+        assert!((batch.alpha - 0.4).abs() < 1e-9);
     }
 }
