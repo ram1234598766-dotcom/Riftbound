@@ -55,6 +55,45 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     WorldTerrainSample { height, surface }
 }
 
+/// Samples absolute world-terrain elevation at the four tyre contact points.
+///
+/// Corner order is front-left, front-right, rear-left, rear-right. Invalid vehicle
+/// geometry returns `None`, allowing callers to preserve their last valid pose.
+#[must_use]
+pub fn world_terrain_vehicle_ground_heights(
+    world_x: f32,
+    world_z: f32,
+    heading: f32,
+    half_track: f32,
+    half_wheelbase: f32,
+) -> Option<[f32; 4]> {
+    if !world_x.is_finite()
+        || !world_z.is_finite()
+        || !heading.is_finite()
+        || !half_track.is_finite()
+        || !half_wheelbase.is_finite()
+        || half_track <= 0.0
+        || half_wheelbase <= 0.0
+    {
+        return None;
+    }
+
+    let (sin_heading, cos_heading) = heading.sin_cos();
+    let mut heights = [0.0_f32; 4];
+    let wheel_offsets = [
+        (-half_track, -half_wheelbase),
+        (half_track, -half_wheelbase),
+        (-half_track, half_wheelbase),
+        (half_track, half_wheelbase),
+    ];
+    for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
+        let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
+        let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
+        heights[index] = world_terrain_sample(contact_x, contact_z).height;
+    }
+    Some(heights)
+}
+
 /// Samples the dominant world surface beneath all four tyre contact points.
 ///
 /// The centre surface wins ties, keeping handling stable when a vehicle straddles
@@ -191,6 +230,26 @@ mod tests {
         assert_eq!(
             world_terrain_sample(-800.0, 0.0).surface,
             VehicleSurface::Mud
+        );
+    }
+
+    #[test]
+    fn world_vehicle_ground_heights_follow_heading_and_corner_order() {
+        let heights = world_terrain_vehicle_ground_heights(125.0, -80.0, 0.7, 0.78, 1.32)
+            .expect("valid vehicle geometry should sample all four corners");
+        assert!(heights.iter().all(|height| height.is_finite()));
+        assert_ne!(heights[0], heights[3]);
+    }
+
+    #[test]
+    fn invalid_world_vehicle_ground_geometry_returns_none() {
+        assert_eq!(
+            world_terrain_vehicle_ground_heights(0.0, 0.0, f32::NAN, 0.8, 1.3),
+            None
+        );
+        assert_eq!(
+            world_terrain_vehicle_ground_heights(0.0, 0.0, 0.0, 0.8, 0.0),
+            None
         );
     }
 
