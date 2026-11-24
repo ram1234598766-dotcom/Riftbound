@@ -2,6 +2,7 @@
 
 use std::{
     collections::BTreeMap,
+    time::Instant,
     net::SocketAddr,
     sync::{
         Arc,
@@ -35,6 +36,8 @@ const SHARD_POSITIONS: [(f32, f32); 5] = [
     (1100.0, 250.0),
 ];
 const EXTRACTION_POSITION: (f32, f32) = (1100.0, 750.0);
+const PLAYER_SPEED: f32 = 230.0;
+const MAX_INPUT_DELTA: f32 = 0.1;
 
 #[derive(Clone)]
 struct HostState {
@@ -56,8 +59,8 @@ struct PlayerState {
 #[derive(Deserialize)]
 struct ClientMessage {
     kind: String,
-    x: Option<f32>,
-    y: Option<f32>,
+    dx: Option<f32>,
+    dy: Option<f32>,
     face: Option<f32>,
     shard: Option<usize>,
 }
@@ -153,6 +156,7 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     state.players.lock().await.insert(id, initial);
 
     let (mut sender, mut receiver) = socket.split();
+    let mut last_input_at = Instant::now();
     let welcome = serde_json::json!({ "kind": "welcome", "self_id": id }).to_string();
     if sender.send(Message::Text(welcome.into())).await.is_err() {
         state.players.lock().await.remove(&id);
@@ -177,36 +181,59 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else {
             continue;
         };
-        let (Some(x), Some(y), Some(face)) = (input.x, input.y, input.face) else {
-            continue;
-        };
-        if !x.is_finite() || !y.is_finite() || !face.is_finite() {
-            continue;
-        }
-        let x = clamp_world_position(x, WORLD_WIDTH);
-        let y = clamp_world_position(y, WORLD_HEIGHT);
-        {
-            let mut players = state.players.lock().await;
-            if let Some(player) = players.get_mut(&id) {
-                player.x = x;
-                player.y = y;
-                player.face = face;
-            }
-        }
         match input.kind.as_str() {
-            "move" => {}
+            "move" => {
+                let (Some(dx), Some(dy), Some(face)) = (input.dx, input.dy, input.face) else {
+                    continue;
+                };
+                if !dx.is_finite() || !dy.is_finite() || !face.is_finite() {
+                    continue;
+                }
+                let magnitude = dx.hypot(dy);
+                if magnitude > 1.01 {
+                    continue;
+                }
+                let elapsed = last_input_at.elapsed().as_secs_f32().min(MAX_INPUT_DELTA);
+                last_input_at = Instant::now();
+                let mut players = state.players.lock().await;
+                if let Some(player) = players.get_mut(&id) {
+                    let scale = if magnitude > 1.0 { 1.0 / magnitude } else { 1.0 };
+                    player.x = clamp_world_position(
+                        player.x + dx * scale * PLAYER_SPEED * elapsed,
+                        WORLD_WIDTH,
+                    );
+                    player.y = clamp_world_position(
+                        player.y + dy * scale * PLAYER_SPEED * elapsed,
+                        WORLD_HEIGHT,
+                    );
+                    player.face = face;
+                }
+            }
             "collect" => {
                 let Some(index) = input.shard else {
                     continue;
                 };
-                if index >= SHARD_POSITIONS.len() || !within_pickup_range(x, y, index) {
+                let players = state.players.lock().await;
+                let Some(player) = players.get(&id) else {
+                    continue;
+                };
+                if index >= SHARD_POSITIONS.len()
+                    || !within_pickup_range(player.x, player.y, index)
+                {
                     continue;
                 }
+                drop(players);
                 state.shards.lock().await[index] = true;
             }
             "extract" => {
+                let players = state.players.lock().await;
+                let Some(player) = players.get(&id) else {
+                    continue;
+                };
+                let in_range = within_extraction_range(player.x, player.y);
+                drop(players);
                 let all_collected = state.shards.lock().await.iter().all(|taken| *taken);
-                if all_collected && within_extraction_range(x, y) {
+                if all_collected && in_range {
                     *state.extracted.lock().await = true;
                 }
             }
@@ -273,6 +300,15 @@ mod tests {
             clamp_world_position(42.0, WORLD_WIDTH).to_bits(),
             42.0_f32.to_bits()
         );
+    }
+
+    #[test]
+    fn movement_is_normalized_and_bounded_by_host_speed() {
+        let magnitude = 1.0_f32.hypot(1.0);
+        let scale = 1.0 / magnitude;
+        let step = scale * PLAYER_SPEED * MAX_INPUT_DELTA;
+        assert!((step.hypot(step) - PLAYER_SPEED * MAX_INPUT_DELTA).abs() < 0.001);
+        assert_eq!(clamp_world_position(WORLD_WIDTH + step, WORLD_WIDTH), WORLD_WIDTH);
     }
 
     #[test]
