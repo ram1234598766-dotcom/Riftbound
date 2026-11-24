@@ -70,7 +70,7 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    depth_texture: wgpu::Texture,
+    _depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -191,7 +191,7 @@ impl Renderer {
             device,
             queue,
             config,
-            depth_texture,
+            _depth_texture: depth_texture,
             depth_view,
             camera_buffer,
             camera_bind_group,
@@ -208,7 +208,7 @@ impl Renderer {
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
         let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
-        self.depth_texture = depth_texture;
+        self._depth_texture = depth_texture;
         self.depth_view = depth_view;
         self.queue.write_buffer(
             &self.camera_buffer,
@@ -217,7 +217,7 @@ impl Renderer {
         );
     }
 
-    /// Draws a lit-color 3D cube with perspective projection and depth testing.
+    /// Draws a colored 3D cube with perspective projection and depth testing.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -315,6 +315,7 @@ fn create_depth_target(
 }
 
 fn camera_bytes(width: u32, height: u32) -> [u8; 64] {
+    #[allow(clippy::cast_precision_loss)]
     let aspect = width.max(1) as f32 / height.max(1) as f32;
     let eye = [3.2_f32, 2.4, 4.8];
     let target = [0.0_f32, 0.0, 0.0];
@@ -351,11 +352,11 @@ fn camera_bytes(width: u32, height: u32) -> [u8; 64] {
 
 fn multiply(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
     let mut result = [0.0; 16];
-    for column in 0..4 {
-        for row in 0..4 {
-            for inner in 0..4 {
-                result[column * 4 + row] +=
-                    a[inner * 4 + row] * b[column * 4 + inner];
+    for (column, b_column) in b.chunks_exact(4).enumerate() {
+        for (inner, a_column) in a.chunks_exact(4).enumerate() {
+            let factor = b_column[inner];
+            for (row, value) in a_column.iter().enumerate() {
+                result[column * 4 + row] += value * factor;
             }
         }
     }
@@ -377,4 +378,30 @@ fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 fn normalize(value: [f32; 3]) -> [f32; 3] {
     let length = dot(value, value).sqrt().max(f32::EPSILON);
     [value[0] / length, value[1] / length, value[2] / length]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn camera_uniform_is_finite_for_landscape_and_portrait_targets() {
+        for bytes in [camera_bytes(1280, 720), camera_bytes(720, 1280)] {
+            for chunk in bytes.chunks_exact(4) {
+                let value = f32::from_ne_bytes(chunk.try_into().expect("four-byte float"));
+                assert!(value.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn matrix_multiplication_preserves_identity() {
+        let identity = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
+        assert_eq!(multiply(identity, identity), identity);
+    }
 }
