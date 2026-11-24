@@ -42,7 +42,7 @@ Dependencies point inward toward stable contracts. The renderer must not own gam
 
 1. **Core foundations:** fixed clock, logical input, vector math, generational entity arena and 3D transforms.
 2. **Native shell:** window lifecycle, resize/suspend handling and logical input mapping.
-3. **First GPU scene:** standalone WGSL shader, CPU-authored cube vertices, reusable GPU vertex buffers, a standard position-and-color vertex layout, perspective camera uniform, depth buffer, and resize-aware render targets. Next: indexed meshes, mesh handles, material bindings, and shader hot reload.
+3. **First GPU scene:** standalone WGSL shader, indexed cube mesh with reusable vertex/index buffers, per-instance model transforms, instanced drawing, perspective camera uniform, depth buffer, and resize-aware render targets. Next: scene mesh handles, material bindings, lighting, and shader hot reload.
 4. **Scene runtime:** transform hierarchy, visibility, mesh/material handles and deterministic simulation scheduling.
 5. **World rendering:** physically based materials, image-based lighting, cascaded shadows, occlusion and post-processing.
 6. **Content pipeline:** glTF import, texture compression, validation, provenance and asynchronous streaming.
