@@ -119,6 +119,123 @@ impl WorldChunkChanges {
     }
 }
 
+/// Stable renderer-slot assignment for a bounded set of active world chunks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WorldChunkSlot {
+    /// Reusable zero-based slot in the renderer's fixed mesh registry.
+    pub slot_index: usize,
+    /// Chunk coordinate and detail tier currently occupying this slot.
+    pub request: WorldChunkRequest,
+}
+
+/// Fixed-capacity mapping from active chunk coordinates to reusable renderer slots.
+///
+/// Removed chunks release their slots, LOD changes retain the existing slot, and
+/// newly-added chunks reuse the first free slot. Applying a malformed or oversized
+/// change set fails without partially mutating the mapping.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WorldChunkSlotMap {
+    slots: Vec<Option<WorldChunkRequest>>,
+}
+
+impl WorldChunkSlotMap {
+    /// Creates an empty slot map with the requested fixed capacity.
+    #[must_use]
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            slots: vec![None; capacity],
+        }
+    }
+
+    /// Creates a slot map sized for a validated chunk window.
+    #[must_use]
+    pub fn for_config(config: WorldChunkConfig) -> Self {
+        let config =
+            WorldChunkConfig::new(config.detailed_radius, config.active_radius).unwrap_or_default();
+        Self::new(config.max_active_chunks())
+    }
+
+    /// Returns all slots, including empty entries available for reuse.
+    #[must_use]
+    pub fn slots(&self) -> &[Option<WorldChunkRequest>] {
+        &self.slots
+    }
+
+    /// Returns the number of occupied slots.
+    #[must_use]
+    pub fn occupied(&self) -> usize {
+        self.slots.iter().filter(|slot| slot.is_some()).count()
+    }
+
+    /// Applies one streamer's delta while retaining slots for unchanged coordinates.
+    ///
+    /// Returns false and leaves the map unchanged if the delta is inconsistent or
+    /// cannot fit in the fixed slot capacity.
+    pub fn apply_changes(&mut self, changes: &WorldChunkChanges) -> bool {
+        for (index, removed) in changes.removed.iter().enumerate() {
+            if !self.slots.iter().any(|slot| {
+                slot.is_some_and(|request| request.coord == *removed)
+            }) || changes.removed[..index].contains(removed)
+            {
+                return false;
+            }
+        }
+        for (index, updated) in changes.updated.iter().enumerate() {
+            if !self.slots.iter().any(|slot| {
+                slot.is_some_and(|request| {
+                    request.coord == updated.coord
+                        && !changes.removed.contains(&request.coord)
+                })
+            }) || changes.updated[..index]
+                .iter()
+                .any(|request| request.coord == updated.coord)
+            {
+                return false;
+            }
+        }
+        for (index, added) in changes.added.iter().enumerate() {
+            if self.slots.iter().flatten().any(|request| request.coord == added.coord)
+                && !changes.removed.contains(&added.coord)
+                || changes.added[..index]
+                    .iter()
+                    .any(|request| request.coord == added.coord)
+            {
+                return false;
+            }
+        }
+
+        let free_after_removals = self.slots.iter().filter(|slot| slot.is_none()).count()
+            + changes.removed.len();
+        if changes.added.len() > free_after_removals {
+            return false;
+        }
+
+        for removed in &changes.removed {
+            let Some(slot) = self.slots.iter_mut().find(|slot| {
+                slot.is_some_and(|request| request.coord == *removed)
+            }) else {
+                return false;
+            };
+            *slot = None;
+        }
+        for updated in &changes.updated {
+            let Some(slot) = self.slots.iter_mut().find(|slot| {
+                slot.is_some_and(|request| request.coord == updated.coord)
+            }) else {
+                return false;
+            };
+            *slot = Some(*updated);
+        }
+        for added in &changes.added {
+            let Some(slot) = self.slots.iter_mut().find(|slot| slot.is_none()) else {
+                return false;
+            };
+            *slot = Some(*added);
+        }
+        true
+    }
+}
+
 /// CPU-side active chunk window with retained capacity and incremental change tracking.
 ///
 /// Call `update_focus` when the player or vehicle moves. If the focus remains in
@@ -338,6 +455,55 @@ mod tests {
 
         assert!(!streamer.update_focus(WORLD_CHUNK_SIZE + 1.0, 0.0));
         assert_eq!(streamer.changes(), &changes);
+    }
+
+    #[test]
+    fn slot_map_reuses_evicted_slots_and_preserves_unchanged_chunk_slots() {
+        let mut streamer = WorldChunkStreamer::standard();
+        let mut slots = WorldChunkSlotMap::for_config(WorldChunkConfig::default());
+        assert!(streamer.update_focus(0.0, 0.0));
+        assert!(slots.apply_changes(streamer.changes()));
+        assert_eq!(slots.occupied(), 25);
+        let retained = slots
+            .slots()
+            .iter()
+            .enumerate()
+            .find_map(|(index, request)| {
+                request
+                    .filter(|request| request.coord == WorldChunkCoord { x: 0, z: 0 })
+                    .map(|_| index)
+            })
+            .expect("origin chunk has a slot");
+
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
+        assert!(slots.apply_changes(streamer.changes()));
+        assert_eq!(slots.occupied(), 25);
+        assert_eq!(
+            slots.slots()[retained].expect("origin slot remains occupied").coord,
+            WorldChunkCoord { x: 0, z: 0 }
+        );
+        assert!(slots
+            .slots()
+            .iter()
+            .flatten()
+            .any(|request| request.coord == WorldChunkCoord { x: 3, z: 0 }));
+    }
+
+    #[test]
+    fn slot_map_rejects_inconsistent_changes_without_partial_mutation() {
+        let mut slots = WorldChunkSlotMap::new(1);
+        let request = WorldChunkRequest {
+            coord: WorldChunkCoord { x: 0, z: 0 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 0,
+        };
+        let malformed = WorldChunkChanges {
+            added: vec![request, request],
+            removed: Vec::new(),
+            updated: Vec::new(),
+        };
+        assert!(!slots.apply_changes(&malformed));
+        assert_eq!(slots.occupied(), 0);
     }
 
     #[test]
