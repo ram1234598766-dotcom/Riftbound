@@ -272,12 +272,7 @@ impl CollisionWorld {
         let cos = heading.cos().abs();
         let world_half_width = half_width * cos + half_length * sin;
         let world_half_length = half_width * sin + half_length * cos;
-        self.move_vehicle(
-            start,
-            displacement,
-            world_half_width,
-            world_half_length,
-        )
+        self.move_vehicle(start, displacement, world_half_width, world_half_length)
     }
 
     fn is_vehicle_walkable(&self, x: f32, z: f32, half_width: f32, half_length: f32) -> bool {
@@ -376,7 +371,6 @@ mod tests {
         assert!(result.blocked_x);
         assert!((result.position.x - 4.2).abs() < 0.01);
     }
-
 
     #[test]
     fn oriented_vehicle_expands_footprint_when_heading_is_diagonal() {
