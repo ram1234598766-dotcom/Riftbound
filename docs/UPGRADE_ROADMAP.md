@@ -209,4 +209,4 @@ The deterministic core collision world now supports a rectangular vehicle footpr
 
 ### Heading-aware vehicle footprint
 
-The vehicle collision API now derives conservative horizontal extents from the vehicle heading before resolving movement. This prevents the car from using its narrow straight-ahead footprint while turned diagonally. The runtime now supplies the current heading. This is a conservative rotated bounding-box approximation, not a full oriented-box narrow-phase solver; it can stop slightly early near obstacles. Exact oriented collision and wheel/contact response remain planned.
+The vehicle collision API now uses an oriented-rectangle separating-axis test against axis-aligned obstacle footprints, with heading-aware bounds checks, bounded substeps, and binary refinement. The runtime supplies the current heading. This avoids false collisions at the corners of a conservative axis-aligned envelope while retaining deterministic, allocation-free movement. Wheel/contact response, dynamic obstacles, and streamed open-world collision chunks remain planned.
