@@ -457,6 +457,8 @@ struct CharacterParts {
     right_leg: EntityId,
 }
 
+// This convenience constructor mirrors Transform3's three vector groups as scalar arguments.
+#[allow(clippy::too_many_arguments)]
 fn character_part_transform(
     x: f32,
     y: f32,
@@ -611,6 +613,8 @@ fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialI
     scene.set_material(id, material);
 }
 
+// Keep the arena layout together so its geometry can be tuned as one authored level.
+#[allow(clippy::too_many_lines)]
 fn build_arena(scene: &mut Scene) {
     // A broad, flat cube forms the walkable floor.
     spawn_box(
