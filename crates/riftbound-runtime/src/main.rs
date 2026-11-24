@@ -180,7 +180,12 @@ impl ApplicationHandler for RiftboundApp {
                         return;
                     };
                     let previous_position = transform.translation;
-                    self.controller.update(&mut transform, &self.input, delta);
+                    self.controller.update_camera_relative(
+                        &mut transform,
+                        &self.input,
+                        delta,
+                        renderer.camera_yaw(),
+                    );
                     let horizontal_velocity = self.controller.velocity();
                     if horizontal_velocity.x * horizontal_velocity.x
                         + horizontal_velocity.z * horizontal_velocity.z
