@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EnemyBrain,
     EnemyConfig, EnemyEvent, EnemyState, EntityId, ExtractionZone, InputState, MaterialId, MeshId,
-    MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene,
-    Transform3, Vec3, terrain_height,
+    MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
+    PlayerHealth, Scene, Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -419,7 +419,8 @@ impl ApplicationHandler for RiftboundApp {
                             self.animated_transforms.push((sentinel, enemy_transform));
                             if event == Some(EnemyEvent::PulseReleased) {
                                 self.sentinel_pulse_timer = 0.32;
-                                let pulse_distance = distance_squared(transform.translation, enemy_position);
+                                let pulse_distance =
+                                    distance_squared(transform.translation, enemy_position);
                                 if pulse_distance <= 2.2 * 2.2
                                     && self.player_health.apply_damage(25, 1.0)
                                 {
@@ -434,7 +435,9 @@ impl ApplicationHandler for RiftboundApp {
                                         log::info!("Player recovered at the active checkpoint");
                                     }
                                 } else {
-                                    log::info!("Sentinel pulse missed or was blocked by damage protection");
+                                    log::info!(
+                                        "Sentinel pulse missed or was blocked by damage protection"
+                                    );
                                 }
                                 log::info!("Sentinel released its pulse; close in during recovery");
                             }
