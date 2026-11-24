@@ -3,6 +3,7 @@ members = [
     "crates/riftbound-core",
     "crates/riftbound-renderer",
     "crates/riftbound-runtime",
+    "crates/riftbound-net",
 ]
 resolver = "2"
 
