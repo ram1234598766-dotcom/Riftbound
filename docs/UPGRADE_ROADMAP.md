@@ -205,3 +205,8 @@ The platform-independent vehicle core now includes a reusable recovery record th
 ### Rectangular vehicle collision foundation
 
 The deterministic core collision world now supports a rectangular vehicle footprint in addition to the existing circular character footprint. Vehicle movement uses separate width and length extents, bounded substeps, axis-separated resolution, and binary refinement at obstacle boundaries. The native driving prototype now resolves its horizontal movement through this vehicle footprint and stops the current speed when a collision blocks movement. This is still an axis-aligned approximation: it does not yet rotate the footprint with vehicle heading, model suspension/wheel contact, or provide streamed open-world collision chunks. The current runtime also uses the arena collision world, so this is a tested foundation rather than open-world collision coverage.
+
+
+### Heading-aware vehicle footprint
+
+The vehicle collision API now derives conservative horizontal extents from the vehicle heading before resolving movement. This prevents the car from using its narrow straight-ahead footprint while turned diagonally. The runtime now supplies the current heading. This is a conservative rotated bounding-box approximation, not a full oriented-box narrow-phase solver; it can stop slightly early near obstacles. Exact oriented collision and wheel/contact response remain planned.
