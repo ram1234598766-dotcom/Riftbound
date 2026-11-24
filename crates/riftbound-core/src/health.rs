@@ -53,8 +53,7 @@ impl PlayerHealth {
     /// Advances the protection timer; invalid time steps are ignored.
     pub fn update(&mut self, delta_seconds: f32) {
         if delta_seconds.is_finite() && delta_seconds > 0.0 {
-            self.protection_remaining =
-                (self.protection_remaining - delta_seconds.min(0.25)).max(0.0);
+            self.protection_remaining = (self.protection_remaining - delta_seconds).max(0.0);
         }
     }
 
