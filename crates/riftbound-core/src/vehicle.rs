@@ -216,9 +216,17 @@ mod tests {
     fn loose_surfaces_reduce_acceleration_and_top_speed() {
         let mut road = VehicleState::default();
         let mut mud = VehicleState::default();
-        let input = VehicleInput { throttle: 1.0, ..VehicleInput::default() };
+        let input = VehicleInput {
+            throttle: 1.0,
+            ..VehicleInput::default()
+        };
         for _ in 0..20 {
-            road.update(input, VehicleSurface::Asphalt, VehicleConfig::default(), 0.05);
+            road.update(
+                input,
+                VehicleSurface::Asphalt,
+                VehicleConfig::default(),
+                0.05,
+            );
             mud.update(input, VehicleSurface::Mud, VehicleConfig::default(), 0.05);
         }
         assert!(road.speed > mud.speed);
