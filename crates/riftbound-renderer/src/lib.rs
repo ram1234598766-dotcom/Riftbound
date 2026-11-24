@@ -59,6 +59,8 @@ pub struct Renderer {
 struct MeshBatch {
     mesh_index: usize,
     instance_buffer: wgpu::Buffer,
+    instance_capacity: u64,
+    instance_staging: Vec<u8>,
     instance_count: u32,
 }
 
@@ -251,8 +253,50 @@ impl Renderer {
                 *current = *transform;
             }
         }
-        self.mesh_batches = create_mesh_batches(&self.device, &self.scene, self.meshes.len())?;
+        self.update_mesh_batch_buffers()?;
         Ok(true)
+    }
+
+    fn update_mesh_batch_buffers(&mut self) -> Result<(), std::num::TryFromIntError> {
+        for batch in &mut self.mesh_batches {
+            batch.instance_staging.clear();
+            let mut instance_count = 0_usize;
+            for object in self.scene.iter() {
+                let Ok(mesh_index) = usize::try_from(object.mesh.index()) else {
+                    continue;
+                };
+                if mesh_index != batch.mesh_index {
+                    continue;
+                }
+                let world = self
+                    .scene
+                    .world_matrix(object.id)
+                    .expect("iterated scene objects must have valid hierarchy");
+                let instance =
+                    InstanceRaw::from_matrix(world, material_tint(object.material));
+                append_instance_bytes(&mut batch.instance_staging, &instance);
+                instance_count += 1;
+            }
+            let draw_count = u32::try_from(instance_count)?;
+            if instance_count == 0 {
+                batch.instance_count = 0;
+                continue;
+            }
+            let required_capacity = u64::try_from(batch.instance_staging.len())?;
+            if required_capacity > batch.instance_capacity {
+                batch.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("riftbound-mesh-instance-batch"),
+                    size: required_capacity,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                batch.instance_capacity = required_capacity;
+            }
+            self.queue
+                .write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
+            batch.instance_count = draw_count;
+        }
+        Ok(())
     }
 
     /// Moves the camera target and eye together across the horizontal world plane.
@@ -558,14 +602,17 @@ fn create_mesh_batches(
         }
         let instance_count = u32::try_from(instances.len())?;
         let bytes = instance_bytes(instances);
+        let instance_capacity = u64::try_from(bytes.len())?;
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("riftbound-mesh-instance-batch"),
             contents: &bytes,
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         batches.push(MeshBatch {
             mesh_index,
             instance_buffer,
+            instance_capacity,
+            instance_staging: bytes,
             instance_count,
         });
     }
@@ -583,11 +630,15 @@ fn material_tint(material: MaterialId) -> [f32; 4] {
 fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(instances.len() * 80);
     for instance in instances {
-        for component in instance.model.iter().chain(instance.tint.iter()) {
-            bytes.extend_from_slice(&component.to_ne_bytes());
-        }
+        append_instance_bytes(&mut bytes, instance);
     }
     bytes
+}
+
+fn append_instance_bytes(bytes: &mut Vec<u8>, instance: &InstanceRaw) {
+    for component in instance.model.iter().chain(instance.tint.iter()) {
+        bytes.extend_from_slice(&component.to_ne_bytes());
+    }
 }
 
 fn create_hud_pipeline(
