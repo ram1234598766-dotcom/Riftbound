@@ -83,6 +83,18 @@ impl CollisionWorld {
             if self.is_walkable(next_x, result.position.z, radius) {
                 result.position.x = next_x;
             } else {
+                let mut low = 0.0;
+                let mut high = 1.0;
+                for _ in 0..8 {
+                    let middle = (low + high) * 0.5;
+                    let candidate = result.position.x + step_x * middle;
+                    if self.is_walkable(candidate, result.position.z, radius) {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                result.position.x += step_x * low;
                 result.blocked_x = true;
             }
 
@@ -90,6 +102,18 @@ impl CollisionWorld {
             if self.is_walkable(result.position.x, next_z, radius) {
                 result.position.z = next_z;
             } else {
+                let mut low = 0.0;
+                let mut high = 1.0;
+                for _ in 0..8 {
+                    let middle = (low + high) * 0.5;
+                    let candidate = result.position.z + step_z * middle;
+                    if self.is_walkable(result.position.x, candidate, radius) {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                result.position.z += step_z * low;
                 result.blocked_z = true;
             }
         }
