@@ -91,7 +91,7 @@ impl Renderer {
             device,
             queue,
             config,
-            depth_texture: depth_texture,
+            depth_texture,
             depth_view,
             camera_buffer,
             camera_bind_group,
