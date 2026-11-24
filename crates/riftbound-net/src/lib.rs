@@ -248,6 +248,7 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     writer.abort();
 }
 
+#[allow(clippy::too_many_lines)]
 async fn handle_client_message(
     state: &HostState,
     id: u64,
