@@ -23,9 +23,11 @@ pub struct HudVertex {
 }
 
 impl HudVertex {
+    /// Vertex attributes consumed by the HUD pipeline.
     pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
         wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4];
 
+    /// Returns the GPU vertex-buffer layout.
     pub const fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: 24,
@@ -35,6 +37,7 @@ impl HudVertex {
     }
 }
 
+/// Builds screen-space triangles for the current mission HUD.
 pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex> {
     let width = width.max(1) as f32;
     let height = height.max(1) as f32;
