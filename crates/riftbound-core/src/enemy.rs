@@ -17,7 +17,6 @@ pub enum EnemyState {
     Return,
 }
 
-
 /// Behaviour profile used to build a distinct enemy encounter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EnemyArchetype {
