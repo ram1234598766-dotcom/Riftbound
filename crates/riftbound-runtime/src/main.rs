@@ -8,8 +8,8 @@ use riftbound_core::{
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
-    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
-    terrain_height,
+    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
+    VehicleSurface, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -376,7 +376,10 @@ impl ApplicationHandler for RiftboundApp {
                             VehicleConfig::default(),
                             delta,
                         );
-                        if self.vehicle_recovery.recover_if_fallen(&mut self.vehicle_state, -3.0) {
+                        if self
+                            .vehicle_recovery
+                            .recover_if_fallen(&mut self.vehicle_state, -3.0)
+                        {
                             self.vehicle_suspension = SuspensionState::default();
                             log::info!("Vehicle recovered at its latest safe terrain position");
                         }
