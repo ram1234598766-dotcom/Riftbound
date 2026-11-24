@@ -220,3 +220,8 @@ The shared terrain module now exposes a deterministic surface query for the star
 ### Shared terrain visuals and vehicle surface palette
 
 The native terrain mesh now samples the same `terrain_surface` query used by vehicle physics and assigns a distinct vertex-color palette for asphalt, gravel, mud, sand, snow, and rock. This makes the starter region's handling zones visible in the terrain instead of leaving the surface map data-only. Colors are baked per terrain vertex and shared by detailed and LOD chunk generation, preserving matching chunk-edge samples. This is a stylized blockout palette, not final AAA ground materials, decals, textures, or biome art.
+
+
+### Four-wheel terrain handling
+
+Vehicle handling now queries the terrain beneath all four tyre contact points using the vehicle's current heading, track width, and wheelbase. The dominant sampled surface controls grip, speed cap, and rolling resistance; equal surface counts prefer the chassis-center surface so a vehicle straddling a narrow road edge does not flicker unpredictably. The query is deterministic, allocation-free, validates non-finite inputs, and has coverage for mud, sand, snow, road-edge ties, and invalid samples. This is still the arena's provisional surface map, not streamed open-world biome data.
