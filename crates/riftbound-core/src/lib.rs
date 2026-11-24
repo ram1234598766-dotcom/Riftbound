@@ -19,6 +19,7 @@ mod scene;
 mod terrain;
 mod transform;
 mod vehicle;
+mod world_terrain;
 
 pub use character::{
     CharacterController, CharacterMovementState, MovementConfig, VerticalMotionConfig,
@@ -37,6 +38,7 @@ pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
 pub use terrain::{terrain_height, terrain_surface, terrain_vehicle_surface};
 pub use transform::Transform3;
+pub use world_terrain::{WorldTerrainSample, world_terrain_sample};
 pub use vehicle::{
     SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
     VehicleRecovery, VehicleState, VehicleSurface,
