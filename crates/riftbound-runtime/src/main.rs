@@ -198,7 +198,8 @@ impl ApplicationHandler for RiftboundApp {
         self.vehicle_wheels = None;
         self.vehicle_state = VehicleState::default();
         self.vehicle_suspension = SuspensionState::default();
-        self.driving = false;        self.collision = None;
+        self.driving = false;
+        self.collision = None;
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
         self.animated_transforms.clear();
@@ -396,7 +397,8 @@ impl ApplicationHandler for RiftboundApp {
                             self.vehicle_state.position.y,
                             suspension_config,
                             delta,
-                        );                        let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
+                        );
+                        let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
                         self.vehicle_state.position.y = average_ground
                             + suspension_config.rest_length
                             - suspension_pose.average_compression;
@@ -595,7 +597,8 @@ impl ApplicationHandler for RiftboundApp {
                                 } else {
                                     log::info!(
                                         "Sentinel pulse missed or was blocked by damage protection"
-                                    );                                }
+                                    );
+                                }
                                 log::info!("Sentinel released its pulse; close in during recovery");
                             }
                             self.sentinel_pulse_timer =
@@ -794,7 +797,8 @@ impl ApplicationHandler for RiftboundApp {
                                 window.set_title("RIFTBOUND — Sentinel disabled");
                                 log::info!(
                                     "Sentinel encounter complete; defeat objective advanced"
-                                );                            }
+                                );
+                            }
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
                             });
@@ -993,7 +997,8 @@ fn build_player_character(scene: &mut Scene, player: EntityId) -> CharacterParts
     let _backpack = spawn_character_part(
         scene,
         player,
-        character_part_transform(0.0, 0.48, 0.30, 0.0, 0.0, 0.0, 0.34, 0.48, 0.18),        MaterialId::AMBER,
+        character_part_transform(0.0, 0.48, 0.30, 0.0, 0.0, 0.0, 0.34, 0.48, 0.18),
+        MaterialId::AMBER,
     );
     let _visor = spawn_character_part(
         scene,
@@ -1192,7 +1197,8 @@ fn build_arena(scene: &mut Scene) {
     spawn_box(
         scene,
         Vec3::new(0.0, 1.0, 9.75),
-        Vec3::new(20.0, 2.0, 0.5),        MaterialId::RIFT,
+        Vec3::new(20.0, 2.0, 0.5),
+        MaterialId::RIFT,
     );
 
     // Solid amber blocks are both visible and registered in the collision world.
@@ -1391,7 +1397,8 @@ fn build_vehicle(scene: &mut Scene) -> (EntityId, [EntityId; 4]) {
             Vec3::default(),
             Vec3::new(1.75, 0.55, 3.25),
         ))
-        .expect("vehicle body entity ID space available");    scene.set_material(body, MaterialId::RIFT);
+        .expect("vehicle body entity ID space available");
+    scene.set_material(body, MaterialId::RIFT);
     let mut wheels = Vec::with_capacity(4);
     for (x, z) in [(-0.95, -0.95), (0.95, -0.95), (-0.95, 0.95), (0.95, 0.95)] {
         let wheel = scene
