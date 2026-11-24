@@ -431,6 +431,27 @@ mod tests {
     }
 
     #[test]
+    fn grounded_controller_tracks_a_changed_terrain_height_before_jumping() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert!(controller.is_grounded());
+        assert!((transform.translation.y - 0.2).abs() < 0.0001);
+
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.5);
+        assert!(controller.is_grounded());
+        assert!((transform.translation.y - 0.5).abs() < 0.0001);
+        assert_eq!(controller.vertical_velocity(), 0.0);
+
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.5);
+        assert_eq!(controller.movement_state(), CharacterMovementState::Jumping);
+        assert!(transform.translation.y > 0.5);
+    }
+
+    #[test]
     fn jump_lands_on_ground_and_resets_vertical_velocity() {
         let mut controller = CharacterController::default();
         let mut transform = Transform3::IDENTITY;
