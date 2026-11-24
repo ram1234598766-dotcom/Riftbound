@@ -133,7 +133,7 @@ impl Renderer {
             .write_buffer(&self.camera_buffer, 0, &camera_bytes(width, height));
     }
 
-    /// Draws a colored 3D cube with perspective projection and depth testing.
+    /// Draws the indexed cube mesh as several transformed instances with depth testing.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -444,6 +444,18 @@ mod tests {
                 assert!(value.is_finite());
             }
         }
+    }
+
+    #[test]
+    fn scene_instances_have_distinct_finite_model_transforms() {
+        let instances = scene_instances();
+        assert_eq!(instances.len(), 3);
+        assert_ne!(instances[0].model, instances[1].model);
+        assert_ne!(instances[1].model, instances[2].model);
+        assert!(instances.iter().all(|instance| {
+            instance.model.iter().all(|component| component.is_finite())
+        }));
+        assert_eq!(instance_bytes(&instances).len(), instances.len() * 64);
     }
 
     #[test]
