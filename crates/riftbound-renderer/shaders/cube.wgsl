@@ -42,10 +42,20 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let world_normal = normalize(cross(dpdx(input.world_position), dpdy(input.world_position)));
     let light_direction = normalize(vec3<f32>(-0.45, 0.82, 0.35));
+    let view_direction = normalize(camera.eye_position.xyz - input.world_position);
     let diffuse = abs(dot(world_normal, light_direction));
-    let ambient = 0.28;
-    let lighting = ambient + (1.0 - ambient) * diffuse;
-    let lit_color = input.color * lighting;
+    let ambient = 0.24;
+    let key_light = ambient + (1.0 - ambient) * diffuse;
+
+    // A restrained cool fill and view-dependent rim keep dark facets readable.
+    let fill_light = max(dot(abs(world_normal), normalize(vec3<f32>(0.35, 0.25, -0.45))), 0.0);
+    let rim = pow(1.0 - clamp(abs(dot(world_normal, view_direction)), 0.0, 1.0), 3.0);
+    let cool_fill = vec3<f32>(0.10, 0.19, 0.30) * fill_light * 0.22;
+    let cyan_rim = vec3<f32>(0.12, 0.48, 0.62) * rim * 0.16;
+    let warm_key = vec3<f32>(1.0, 0.82, 0.68) * diffuse * 0.06;
+    let lit_color = input.color * key_light + cool_fill + cyan_rim + warm_key;
+
+    // Soft distance haze blends into the same deep-blue environment palette.
     let view_distance = distance(input.world_position, camera.eye_position.xyz);
     let fog_amount = smoothstep(20.0, 72.0, view_distance);
     let fog_color = vec3<f32>(0.018, 0.032, 0.075);
