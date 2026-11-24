@@ -28,6 +28,8 @@ pub struct EnemyConfig {
     pub leash_radius: f32,
     /// Movement speed while patrolling.
     pub patrol_speed: f32,
+    /// Horizontal distance from home covered by the patrol route.
+    pub patrol_radius: f32,
     /// Movement speed while pursuing or returning.
     pub chase_speed: f32,
     /// Seconds spent telegraphing an attack.
@@ -43,6 +45,7 @@ impl Default for EnemyConfig {
             attack_radius: 1.7,
             leash_radius: 12.0,
             patrol_speed: 1.1,
+            patrol_radius: 1.6,
             chase_speed: 2.4,
             telegraph_seconds: 0.65,
             recovery_seconds: 0.8,
@@ -119,6 +122,8 @@ impl EnemyBrain {
             || c.leash_radius < c.awareness_radius
             || !c.patrol_speed.is_finite()
             || c.patrol_speed < 0.0
+            || !c.patrol_radius.is_finite()
+            || c.patrol_radius < 0.0
             || !c.chase_speed.is_finite()
             || c.chase_speed < 0.0
             || !c.telegraph_seconds.is_finite()
@@ -139,6 +144,17 @@ impl EnemyBrain {
                     self.state = EnemyState::Chase;
                     Some(EnemyEvent::PlayerDetected)
                 } else {
+                    if c.patrol_radius > 0.0 && c.patrol_speed > 0.0 {
+                        self.timer = (self.timer + delta) % 4.0;
+                        let phase = self.timer;
+                        let offset = if phase < 2.0 {
+                            -c.patrol_radius + c.patrol_radius * phase
+                        } else {
+                            c.patrol_radius - c.patrol_radius * (phase - 2.0)
+                        };
+                        let target = Vec3::new(self.home.x + offset, position.y, self.home.z);
+                        move_toward(position, target, c.patrol_speed * delta);
+                    }
                     None
                 }
             }
@@ -186,6 +202,7 @@ impl EnemyBrain {
             EnemyState::Return => {
                 if home_distance <= 0.08 {
                     self.state = EnemyState::Patrol;
+                    self.timer = 0.0;
                     None
                 } else {
                     move_toward(position, self.home, c.patrol_speed * delta);
@@ -226,6 +243,17 @@ mod tests {
 
     fn brain() -> EnemyBrain {
         EnemyBrain::new(Vec3::new(0.0, 0.0, 0.0), EnemyConfig::default())
+    }
+
+    #[test]
+    fn patrol_moves_between_bounded_home_waypoints() {
+        let mut brain = brain();
+        let mut position = Vec3::new(0.0, 0.0, 0.0);
+        let distant_player = Vec3::new(20.0, 0.0, 0.0);
+        brain.update(&mut position, distant_player, 0.1);
+        assert!(position.x < 0.0);
+        assert!(position.x >= -EnemyConfig::default().patrol_radius);
+        assert_eq!(brain.state(), EnemyState::Patrol);
     }
 
     #[test]
