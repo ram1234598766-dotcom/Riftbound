@@ -41,12 +41,20 @@ impl Renderer {
             .ok_or("No compatible surface configuration was reported by the GPU adapter")?;
         surface.configure(&device, &config);
 
-        Ok(Self { _instance: instance, surface, device, queue, config })
+        Ok(Self {
+            _instance: instance,
+            surface,
+            device,
+            queue,
+            config,
+        })
     }
 
     /// Updates presentation dimensions after a non-zero window resize.
     pub fn resize(&mut self, width: u32, height: u32) {
-        if width == 0 || height == 0 { return; }
+        if width == 0 || height == 0 {
+            return;
+        }
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
@@ -72,10 +80,14 @@ impl Renderer {
             }
         };
 
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("riftbound-frame-encoder"),
-        });
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("riftbound-frame-encoder"),
+            });
         {
             let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("riftbound-background-pass"),
@@ -85,7 +97,10 @@ impl Renderer {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.018, g: 0.032, b: 0.062, a: 1.0,
+                            r: 0.018,
+                            g: 0.032,
+                            b: 0.062,
+                            a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
