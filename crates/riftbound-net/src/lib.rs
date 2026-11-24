@@ -43,11 +43,24 @@ struct ClientMessage {
 #[derive(Serialize)]
 struct Snapshot<'a> {
     kind: &'static str,
-    self_id: u64,
     players: &'a [PlayerState],
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
+pub fn spawn() {
+    std::thread::Builder::new()
+        .name("riftbound-lan-server".to_owned())
+        .spawn(|| {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("LAN server runtime should initialize");
+            runtime.block_on(serve());
+        })
+        .expect("LAN server thread should start");
+}
+
+/// Starts the HTTP and WebSocket server until the host process exits.
 pub async fn serve() {
     let (updates, _) = broadcast::channel(128);
     let state = HostState {
@@ -95,10 +108,15 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
     let initial = PlayerState { id, x: WORLD_WIDTH * 0.5, y: WORLD_HEIGHT * 0.5, face: 0.0 };
     state.players.lock().await.insert(id, initial);
-    publish_snapshot(&state, id).await;
 
     let (mut sender, mut receiver) = socket.split();
+    let welcome = serde_json::json!({ "kind": "welcome", "self_id": id }).to_string();
+    if sender.send(Message::Text(welcome.into())).await.is_err() {
+        state.players.lock().await.remove(&id);
+        return;
+    }
     let mut updates = state.updates.subscribe();
+    publish_snapshot(&state).await;
     let writer = tokio::spawn(async move {
         while let Ok(message) = updates.recv().await {
             if sender.send(Message::Text(message.into())).await.is_err() {
@@ -108,9 +126,10 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     });
 
     while let Some(Ok(message)) = receiver.next().await {
-        let Message::Text(text) = message else {
-            if matches!(message, Message::Close(_)) { break; }
-            continue;
+        let text = match message {
+            Message::Text(text) => text,
+            Message::Close(_) => break,
+            _ => continue,
         };
         let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else { continue; };
         if input.kind != "move" || !input.x.is_finite() || !input.y.is_finite() || !input.face.is_finite() {
@@ -119,22 +138,22 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         {
             let mut players = state.players.lock().await;
             if let Some(player) = players.get_mut(&id) {
-                player.x = input.x.clamp(0.0, WORLD_WIDTH);
-                player.y = input.y.clamp(0.0, WORLD_HEIGHT);
+                player.x = clamp_world_position(input.x, WORLD_WIDTH);
+                player.y = clamp_world_position(input.y, WORLD_HEIGHT);
                 player.face = input.face;
             }
         }
-        publish_snapshot(&state, id).await;
+        publish_snapshot(&state).await;
     }
 
     state.players.lock().await.remove(&id);
-    publish_snapshot(&state, 0).await;
+    publish_snapshot(&state).await;
     writer.abort();
 }
 
-async fn publish_snapshot(state: &HostState, self_id: u64) {
+async fn publish_snapshot(state: &HostState) {
     let players: Vec<PlayerState> = state.players.lock().await.values().cloned().collect();
-    if let Ok(message) = serde_json::to_string(&Snapshot { kind: "snapshot", self_id, players: &players }) {
+    if let Ok(message) = serde_json::to_string(&Snapshot { kind: "snapshot", players: &players }) {
         let _ = state.updates.send(message);
     }
 }
@@ -143,4 +162,20 @@ fn discover_lan_ip() -> Option<String> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("192.0.2.1:80").ok()?;
     Some(socket.local_addr().ok()?.ip().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn world_position_is_bounded() {
+        assert_eq!(clamp_world_position(-20.0, WORLD_WIDTH), 0.0);
+        assert_eq!(clamp_world_position(WORLD_WIDTH + 20.0, WORLD_WIDTH), WORLD_WIDTH);
+        assert_eq!(clamp_world_position(42.0, WORLD_WIDTH), 42.0);
+    }
+}
+
+fn clamp_world_position(value: f32, maximum: f32) -> f32 {
+    value.clamp(0.0, maximum)
 }
