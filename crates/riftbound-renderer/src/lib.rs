@@ -24,6 +24,8 @@ pub struct Renderer {
     camera_bind_group: wgpu::BindGroup,
     cube_pipeline: wgpu::RenderPipeline,
     cube_mesh: Mesh,
+    instance_buffer: wgpu::Buffer,
+    instance_count: u32,
 }
 
 impl Renderer {
@@ -88,6 +90,14 @@ impl Renderer {
 
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
         let cube_mesh = Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?;
+        let instances = scene_instances();
+        let instance_count = u32::try_from(instances.len())?;
+        let instance_bytes = instance_bytes(&instances);
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("riftbound-scene-instances"),
+            contents: &instance_bytes,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
@@ -103,6 +113,8 @@ impl Renderer {
             camera_bind_group,
             cube_pipeline,
             cube_mesh,
+            instance_buffer,
+            instance_count,
         })
     }
 
@@ -181,7 +193,12 @@ impl Renderer {
             pass.set_pipeline(&self.cube_pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
             pass.set_vertex_buffer(0, self.cube_mesh.vertex_buffer().slice(..));
-            pass.draw(0..self.cube_mesh.vertex_count(), 0..1);
+            pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            pass.set_index_buffer(
+                self.cube_mesh.index_buffer().slice(..),
+                wgpu::IndexFormat::Uint16,
+            );
+            pass.draw_indexed(0..self.cube_mesh.index_count(), 0, 0..self.instance_count);
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
@@ -194,6 +211,67 @@ impl Renderer {
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
     }
+}
+
+
+#[derive(Clone, Copy)]
+struct InstanceRaw {
+    model: [f32; 16],
+}
+
+impl InstanceRaw {
+    const ATTRIBUTES: [wgpu::VertexAttribute; 4] =
+        wgpu::vertex_attr_array![2 => Float32x4, 3 => Float32x4, 4 => Float32x4, 5 => Float32x4];
+
+    const fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: 64,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+
+    fn new(x: f32, y: f32, z: f32, scale: f32, rotation_y: f32) -> Self {
+        let (sine, cosine) = rotation_y.sin_cos();
+        Self {
+            model: [
+                cosine * scale,
+                0.0,
+                -sine * scale,
+                0.0,
+                0.0,
+                scale,
+                0.0,
+                0.0,
+                sine * scale,
+                0.0,
+                cosine * scale,
+                0.0,
+                x,
+                y,
+                z,
+                1.0,
+            ],
+        }
+    }
+}
+
+fn scene_instances() -> Vec<InstanceRaw> {
+    vec![
+        InstanceRaw::new(-1.65, 0.0, 0.0, 0.58, -0.25),
+        InstanceRaw::new(0.0, 0.0, 0.0, 0.82, 0.15),
+        InstanceRaw::new(1.65, 0.0, 0.0, 0.58, 0.45),
+    ]
+}
+
+fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(instances.len() * 64);
+    for instance in instances {
+        for component in instance.model {
+            bytes.extend_from_slice(&component.to_ne_bytes());
+        }
+    }
+    bytes
 }
 
 fn create_cube_pipeline(
@@ -217,7 +295,7 @@ fn create_cube_pipeline(
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(MeshVertex::layout())],
+            buffers: &[Some(MeshVertex::layout()), Some(InstanceRaw::layout())],
         },
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
