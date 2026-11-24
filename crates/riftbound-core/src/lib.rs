@@ -12,7 +12,7 @@ mod math;
 mod scene;
 mod transform;
 
-pub use character::{CharacterController, MovementConfig};
+pub use character::{CharacterController, MovementConfig, VerticalMotionConfig};
 pub use clock::{FixedClock, TickBatch};
 pub use collision::{Aabb2, CollisionResult, CollisionWorld};
 pub use entity::{EntityArena, EntityId};
