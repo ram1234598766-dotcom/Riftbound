@@ -121,7 +121,7 @@ impl WorldChunkChanges {
 
 /// CPU-side active chunk window with retained capacity and incremental change tracking.
 ///
-/// Call update_focus when the player or vehicle moves. If the focus remains in
+/// Call `update_focus` when the player or vehicle moves. If the focus remains in
 /// the same chunk, the method returns false and leaves the active window intact.
 /// All active and change vectors reserve their maximum capacity at construction.
 pub struct WorldChunkStreamer {
@@ -327,13 +327,13 @@ mod tests {
         let mut streamer = WorldChunkStreamer::standard();
         assert!(streamer.update_focus(0.0, 0.0));
         assert_eq!(streamer.changes().added().len(), 25);
-        assert!(streamer.changes().removed().is_empty());
+        assert_eq!(streamer.changes().removed(), []);
 
         assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
         let changes = streamer.changes().clone();
         assert_eq!(changes.added().len(), 5);
         assert_eq!(changes.removed().len(), 5);
-        assert!(!changes.updated().is_empty());
+        assert_ne!(changes.updated(), []);
         assert_eq!(streamer.active_chunks().len(), 25);
 
         assert!(!streamer.update_focus(WORLD_CHUNK_SIZE + 1.0, 0.0));
