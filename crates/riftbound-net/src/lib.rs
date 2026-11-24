@@ -21,7 +21,7 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 
 const PORT: u16 = 7878;
 const WORLD_WIDTH: f32 = 2200.0;
