@@ -27,7 +27,7 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 ### 2. Renderer and world quality
 - [x] Add an initial camera-distance cube LOD tier with hysteresis to prevent visual popping.
 - [ ] Extend LOD tiers to environment props and additional mesh types.
-- [ ] Add frustum-aware terrain chunking so large worlds do not require one monolithic terrain mesh.
+- [x] Split the native arena floor into four frustum-culled terrain chunks with matching shared-edge height and colour samples.
 - [ ] Add a compact lighting model and tone-controlled environment palette.
 - [ ] Add bounded ambient effects with quality-scalable density.
 - [ ] Add asset/mesh validation and graceful fallback for missing resources.
@@ -65,4 +65,4 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ## Current implementation note
 
-The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. This is an initial culling foundation, not a substitute for profiling or future mesh-specific bounds. Terrain chunking and LOD remain separate future milestones.
+The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
