@@ -8,7 +8,7 @@ use riftbound_core::{
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, Transform3, Vec3, VehicleConfig,
-    VehicleInput, VehicleState, VehicleSurface, terrain_height,
+    SuspensionConfig, SuspensionState, VehicleInput, VehicleState, VehicleSurface, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -38,6 +38,7 @@ struct RiftboundApp {
     vehicle: Option<EntityId>,
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_state: VehicleState,
+    vehicle_suspension: SuspensionState,
     driving: bool,
     collision: Option<CollisionWorld>,
     input: InputState,
@@ -106,9 +107,10 @@ impl ApplicationHandler for RiftboundApp {
                 let player_parts = build_player_character(&mut scene, player);
                 let (vehicle, vehicle_wheels) = build_vehicle(&mut scene);
                 let vehicle_state = VehicleState {
-                    position: Vec3::new(0.0, 0.62, -1.2),
+                    position: Vec3::new(0.0, 0.58, -1.2),
                     ..VehicleState::default()
                 };
+                let vehicle_suspension = SuspensionState::default();
                 if let Some(transform) = scene.get_mut(vehicle) {
                     transform.translation = vehicle_state.position;
                 }
@@ -154,6 +156,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle = Some(vehicle);
                 self.vehicle_wheels = Some(vehicle_wheels);
                 self.vehicle_state = vehicle_state;
+                self.vehicle_suspension = vehicle_suspension;
                 self.driving = false;
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
@@ -193,6 +196,7 @@ impl ApplicationHandler for RiftboundApp {
         self.vehicle = None;
         self.vehicle_wheels = None;
         self.vehicle_state = VehicleState::default();
+        self.vehicle_suspension = SuspensionState::default();
         self.driving = false;
         self.collision = None;
         self.pickups = PickupTracker::new();
@@ -367,9 +371,44 @@ impl ApplicationHandler for RiftboundApp {
                             VehicleConfig::default(),
                             delta,
                         );
+                        // Sample the same deterministic terrain function used by the arena.
+                        // Corner order matches SuspensionState: front-left, front-right,
+                        // rear-left, rear-right.
+                        let wheel_offsets = [
+                            (-0.78_f32, -1.32_f32),
+                            (0.78, -1.32),
+                            (-0.78, 1.32),
+                            (0.78, 1.32),
+                        ];
+                        let (sin_heading, cos_heading) = self.vehicle_state.heading.sin_cos();
+                        let mut ground_heights = [0.0_f32; 4];
+                        for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
+                            let world_x = self.vehicle_state.position.x
+                                + cos_heading * local_x
+                                + sin_heading * local_z;
+                            let world_z = self.vehicle_state.position.z
+                                - sin_heading * local_x
+                                + cos_heading * local_z;
+                            ground_heights[index] = terrain_height(world_x, world_z);
+                        }
+                        let suspension_config = SuspensionConfig::default();
+                        let suspension_pose = self.vehicle_suspension.update(
+                            ground_heights,
+                            self.vehicle_state.position.y,
+                            suspension_config,
+                            delta,
+                        );
+                        let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
+                        self.vehicle_state.position.y = average_ground
+                            + suspension_config.rest_length
+                            - suspension_pose.average_compression;
                         let vehicle_transform = Transform3::new(
                             self.vehicle_state.position,
-                            Vec3::new(0.0, self.vehicle_state.heading, 0.0),
+                            Vec3::new(
+                                suspension_pose.pitch,
+                                self.vehicle_state.heading,
+                                suspension_pose.roll,
+                            ),
                             Vec3::new(1.0, 1.0, 1.0),
                         );
                         if let Some(vehicle) = self.vehicle {
@@ -379,13 +418,14 @@ impl ApplicationHandler for RiftboundApp {
                             let wheel_spin = self.vehicle_state.speed * delta * 1.7;
                             for (index, wheel) in wheels.iter().enumerate() {
                                 let front = index < 2;
-                                let side = if index % 2 == 0 { -1.0 } else { 1.0 };
-                                let z = if front { -0.95 } else { 0.95 };
                                 let steer = if front { steering * 0.35 } else { 0.0 };
+                                let local_y = ground_heights[index] + 0.34
+                                    - self.vehicle_state.position.y;
+                                let (local_x, local_z) = wheel_offsets[index];
                                 self.animated_transforms.push((
                                     *wheel,
                                     Transform3::new(
-                                        Vec3::new(side * 0.95, -0.30, z),
+                                        Vec3::new(local_x, local_y, local_z),
                                         Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
                                         Vec3::new(0.34, 0.68, 0.68),
                                     ),
