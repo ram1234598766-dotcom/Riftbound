@@ -595,14 +595,16 @@ impl Renderer {
             if usize::try_from(object.mesh.index()).ok() != Some(0) {
                 continue;
             }
-            let world = self.scene.world_matrix(object.id)
+            let world = self
+                .scene
+                .world_matrix(object.id)
                 .expect("iterated scene objects must have valid hierarchy");
             let dx = world[12] - self.camera_offset[0];
             let dy = world[13] - self.camera_offset[1];
             let dz = world[14] - self.camera_offset[2];
             let distance = (dx * dx + dy * dy + dz * dz).sqrt();
             let state_index = self.lod_states.iter().position(|(id, _)| *id == object.id);
-            let was_low = state_index.map(|index| self.lod_states[index].1).unwrap_or(false);
+            let was_low = state_index.is_some_and(|index| self.lod_states[index].1);
             let use_low = select_cube_lod(distance, was_low);
             if let Some(index) = state_index {
                 self.lod_states[index].1 = use_low;
@@ -617,7 +619,19 @@ impl Renderer {
             batch.instance_staging.clear();
             let mut count = 0_u32;
             for object in self.scene.iter() {
-                if usize::try_from(object.mesh.index()).ok() != Some(batch.mesh_index) {
+                let object_mesh = usize::try_from(object.mesh.index()).unwrap_or(usize::MAX);
+                let use_low = object_mesh == 0
+                    && self
+                        .lod_states
+                        .iter()
+                        .find(|(id, _)| *id == object.id)
+                        .is_some_and(|(_, low)| *low);
+                let matches_batch = if batch.mesh_index == CUBE_LOD_MESH_INDEX {
+                    use_low
+                } else {
+                    object_mesh == batch.mesh_index && !use_low
+                };
+                if !matches_batch {
                     continue;
                 }
                 let world = self
