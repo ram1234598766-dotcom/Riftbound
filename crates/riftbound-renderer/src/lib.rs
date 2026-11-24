@@ -15,6 +15,11 @@ pub struct Renderer {
 
 impl Renderer {
     /// Creates a renderer for an existing native window.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no compatible GPU adapter or surface configuration is available,
+    /// or if the graphics device cannot be created.
     pub async fn new(
         display: OwnedDisplayHandle,
         window: Arc<Window>,
