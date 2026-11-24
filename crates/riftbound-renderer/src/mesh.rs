@@ -115,14 +115,28 @@ fn valid_index_data(vertex_count: usize, indices: &[u16]) -> bool {
             .all(|index| usize::from(*index) < vertex_count)
 }
 
-
 fn pyramid_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let vertices = vec![
-        MeshVertex { position: [-1.0, -1.0, -1.0], color: [0.08, 0.30, 0.82] },
-        MeshVertex { position: [1.0, -1.0, -1.0], color: [0.08, 0.30, 0.82] },
-        MeshVertex { position: [1.0, -1.0, 1.0], color: [0.08, 0.30, 0.82] },
-        MeshVertex { position: [-1.0, -1.0, 1.0], color: [0.08, 0.30, 0.82] },
-        MeshVertex { position: [0.0, 1.0, 0.0], color: [0.62, 0.22, 1.0] },
+        MeshVertex {
+            position: [-1.0, -1.0, -1.0],
+            color: [0.08, 0.30, 0.82],
+        },
+        MeshVertex {
+            position: [1.0, -1.0, -1.0],
+            color: [0.08, 0.30, 0.82],
+        },
+        MeshVertex {
+            position: [1.0, -1.0, 1.0],
+            color: [0.08, 0.30, 0.82],
+        },
+        MeshVertex {
+            position: [-1.0, -1.0, 1.0],
+            color: [0.08, 0.30, 0.82],
+        },
+        MeshVertex {
+            position: [0.0, 1.0, 0.0],
+            color: [0.62, 0.22, 1.0],
+        },
     ];
     let indices = vec![0, 2, 1, 0, 3, 2, 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4];
     (vertices, indices)
