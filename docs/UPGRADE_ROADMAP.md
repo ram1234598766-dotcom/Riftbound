@@ -31,6 +31,48 @@
 7. **Content expansion:** more biomes, vehicles, races, deliveries, side quests and optional encounters.
 8. **Multiplayer/release:** only after the single-player driving/RPG loop is cohesive; then authoritative world state, persistence, profiling and packaging.
 
+## Quality, presentation, and asset production plan
+
+Visual, audio, and animation quality are first-class production pillars. They are developed alongside gameplay foundations, not postponed until the end. "High quality" means coherent art direction, readable silhouettes, responsive animation, clean mixes, and stable performance—not simply maximum polygon counts or loud effects.
+
+### Art direction and asset standards
+- Establish a consistent world art bible: materials, palette, lighting, scale, weather, biome identity, vehicle wear, character proportions, and UI language.
+- Build a modular vehicle asset pipeline with detailed exterior meshes, readable interiors where practical, wheels/tires, glass, lights, damage states, and LOD variants.
+- Build player/NPC character assets with clean topology, consistent rigs, reusable clothing/gear pieces, facial/identity variation, and distance-appropriate LODs.
+- Use physically based material conventions, efficient texture atlases/arrays where appropriate, mipmaps, compressed texture formats, and sensible texture budgets.
+- Prefer authored assets and reusable modular kits over expensive unique geometry everywhere. Validate asset licensing and provenance before adding external assets.
+- Create a quality ladder: high detail for close inspection, simplified LODs at distance, impostors or billboards only where visually acceptable, and graceful fallbacks for missing assets.
+
+### Animation quality
+- Define a shared character rig and animation state machine: idle, walk, jog, run, start/stop, turn, jump/fall/land, interact, enter/exit vehicle, and context actions.
+- Add animation blending, transition timing, foot contact, root-motion policy, upper-body layers, and animation event hooks.
+- Create vehicle animation layers for wheel rotation/steering, suspension travel, body roll/pitch, brake/reverse lights, door/hood interactions, and damage response.
+- Add world animation for foliage, water, weather, ambient NPCs, and interactive props with scalable update rates.
+- Keep animation evaluation allocation-free where possible, update distant actors less frequently, and use LOD-aware rig complexity.
+
+### Sound and music quality
+- Create an original audio identity: environment ambience, biome beds, weather, UI feedback, player movement, NPC interaction, vehicle engine layers, tires by surface, suspension impacts, collisions, brakes, horns, and activity stingers.
+- Use layered, parameter-driven vehicle audio driven by RPM/load/speed/gear/throttle, with distinct profiles for vehicle classes and surfaces.
+- Use spatial audio with distance attenuation, stereo positioning, occlusion/reverb zones where supported, and sensible voice prioritisation.
+- Add adaptive music states for exploration, discovery, racing, danger, and story moments; provide separate master/music/SFX/ambience/voice controls and mute options.
+- Stream longer music/ambience tracks, keep short effects resident only within a defined budget, reuse voices carefully, and avoid unbounded audio sources.
+- All shipped audio should be original, properly licensed, or otherwise cleared for distribution.
+
+### Performance and accessibility requirements
+- Every model, texture, animation, and audio asset gets a documented memory/CPU/GPU budget and at least one lower-cost fallback.
+- Support scalable presets, dynamic resolution where appropriate, texture/LOD distance controls, animation throttling, audio voice limits, and reduced-effects options.
+- Test both visual quality and frame pacing on representative low-, mid-, and high-tier hardware before making compatibility claims.
+- Accessibility includes remappable controls, adjustable camera sensitivity, subtitles/captions for important dialogue and cues, volume sliders, text scaling, colour-safe indicators, and reduced camera shake/effects.
+
+### Revised production order
+1. **Foundation and standards:** confirm runtime architecture, world scale conventions, art/audio bibles, asset naming/import validation, profiling hooks, and budgets.
+2. **Vehicle vertical slice:** integrate the car into native runtime; driving controls, camera, terrain contact, collision/recovery, wheels/suspension animation, engine/tire audio, and clear HUD feedback.
+3. **Player presentation:** rigged player model, locomotion state machine, animation blending, camera response, footstep audio, and vehicle enter/exit transitions.
+4. **Terrain and first region:** shared terrain/material queries, road/off-road route, biome materials, environment props, ambience, weather foundations, and streaming-ready chunk boundaries.
+5. **RPG foundations:** NPCs, dialogue, quests, inventory, garages, upgrades, rewards, save/load, voiced or captioned story presentation as scope permits.
+6. **World and content scale:** additional biomes, vehicle classes, races/deliveries, ambient life, dynamic weather, LOD, streaming, and memory budgets.
+7. **Polish and validation:** audio mix, animation cleanup, asset validation, accessibility, performance captures, platform testing, and release packaging.
+
 ## Product goals
 
 Riftbound should feel responsive, cohesive, and polished while keeping memory use and frame cost predictable. The native Rust renderer and browser multiplayer prototype are separate targets; features must be implemented and tested in the correct runtime rather than assumed to transfer between them.
