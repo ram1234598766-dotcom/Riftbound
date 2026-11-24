@@ -28,7 +28,7 @@ use winit::{event_loop::OwnedDisplayHandle, window::Window};
 const CUBE_SHADER: &str = include_str!("../shaders/cube.wgsl");
 
 const HUD_BUFFER_CAPACITY: u64 = 512 * 1024;
-const CUBE_LOD_MESH_INDEX: usize = 4;
+const CUBE_LOD_MESH_INDEX: usize = 7;
 const CUBE_LOD_ENTER_DISTANCE: f32 = 10.0;
 const CUBE_LOD_EXIT_DISTANCE: f32 = 8.0;
 
@@ -163,7 +163,14 @@ impl Renderer {
             Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?,
             Mesh::pyramid(&device).ok_or("Failed to create the built-in pyramid mesh")?,
             Mesh::crystal(&device).ok_or("Failed to create the built-in crystal mesh")?,
-            Mesh::terrain(&device).ok_or("Failed to create the built-in terrain mesh")?,
+            Mesh::terrain_chunk(&device, 0, 0)
+                .ok_or("Failed to create north-west terrain chunk")?,
+            Mesh::terrain_chunk(&device, 1, 0)
+                .ok_or("Failed to create north-east terrain chunk")?,
+            Mesh::terrain_chunk(&device, 0, 1)
+                .ok_or("Failed to create south-west terrain chunk")?,
+            Mesh::terrain_chunk(&device, 1, 1)
+                .ok_or("Failed to create south-east terrain chunk")?,
             Mesh::cube_lod(&device).ok_or("Failed to create the compact cube LOD mesh")?,
         ];
         let scene = starter_scene();
