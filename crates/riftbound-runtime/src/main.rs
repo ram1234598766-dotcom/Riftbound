@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId,
-    Scene, Transform3, Vec3,
+    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId, Scene,
+    Transform3, Vec3,
 };
 use riftbound_renderer::Renderer;
 use winit::{
@@ -134,11 +134,9 @@ impl ApplicationHandler for RiftboundApp {
                     .last_frame
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
-                if let (Some(renderer), Some(player), Some(collision)) = (
-                    self.renderer.as_mut(),
-                    self.player,
-                    self.collision.as_ref(),
-                ) {
+                if let (Some(renderer), Some(player), Some(collision)) =
+                    (self.renderer.as_mut(), self.player, self.collision.as_ref())
+                {
                     let Some(mut transform) = renderer.scene().get(player).copied() else {
                         log::error!("The player entity is no longer in the active scene");
                         event_loop.exit();
@@ -189,7 +187,9 @@ impl ApplicationHandler for RiftboundApp {
 
 fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialId) {
     let transform = Transform3::new(position, Vec3::new(0.0, 0.0, 0.0), scale);
-    let id = scene.spawn(transform).expect("arena entity ID space available");
+    let id = scene
+        .spawn(transform)
+        .expect("arena entity ID space available");
     scene.set_material(id, material);
 }
 
