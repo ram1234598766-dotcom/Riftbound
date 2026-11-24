@@ -103,11 +103,11 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-crystal-mesh")
     }
 
-    /// Creates a subdivided, flat terrain surface with deterministic ground colour variation.
+    /// Creates one of four terrain quadrants sampled in shared world space.
     #[must_use]
-    pub fn terrain(device: &wgpu::Device) -> Option<Self> {
-        let (vertices, indices) = terrain_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-terrain-mesh")
+    pub fn terrain_chunk(device: &wgpu::Device, chunk_x: u8, chunk_z: u8) -> Option<Self> {
+        let (vertices, indices) = terrain_chunk_data(chunk_x, chunk_z)?;
+        Self::from_data(device, &vertices, &indices, "riftbound-terrain-chunk-mesh")
     }
 
     /// Returns the GPU vertex buffer.
@@ -240,22 +240,29 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
-    const SIDE: usize = 17;
+fn terrain_chunk_data(chunk_x: u8, chunk_z: u8) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
+    const SIDE: usize = 9;
+    const CELLS_PER_CHUNK: usize = SIDE - 1;
+    let chunk_x = usize::from(chunk_x);
+    let chunk_z = usize::from(chunk_z);
+    if chunk_x >= 2 || chunk_z >= 2 {
+        return None;
+    }
     let mut vertices = Vec::with_capacity(SIDE * SIDE);
-    let mut indices = Vec::with_capacity((SIDE - 1) * (SIDE - 1) * 6);
+    let mut indices = Vec::with_capacity(CELLS_PER_CHUNK * CELLS_PER_CHUNK * 6);
     for z in 0..SIDE {
         for x in 0..SIDE {
-            let u = f32::from(u8::try_from(x).expect("terrain x fits u8")) / 16.0;
-            let v = f32::from(u8::try_from(z).expect("terrain z fits u8")) / 16.0;
-            let variation =
-                f32::from(u8::try_from((x * 13 + z * 7) % 5).expect("terrain variation fits u8"))
-                    * 0.012;
-            // Sample the same world-space terrain used by character grounding.
-            let height = terrain_height(u * 20.0 - 10.0, v * 20.0 - 10.0);
+            let global_x = chunk_x * CELLS_PER_CHUNK + x;
+            let global_z = chunk_z * CELLS_PER_CHUNK + z;
+            let world_x = -10.0 + global_x as f32 * 1.25;
+            let world_z = -10.0 + global_z as f32 * 1.25;
+            let local_x = x as f32 / 4.0 - 1.0;
+            let local_z = z as f32 / 4.0 - 1.0;
+            let variation = ((global_x * 13 + global_z * 7) % 5) as f32 * 0.012;
+            let height = terrain_height(world_x, world_z);
             let elevation_tint = height.max(0.0) * 0.22;
             vertices.push(MeshVertex {
-                position: [u * 2.0 - 1.0, height, v * 2.0 - 1.0],
+                position: [local_x, height, local_z],
                 color: [
                     0.055 + variation + elevation_tint,
                     0.13 + variation + elevation_tint,
@@ -264,8 +271,8 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
             });
         }
     }
-    for z in 0..(SIDE - 1) {
-        for x in 0..(SIDE - 1) {
+    for z in 0..CELLS_PER_CHUNK {
+        for x in 0..CELLS_PER_CHUNK {
             let top_left = u16::try_from(z * SIDE + x).expect("terrain vertex index fits u16");
             let top_right = top_left + 1;
             let bottom_left = top_left + u16::try_from(SIDE).expect("terrain side fits u16");
@@ -280,7 +287,7 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
             ]);
         }
     }
-    (vertices, indices)
+    Some((vertices, indices))
 }
 
 fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
@@ -394,37 +401,33 @@ mod tests {
     }
 
     #[test]
-    fn terrain_is_a_subdivided_valid_grid_with_colour_variation() {
-        let (vertices, indices) = terrain_data();
-        assert_eq!(vertices.len(), 17 * 17);
-        assert_eq!(indices.len(), 16 * 16 * 6);
-        assert!(valid_index_data(vertices.len(), &indices));
-        assert!(vertices.iter().all(|vertex| {
-            vertex
-                .position
-                .iter()
-                .chain(vertex.color.iter())
-                .all(|value| value.is_finite())
-        }));
-        assert!(
-            vertices
-                .iter()
-                .any(|vertex| vertex.color.map(f32::to_bits) != vertices[0].color.map(f32::to_bits))
-        );
-        assert!(vertices.iter().any(|vertex| vertex.position[1] > 0.01));
-        assert!(vertices.iter().any(|vertex| vertex.position[1] < -0.01));
-        assert!(
-            vertices
-                .iter()
-                .all(|vertex| vertex.position[1].abs() <= 0.075)
-        );
-        assert!(
-            vertices
-                .iter()
-                .filter(|vertex| (vertex.position[0].abs() - 1.0).abs() < 0.000_001
-                    || (vertex.position[2].abs() - 1.0).abs() < 0.000_001)
-                .all(|vertex| vertex.position[1].abs() < 0.000_001)
-        );
+    fn terrain_chunks_have_valid_grids_and_matching_shared_edges() {
+        let chunks = [
+            terrain_chunk_data(0, 0).expect("north-west chunk"),
+            terrain_chunk_data(1, 0).expect("north-east chunk"),
+            terrain_chunk_data(0, 1).expect("south-west chunk"),
+            terrain_chunk_data(1, 1).expect("south-east chunk"),
+        ];
+        for (vertices, indices) in &chunks {
+            assert_eq!(vertices.len(), 9 * 9);
+            assert_eq!(indices.len(), 8 * 8 * 6);
+            assert!(valid_index_data(vertices.len(), indices));
+            assert!(vertices.iter().all(|vertex| {
+                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            }));
+        }
+        let edge = |vertices: &[MeshVertex], x: usize| {
+            (0..9).map(|z| vertices[z * 9 + x]).collect::<Vec<_>>()
+        };
+        assert_eq!(edge(&chunks[0].0, 8), edge(&chunks[1].0, 0));
+        assert_eq!(edge(&chunks[2].0, 8), edge(&chunks[3].0, 0));
+        let south_edge = |vertices: &[MeshVertex], z: usize| {
+            (0..9).map(|x| vertices[z * 9 + x]).collect::<Vec<_>>()
+        };
+        assert_eq!(south_edge(&chunks[0].0, 8), south_edge(&chunks[2].0, 0));
+        assert_eq!(south_edge(&chunks[1].0, 8), south_edge(&chunks[3].0, 0));
+        assert!(terrain_chunk_data(2, 0).is_none());
+        assert!(terrain_chunk_data(0, 2).is_none());
     }
 
     #[test]
