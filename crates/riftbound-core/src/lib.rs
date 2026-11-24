@@ -38,8 +38,8 @@ pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
 pub use terrain::{terrain_height, terrain_surface, terrain_vehicle_surface};
 pub use transform::Transform3;
-pub use world_terrain::{WorldTerrainSample, world_terrain_sample};
 pub use vehicle::{
     SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
     VehicleRecovery, VehicleState, VehicleSurface,
 };
+pub use world_terrain::{WorldTerrainSample, world_terrain_sample};
