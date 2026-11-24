@@ -144,7 +144,14 @@ impl Renderer {
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
-            &camera_bytes(width, height, self.camera_offset, self.camera_yaw, self.camera_pitch, self.camera_distance),
+            &camera_bytes(
+                width,
+                height,
+                self.camera_offset,
+                self.camera_yaw,
+                self.camera_pitch,
+                self.camera_distance,
+            ),
         );
     }
 
@@ -154,7 +161,14 @@ impl Renderer {
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
-            &camera_bytes(self.config.width, self.config.height, self.camera_offset, self.camera_yaw, self.camera_pitch, self.camera_distance),
+            &camera_bytes(
+                self.config.width,
+                self.config.height,
+                self.camera_offset,
+                self.camera_yaw,
+                self.camera_pitch,
+                self.camera_distance,
+            ),
         );
     }
 
