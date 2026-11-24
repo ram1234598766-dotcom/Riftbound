@@ -8,7 +8,7 @@ use riftbound_core::{
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, Transform3, Vec3,
-    terrain_height,
+    terrain_height, VehicleConfig, VehicleInput, VehicleState, VehicleSurface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -35,6 +35,10 @@ struct RiftboundApp {
     renderer: Option<Renderer>,
     player: Option<EntityId>,
     player_parts: Option<CharacterParts>,
+    vehicle: Option<EntityId>,
+    vehicle_wheels: Option<[EntityId; 4]>,
+    vehicle_state: VehicleState,
+    driving: bool,
     collision: Option<CollisionWorld>,
     input: InputState,
     controller: CharacterController,
@@ -100,6 +104,14 @@ impl ApplicationHandler for RiftboundApp {
                     .expect("player entity ID space available");
                 scene.set_material(player, MaterialId::RIFT);
                 let player_parts = build_player_character(&mut scene, player);
+                let (vehicle, vehicle_wheels) = build_vehicle(&mut scene);
+                let vehicle_state = VehicleState {
+                    position: Vec3::new(0.0, 0.62, -1.2),
+                    ..VehicleState::default()
+                };
+                if let Some(transform) = scene.get_mut(vehicle) {
+                    transform.translation = vehicle_state.position;
+                }
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
                 let (beacon_entity, extraction) = build_extraction_beacon(&mut scene);
                 let (checkpoint_entity, checkpoint) = build_checkpoint(&mut scene);
@@ -139,6 +151,10 @@ impl ApplicationHandler for RiftboundApp {
                 self.renderer = Some(renderer);
                 self.player = Some(player);
                 self.player_parts = Some(player_parts);
+                self.vehicle = Some(vehicle);
+                self.vehicle_wheels = Some(vehicle_wheels);
+                self.vehicle_state = vehicle_state;
+                self.driving = false;
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
                 self.mission = MissionProgress::new(self.pickups.total());
@@ -174,6 +190,10 @@ impl ApplicationHandler for RiftboundApp {
         self.window = None;
         self.player = None;
         self.player_parts = None;
+        self.vehicle = None;
+        self.vehicle_wheels = None;
+        self.vehicle_state = VehicleState::default();
+        self.driving = false;
         self.collision = None;
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
@@ -232,6 +252,14 @@ impl ApplicationHandler for RiftboundApp {
                     if event.state == ElementState::Pressed {
                         update_camera_controls(self.renderer.as_mut(), key);
                     }
+                    if event.state == ElementState::Pressed && key == KeyCode::KeyV {
+                        self.driving = !self.driving;
+                        if self.driving {
+                            log::info!("Driving prototype active: W/S throttle, A/D steering, Space brake, V exit");
+                        } else {
+                            log::info!("Exited vehicle prototype");
+                        }
+                    }
                     if let Some(button) = movement_button(key) {
                         self.input
                             .set_button(button, event.state == ElementState::Pressed);
@@ -256,14 +284,16 @@ impl ApplicationHandler for RiftboundApp {
                         return;
                     };
                     let previous_position = transform.translation;
-                    self.controller.update_camera_relative(
-                        &mut transform,
-                        &self.input,
-                        delta,
-                        renderer.camera_yaw(),
-                    );
-                    let horizontal_velocity = self.controller.velocity();
-                    if horizontal_velocity.x * horizontal_velocity.x
+                    if !self.driving {
+                        self.controller.update_camera_relative(
+                            &mut transform,
+                            &self.input,
+                            delta,
+                            renderer.camera_yaw(),
+                        );
+                    }
+                    let horizontal_velocity = if self.driving { Vec3::default() } else { self.controller.velocity() };
+                    if !self.driving && horizontal_velocity.x * horizontal_velocity.x
                         + horizontal_velocity.z * horizontal_velocity.z
                         > 0.01
                     {
@@ -282,14 +312,16 @@ impl ApplicationHandler for RiftboundApp {
                     let floor_height = terrain_height(resolved.position.x, resolved.position.z)
                         + PLAYER_RADIUS
                         + 0.01;
-                    self.controller.update_vertical(
-                        &mut transform,
-                        &self.input,
-                        delta,
-                        floor_height,
-                    );
-                    self.controller
-                        .resolve_collision(resolved.blocked_x, resolved.blocked_z);
+                    if !self.driving {
+                        self.controller.update_vertical(
+                            &mut transform,
+                            &self.input,
+                            delta,
+                            floor_height,
+                        );
+                        self.controller
+                            .resolve_collision(resolved.blocked_x, resolved.blocked_z);
+                    }
                     if transform.translation.y < -3.0 {
                         if let Some(progress) = self.checkpoint_progress {
                             transform.translation = progress.respawn_position();
@@ -299,6 +331,42 @@ impl ApplicationHandler for RiftboundApp {
                     }
                     self.animated_transforms.clear();
                     self.animated_transforms.push((player, transform));
+                    if self.driving {
+                        let throttle = if self.input.is_held(Button::MoveForward) { 1.0 }
+                            else if self.input.is_held(Button::MoveBackward) { -1.0 }
+                            else { 0.0 };
+                        let steering = if self.input.is_held(Button::MoveLeft) { -1.0 }
+                            else if self.input.is_held(Button::MoveRight) { 1.0 }
+                            else { 0.0 };
+                        self.vehicle_state.update(
+                            VehicleInput { throttle, brake: if self.input.is_held(Button::Jump) { 1.0 } else { 0.0 }, steering },
+                            VehicleSurface::Asphalt,
+                            VehicleConfig::default(),
+                            delta,
+                        );
+                        let vehicle_transform = Transform3::new(
+                            self.vehicle_state.position,
+                            Vec3::new(0.0, self.vehicle_state.heading, 0.0),
+                            Vec3::new(1.0, 1.0, 1.0),
+                        );
+                        if let Some(vehicle) = self.vehicle {
+                            self.animated_transforms.push((vehicle, vehicle_transform));
+                        }
+                        if let Some(wheels) = self.vehicle_wheels {
+                            let wheel_spin = self.vehicle_state.speed * delta * 1.7;
+                            for (index, wheel) in wheels.iter().enumerate() {
+                                let front = index < 2;
+                                let side = if index % 2 == 0 { -1.0 } else { 1.0 };
+                                let z = if front { -0.95 } else { 0.95 };
+                                let steer = if front { steering * 0.35 } else { 0.0 };
+                                self.animated_transforms.push((*wheel, Transform3::new(
+                                    Vec3::new(side * 0.95, -0.30, z),
+                                    Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
+                                    Vec3::new(0.34, 0.68, 0.68),
+                                )));
+                            }
+                        }
+                    }
                     if let Some(parts) = self.player_parts {
                         let movement = ((horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
@@ -565,12 +633,10 @@ impl ApplicationHandler for RiftboundApp {
                     match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
-                            self.camera_target.x +=
-                                (transform.translation.x - self.camera_target.x) * camera_blend;
-                            self.camera_target.y +=
-                                (transform.translation.y - self.camera_target.y) * camera_blend;
-                            self.camera_target.z +=
-                                (transform.translation.z - self.camera_target.z) * camera_blend;
+                            let camera_position = if self.driving { self.vehicle_state.position } else { transform.translation };
+                            self.camera_target.x += (camera_position.x - self.camera_target.x) * camera_blend;
+                            self.camera_target.y += (camera_position.y - self.camera_target.y) * camera_blend;
+                            self.camera_target.z += (camera_position.z - self.camera_target.z) * camera_blend;
                             renderer.follow_camera(self.camera_target);
                             let collected = self.pickups.collect_nearby(
                                 transform.translation,
@@ -734,7 +800,7 @@ impl ApplicationHandler for RiftboundApp {
                             renderer.set_hud(HudData {
                                 collected: self.pickups.collected(),
                                 total: self.pickups.total(),
-                                status: String::from(status),
+                                status: if self.driving { String::from("DRIVING PROTOTYPE • W/S DRIVE • A/D STEER • SPACE BRAKE • V EXIT") } else { String::from(status) },
                                 prompt,
                                 health: self.player_health.current(),
                                 max_health: self.player_health.maximum(),
@@ -1249,6 +1315,27 @@ fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
         KeyCode::Equal => renderer.zoom_camera(-0.6),
         _ => {}
     }
+}
+
+fn build_vehicle(scene: &mut Scene) -> (EntityId, [EntityId; 4]) {
+    let body = scene.spawn(Transform3::new(
+        Vec3::new(0.0, 0.62, -1.2),
+        Vec3::default(),
+        Vec3::new(1.75, 0.55, 3.25),
+    )).expect("vehicle body entity ID space available");
+    scene.set_material(body, MaterialId::RIFT);
+    let mut wheels = Vec::with_capacity(4);
+    for (x, z) in [(-0.95, -0.95), (0.95, -0.95), (-0.95, 0.95), (0.95, 0.95)] {
+        let wheel = scene.spawn(Transform3::new(
+            Vec3::new(x, -0.30, z),
+            Vec3::new(0.0, 0.0, std::f32::consts::FRAC_PI_2),
+            Vec3::new(0.34, 0.68, 0.68),
+        )).expect("vehicle wheel entity ID space available");
+        scene.set_material(wheel, MaterialId::AMBER);
+        assert!(scene.set_parent(wheel, Some(body)));
+        wheels.push(wheel);
+    }
+    (body, wheels.try_into().expect("four vehicle wheels were created"))
 }
 
 fn movement_button(key: KeyCode) -> Option<Button> {
