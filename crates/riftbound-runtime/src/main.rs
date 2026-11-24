@@ -290,17 +290,18 @@ impl ApplicationHandler for RiftboundApp {
                                 );
                             }
 
-                            let near_pickup = PICKUP_POSITIONS
-                                .iter()
-                                .enumerate()
-                                .any(|(index, position)| {
-                                    self.pickups.collected() < self.pickups.total()
-                                        && distance_squared(transform.translation, *position)
-                                            <= 1.7 * 1.7
-                                        && self.pickup_entities.get(index).is_some_and(|id| {
-                                            renderer.scene().get(*id).is_some()
-                                        })
-                                });
+                            let near_pickup =
+                                PICKUP_POSITIONS
+                                    .iter()
+                                    .enumerate()
+                                    .any(|(index, position)| {
+                                        self.pickups.collected() < self.pickups.total()
+                                            && distance_squared(transform.translation, *position)
+                                                <= 1.7 * 1.7
+                                            && self.pickup_entities.get(index).is_some_and(|id| {
+                                                renderer.scene().get(*id).is_some()
+                                            })
+                                    });
                             let near_beacon =
                                 distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0))
                                     <= 1.9 * 1.9;
