@@ -392,7 +392,7 @@ impl CollisionWorld {
             return false;
         }
 
-        !self.obstacles.iter().any(|obstacle| {
+        self.obstacles.iter().all(|obstacle| {
             let center_x = f32::midpoint(obstacle.min_x, obstacle.max_x) - x;
             let center_z = f32::midpoint(obstacle.min_z, obstacle.max_z) - z;
             let obstacle_half_x = (obstacle.max_x - obstacle.min_x) * 0.5;
