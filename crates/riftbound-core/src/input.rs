@@ -39,7 +39,9 @@ impl InputState {
     /// Records a button transition. Repeated key-down events do not retrigger the pressed edge.
     pub fn set_button(&mut self, button: Button, is_down: bool) {
         if is_down {
-            if self.held.insert(button) { self.pressed.insert(button); }
+            if self.held.insert(button) {
+                self.pressed.insert(button);
+            }
         } else if self.held.remove(&button) {
             self.released.insert(button);
         }
@@ -47,15 +49,21 @@ impl InputState {
 
     /// Whether the button is currently held.
     #[must_use]
-    pub fn is_held(&self, button: Button) -> bool { self.held.contains(&button) }
+    pub fn is_held(&self, button: Button) -> bool {
+        self.held.contains(&button)
+    }
 
     /// Whether the button became held during this frame.
     #[must_use]
-    pub fn was_pressed(&self, button: Button) -> bool { self.pressed.contains(&button) }
+    pub fn was_pressed(&self, button: Button) -> bool {
+        self.pressed.contains(&button)
+    }
 
     /// Whether the button became released during this frame.
     #[must_use]
-    pub fn was_released(&self, button: Button) -> bool { self.released.contains(&button) }
+    pub fn was_released(&self, button: Button) -> bool {
+        self.released.contains(&button)
+    }
 }
 
 #[cfg(test)]
