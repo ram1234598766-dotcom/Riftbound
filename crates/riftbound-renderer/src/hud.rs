@@ -11,6 +11,10 @@ pub struct HudData {
     pub status: String,
     /// Contextual interaction hint, when the player is in range.
     pub prompt: Option<String>,
+    /// Current player health points.
+    pub health: u8,
+    /// Maximum player health points.
+    pub max_health: u8,
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
@@ -54,8 +58,8 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     let white = [0.86, 0.93, 1.0, 1.0];
     let muted = [0.35, 0.52, 0.66, 1.0];
     let panel = [0.015, 0.035, 0.075, 0.88];
-    rect(out, 22.0, 20.0, 310.0, 126.0, panel, width, height);
-    rect(out, 22.0, 20.0, 3.0, 126.0, cyan, width, height);
+    rect(out, 22.0, 20.0, 310.0, 164.0, panel, width, height);
+    rect(out, 22.0, 20.0, 3.0, 164.0, cyan, width, height);
     text(out, "RIFTBOUND", 38.0, 34.0, 2.0, cyan, width, height);
     text(
         out,
@@ -76,7 +80,14 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         (f32::from(collected) / f32::from(total)).clamp(0.0, 1.0)
     };
     rect(out, 38.0, 86.0, 270.0 * ratio, 9.0, cyan, width, height);
-    text(out, &data.status, 38.0, 108.0, 1.5, white, width, height);
+    text(out, &format!("HEALTH {}/{}", data.health, data.max_health), 38.0, 112.0, 1.5, white, width, height);
+    rect(out, 38.0, 136.0, 270.0, 8.0, muted, width, height);
+    let health_ratio = if data.max_health == 0 { 0.0 } else {
+        (f32::from(data.health.min(data.max_health)) / f32::from(data.max_health)).clamp(0.0, 1.0)
+    };
+    let health_color = if health_ratio <= 0.25 { [1.0, 0.28, 0.22, 1.0] } else { cyan };
+    rect(out, 38.0, 136.0, 270.0 * health_ratio, 8.0, health_color, width, height);
+    text(out, &data.status, 38.0, 154.0, 1.5, white, width, height);
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
         rect(out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
@@ -210,6 +221,8 @@ mod tests {
             total: 5,
             status: "RETURN TO BEACON".into(),
             prompt: Some("F - EXTRACT".into()),
+            health: 75,
+            max_health: 100,
         };
         let mut reused = Vec::with_capacity(4_096);
         build_vertices_into(&data, 1280, 720, &mut reused);
