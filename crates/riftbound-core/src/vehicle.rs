@@ -403,7 +403,6 @@ mod tests {
         assert_eq!(recovery.last_safe_state(), initial);
     }
 
-
     #[test]
     fn suspension_compresses_over_a_bump_and_returns_a_finite_pose() {
         let mut suspension = SuspensionState::default();
