@@ -149,6 +149,14 @@ impl ApplicationHandler for RiftboundApp {
                     };
                     let previous_position = transform.translation;
                     self.controller.update(&mut transform, &self.input, delta);
+                    let horizontal_velocity = self.controller.velocity();
+                    if horizontal_velocity.x * horizontal_velocity.x
+                        + horizontal_velocity.z * horizontal_velocity.z
+                        > 0.01
+                    {
+                        // Local forward is -Z; yaw follows the actual resolved travel direction.
+                        transform.rotation.y = horizontal_velocity.x.atan2(-horizontal_velocity.z);
+                    }
                     self.controller.update_vertical(
                         &mut transform,
                         &self.input,
