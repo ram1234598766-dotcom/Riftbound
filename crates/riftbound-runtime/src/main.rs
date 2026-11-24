@@ -106,8 +106,16 @@ impl ApplicationHandler for RiftboundApp {
                     build_sentinel(&mut scene);
                 let mut support_enemies = Vec::with_capacity(2);
                 for (home, archetype, material) in [
-                    (Vec3::new(-7.0, terrain_height(-7.0, 5.0) + 0.62, 5.0), EnemyArchetype::Skirmisher, MaterialId::RIFT),
-                    (Vec3::new(7.0, terrain_height(7.0, 5.0) + 0.62, 5.0), EnemyArchetype::Warden, MaterialId::AMBER),
+                    (
+                        Vec3::new(-7.0, terrain_height(-7.0, 5.0) + 0.62, 5.0),
+                        EnemyArchetype::Skirmisher,
+                        MaterialId::RIFT,
+                    ),
+                    (
+                        Vec3::new(7.0, terrain_height(7.0, 5.0) + 0.62, 5.0),
+                        EnemyArchetype::Warden,
+                        MaterialId::AMBER,
+                    ),
                 ] {
                     support_enemies.push(build_profiled_enemy(
                         &mut scene,
@@ -492,7 +500,8 @@ impl ApplicationHandler for RiftboundApp {
                         }
                     }
                     for (enemy, effect, brain, pulse_timer) in &mut self.support_enemies {
-                        let Some(mut enemy_transform) = renderer.scene().get(*enemy).copied() else {
+                        let Some(mut enemy_transform) = renderer.scene().get(*enemy).copied()
+                        else {
                             continue;
                         };
                         let event = brain.update(
@@ -512,8 +521,7 @@ impl ApplicationHandler for RiftboundApp {
                         } else {
                             1.0 + (self.animation_time * 1.8).sin() * 0.03
                         };
-                        enemy_transform.scale =
-                            Vec3::new(0.5 * pulse, 0.68 * pulse, 0.5 * pulse);
+                        enemy_transform.scale = Vec3::new(0.5 * pulse, 0.68 * pulse, 0.5 * pulse);
                         self.animated_transforms.push((*enemy, enemy_transform));
                         if event == Some(EnemyEvent::PulseReleased) {
                             *pulse_timer = 0.28;
