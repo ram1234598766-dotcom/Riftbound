@@ -244,7 +244,9 @@ impl ApplicationHandler for RiftboundApp {
                             {
                                 self.mission_complete = true;
                                 window.set_title("RIFTBOUND — Mission complete!");
-                                log::info!("Shardfall mission completed: all shards recovered and extraction reached");
+                                log::info!(
+                                    "Shardfall mission completed: all shards recovered and extraction reached"
+                                );
                             }
                         }
                         Ok(false) => {
@@ -275,7 +277,6 @@ impl ApplicationHandler for RiftboundApp {
         }
     }
 }
-
 
 fn build_extraction_beacon(scene: &mut Scene) -> ExtractionZone {
     let position = Vec3::new(0.0, 0.55, -8.0);
