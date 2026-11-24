@@ -4,6 +4,7 @@
 //! networking integrations belong in separate crates.
 
 mod character;
+mod checkpoint;
 mod clock;
 mod collision;
 mod entity;
@@ -15,6 +16,7 @@ mod scene;
 mod terrain;
 mod transform;
 
+pub use checkpoint::{Checkpoint, CheckpointProgress};
 pub use character::{
     CharacterController, CharacterMovementState, MovementConfig, VerticalMotionConfig,
 };
