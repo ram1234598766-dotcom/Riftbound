@@ -53,11 +53,11 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     let white = [0.86, 0.93, 1.0, 1.0];
     let muted = [0.35, 0.52, 0.66, 1.0];
     let panel = [0.015, 0.035, 0.075, 0.88];
-    rect(&mut out, 22.0, 20.0, 310.0, 126.0, panel, width, height);
-    rect(&mut out, 22.0, 20.0, 3.0, 126.0, cyan, width, height);
-    text(&mut out, "RIFTBOUND", 38.0, 34.0, 2.0, cyan, width, height);
+    rect(out, 22.0, 20.0, 310.0, 126.0, panel, width, height);
+    rect(out, 22.0, 20.0, 3.0, 126.0, cyan, width, height);
+    text(out, "RIFTBOUND", 38.0, 34.0, 2.0, cyan, width, height);
     text(
-        &mut out,
+        out,
         &format!("SHARDS {:02}/{:02}", data.collected, data.total),
         38.0,
         62.0,
@@ -66,7 +66,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         width,
         height,
     );
-    rect(&mut out, 38.0, 86.0, 270.0, 9.0, muted, width, height);
+    rect(out, 38.0, 86.0, 270.0, 9.0, muted, width, height);
     let ratio = if data.total == 0 {
         0.0
     } else {
@@ -75,7 +75,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         (f32::from(collected) / f32::from(total)).clamp(0.0, 1.0)
     };
     rect(
-        &mut out,
+        out,
         38.0,
         86.0,
         270.0 * ratio,
@@ -85,7 +85,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         height,
     );
     text(
-        &mut out,
+        out,
         &data.status,
         38.0,
         108.0,
@@ -96,9 +96,9 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     );
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
-        rect(&mut out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
+        rect(out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
         rect(
-            &mut out,
+            out,
             22.0,
             panel_y,
             3.0,
@@ -108,7 +108,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
             height,
         );
         text(
-            &mut out,
+            out,
             prompt,
             40.0,
             panel_y + 16.0,
