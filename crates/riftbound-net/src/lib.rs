@@ -60,6 +60,7 @@ struct HostState {
     next_id: Arc<AtomicU64>,
     shards: Arc<Mutex<[bool; 5]>>,
     extracted: Arc<Mutex<bool>>,
+    enemies: Arc<Mutex<Vec<EnemyState>>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -70,6 +71,15 @@ struct PlayerState {
     face: f32,
 }
 
+#[derive(Clone, Serialize)]
+struct EnemyState {
+    id: usize,
+    x: f32,
+    y: f32,
+    hp: u8,
+    stun: f32,
+}
+
 #[derive(Deserialize)]
 struct ClientMessage {
     kind: String,
@@ -77,6 +87,7 @@ struct ClientMessage {
     dy: Option<f32>,
     face: Option<f32>,
     shard: Option<usize>,
+    enemy: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -85,6 +96,7 @@ struct Snapshot<'a> {
     players: &'a [PlayerState],
     shards: &'a [bool; 5],
     extracted: bool,
+    enemies: &'a [EnemyState],
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
@@ -119,6 +131,12 @@ pub async fn serve() {
         next_id: Arc::new(AtomicU64::new(1)),
         shards: Arc::new(Mutex::new([false; 5])),
         extracted: Arc::new(Mutex::new(false)),
+        enemies: Arc::new(Mutex::new(vec![
+            EnemyState { id: 0, x: 700.0, y: 500.0, hp: 2, stun: 0.0 },
+            EnemyState { id: 1, x: 1500.0, y: 700.0, hp: 2, stun: 0.0 },
+            EnemyState { id: 2, x: 900.0, y: 1080.0, hp: 2, stun: 0.0 },
+            EnemyState { id: 3, x: 1840.0, y: 930.0, hp: 2, stun: 0.0 },
+        ])),
     };
     let app = Router::new()
         .route("/", get(index))
@@ -241,7 +259,37 @@ async fn handle_client_message(
                 player.x = next_x;
                 player.y = next_y;
                 player.face = face;
+                let player_x = player.x;
+                let player_y = player.y;
+                drop(players);
+                let mut enemies = state.enemies.lock().await;
+                for enemy in enemies.iter_mut().filter(|enemy| enemy.hp > 0) {
+                    enemy.stun = (enemy.stun - elapsed).max(0.0);
+                    if enemy.stun <= 0.0 {
+                        let dx = player_x - enemy.x;
+                        let dy = player_y - enemy.y;
+                        let distance = dx.hypot(dy);
+                        if distance < 430.0 {
+                            let speed = if distance > 100.0 { 85.0 } else { 0.0 };
+                            let step = speed * elapsed;
+                            if distance > 0.001 {
+                                enemy.x = (enemy.x + dx / distance * step).clamp(50.0, WORLD_WIDTH - 50.0);
+                                enemy.y = (enemy.y + dy / distance * step).clamp(50.0, WORLD_HEIGHT - 50.0);
+                            }
+                        }
+                    }
+                }
             }
+        }
+        "attack" => {
+            let Some(index) = input.enemy else { return false; };
+            let players = state.players.lock().await;
+            let Some(player) = players.get(&id) else { return false; };
+            let mut enemies = state.enemies.lock().await;
+            let Some(enemy) = enemies.iter_mut().find(|enemy| enemy.id == index && enemy.hp > 0) else { return false; };
+            if (player.x - enemy.x).hypot(player.y - enemy.y) > 75.0 { return false; }
+            enemy.hp = enemy.hp.saturating_sub(1);
+            enemy.stun = 0.9;
         }
         "collect" => {
             let Some(index) = input.shard else {
@@ -280,11 +328,13 @@ async fn publish_snapshot(state: &HostState) {
     let players: Vec<PlayerState> = state.players.lock().await.values().cloned().collect();
     let shards = *state.shards.lock().await;
     let extracted = *state.extracted.lock().await;
+    let enemies = state.enemies.lock().await.clone();
     if let Ok(message) = serde_json::to_string(&Snapshot {
         kind: "snapshot",
         players: &players,
         shards: &shards,
         extracted,
+        enemies: &enemies,
     }) {
         let _ = state.updates.send(message);
     }
