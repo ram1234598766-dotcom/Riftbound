@@ -3,7 +3,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use riftbound_core::{Button, CharacterController, EntityId, InputState, Transform3, Vec3};
+use riftbound_core::{
+    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId,
+    Scene, Transform3, Vec3,
+};
 use riftbound_renderer::Renderer;
 use winit::{
     application::ApplicationHandler,
@@ -13,11 +16,14 @@ use winit::{
     window::{Window, WindowId},
 };
 
+const PLAYER_RADIUS: f32 = 0.19;
+
 #[derive(Default)]
 struct RiftboundApp {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
     player: Option<EntityId>,
+    collision: Option<CollisionWorld>,
     input: InputState,
     controller: CharacterController,
     last_frame: Option<Instant>,
@@ -45,25 +51,28 @@ impl ApplicationHandler for RiftboundApp {
         )) {
             Ok(mut renderer) => {
                 let mut scene = renderer.scene().clone();
+                build_arena(&mut scene);
                 let player_transform = Transform3::new(
-                    Vec3::new(0.0, 0.0, -1.8),
+                    Vec3::new(0.0, PLAYER_RADIUS + 0.01, -4.0),
                     Vec3::new(0.0, 0.0, 0.0),
                     Vec3::new(0.38, 0.38, 0.38),
                 );
                 let player = scene
                     .spawn(player_transform)
                     .expect("player entity ID space available");
+                scene.set_material(player, MaterialId::RIFT);
                 if let Err(error) = renderer.set_scene(scene) {
-                    log::error!("Could not add the player to the scene: {error}");
+                    log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
                     return;
                 }
                 renderer.follow_camera(player_transform.translation);
-                log::info!("Riftbound GPU surface and player initialized");
+                log::info!("Riftbound arena, player, and collision world initialized");
                 window.request_redraw();
                 self.window = Some(window);
                 self.renderer = Some(renderer);
                 self.player = Some(player);
+                self.collision = Some(arena_collision_world());
                 self.last_frame = Some(Instant::now());
             }
             Err(error) => {
@@ -77,6 +86,7 @@ impl ApplicationHandler for RiftboundApp {
         self.renderer = None;
         self.window = None;
         self.player = None;
+        self.collision = None;
         self.last_frame = None;
     }
 
@@ -124,13 +134,29 @@ impl ApplicationHandler for RiftboundApp {
                     .last_frame
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
-                if let (Some(renderer), Some(player)) = (self.renderer.as_mut(), self.player) {
+                if let (Some(renderer), Some(player), Some(collision)) = (
+                    self.renderer.as_mut(),
+                    self.player,
+                    self.collision.as_ref(),
+                ) {
                     let Some(mut transform) = renderer.scene().get(player).copied() else {
                         log::error!("The player entity is no longer in the active scene");
                         event_loop.exit();
                         return;
                     };
+                    let previous_position = transform.translation;
                     self.controller.update(&mut transform, &self.input, delta);
+                    let displacement = Vec3::new(
+                        transform.translation.x - previous_position.x,
+                        0.0,
+                        transform.translation.z - previous_position.z,
+                    );
+                    let resolved =
+                        collision.move_character(previous_position, displacement, PLAYER_RADIUS);
+                    transform.translation.x = resolved.position.x;
+                    transform.translation.z = resolved.position.z;
+                    self.controller
+                        .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     match renderer.set_object_transform(player, transform) {
                         Ok(true) => renderer.follow_camera(transform.translation),
                         Ok(false) => {
@@ -159,6 +185,76 @@ impl ApplicationHandler for RiftboundApp {
             window.request_redraw();
         }
     }
+}
+
+fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialId) {
+    let transform = Transform3::new(position, Vec3::new(0.0, 0.0, 0.0), scale);
+    let id = scene.spawn(transform).expect("arena entity ID space available");
+    scene.set_material(id, material);
+}
+
+fn build_arena(scene: &mut Scene) {
+    // A broad, flat cube forms the walkable floor.
+    spawn_box(
+        scene,
+        Vec3::new(0.0, -0.15, 0.0),
+        Vec3::new(20.0, 0.3, 20.0),
+        MaterialId::DEFAULT,
+    );
+
+    // Four perimeter walls visually match the collision world's inner boundary.
+    spawn_box(
+        scene,
+        Vec3::new(-9.75, 1.0, 0.0),
+        Vec3::new(0.5, 2.0, 20.5),
+        MaterialId::RIFT,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(9.75, 1.0, 0.0),
+        Vec3::new(0.5, 2.0, 20.5),
+        MaterialId::RIFT,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 1.0, -9.75),
+        Vec3::new(20.0, 2.0, 0.5),
+        MaterialId::RIFT,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 1.0, 9.75),
+        Vec3::new(20.0, 2.0, 0.5),
+        MaterialId::RIFT,
+    );
+
+    // Solid amber blocks are both visible and registered in the collision world.
+    spawn_box(
+        scene,
+        Vec3::new(-2.0, 0.75, -1.0),
+        Vec3::new(1.5, 1.5, 1.5),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(2.5, 0.75, 1.5),
+        Vec3::new(1.5, 1.5, 1.5),
+        MaterialId::AMBER,
+    );
+    spawn_box(
+        scene,
+        Vec3::new(0.0, 0.75, 4.0),
+        Vec3::new(2.0, 1.5, 1.5),
+        MaterialId::AMBER,
+    );
+}
+
+fn arena_collision_world() -> CollisionWorld {
+    let mut world = CollisionWorld::new(Aabb2::new(-9.5, 9.5, -9.5, 9.5));
+    world.add_obstacle(Aabb2::new(-2.75, -1.25, -1.75, -0.25));
+    world.add_obstacle(Aabb2::new(1.75, 3.25, 0.75, 2.25));
+    world.add_obstacle(Aabb2::new(-1.0, 1.0, 3.25, 4.75));
+    world
 }
 
 fn movement_button(key: KeyCode) -> Option<Button> {
