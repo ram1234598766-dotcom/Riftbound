@@ -411,25 +411,27 @@ impl Renderer {
                 }
             }
             if bytes.len() as u64 > self.hud_buffer_capacity {
-                log::warn!("HUD vertex data exceeds the reusable buffer capacity; skipping HUD draw");
+                log::warn!(
+                    "HUD vertex data exceeds the reusable buffer capacity; skipping HUD draw"
+                );
             } else {
                 self.queue.write_buffer(&self.hud_buffer, 0, &bytes);
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("riftbound-hud-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+                    label: Some("riftbound-hud-pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
                 pass.set_pipeline(&self.hud_pipeline);
                 pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
                 pass.draw(0..u32::try_from(hud_vertices.len()).unwrap_or(0), 0..1);
