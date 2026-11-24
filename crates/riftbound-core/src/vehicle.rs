@@ -183,6 +183,12 @@ pub struct VehicleRecovery {
     last_safe_state: VehicleState,
 }
 
+impl Default for VehicleRecovery {
+    fn default() -> Self {
+        Self::new(VehicleState::default())
+    }
+}
+
 impl VehicleRecovery {
     /// Creates recovery state from the vehicle's initial spawn.
     #[must_use]
