@@ -5,9 +5,13 @@ use crate::Vec3;
 /// Axis-aligned obstacle footprint in world-space X/Z coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aabb2 {
+    /// Minimum X coordinate.
     pub min_x: f32,
+    /// Maximum X coordinate.
     pub max_x: f32,
+    /// Minimum Z coordinate.
     pub min_z: f32,
+    /// Maximum Z coordinate.
     pub max_z: f32,
 }
 
@@ -34,8 +38,11 @@ impl Aabb2 {
 /// Collision result after moving a circular character footprint.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CollisionResult {
+    /// Resolved world-space position.
     pub position: Vec3,
+    /// Whether horizontal movement was blocked on X.
     pub blocked_x: bool,
+    /// Whether horizontal movement was blocked on Z.
     pub blocked_z: bool,
 }
 
@@ -86,26 +93,25 @@ impl CollisionWorld {
             };
         }
 
-        let steps = (displacement.x.abs().max(displacement.z.abs()) / 0.1)
-            .ceil()
-            .max(1.0) as usize;
-        let step_x = displacement.x / steps as f32;
-        let step_z = displacement.z / steps as f32;
+        let mut remaining_x = displacement.x.clamp(-100.0, 100.0);
+        let mut remaining_z = displacement.z.clamp(-100.0, 100.0);
         let mut result = CollisionResult {
             position: start,
             blocked_x: false,
             blocked_z: false,
         };
 
-        for _ in 0..steps {
+        while remaining_x.abs() > f32::EPSILON || remaining_z.abs() > f32::EPSILON {
+            let step_x = remaining_x.clamp(-0.1, 0.1);
             let next_x = result.position.x + step_x;
             if self.is_walkable(next_x, result.position.z, radius) {
                 result.position.x = next_x;
+                remaining_x -= step_x;
             } else {
                 let mut low = 0.0;
                 let mut high = 1.0;
                 for _ in 0..8 {
-                    let middle = (low + high) * 0.5;
+                    let middle = f32::midpoint(low, high);
                     let candidate = result.position.x + step_x * middle;
                     if self.is_walkable(candidate, result.position.z, radius) {
                         low = middle;
@@ -115,16 +121,19 @@ impl CollisionWorld {
                 }
                 result.position.x += step_x * low;
                 result.blocked_x = true;
+                remaining_x = 0.0;
             }
 
+            let step_z = remaining_z.clamp(-0.1, 0.1);
             let next_z = result.position.z + step_z;
             if self.is_walkable(result.position.x, next_z, radius) {
                 result.position.z = next_z;
+                remaining_z -= step_z;
             } else {
                 let mut low = 0.0;
                 let mut high = 1.0;
                 for _ in 0..8 {
-                    let middle = (low + high) * 0.5;
+                    let middle = f32::midpoint(low, high);
                     let candidate = result.position.z + step_z * middle;
                     if self.is_walkable(result.position.x, candidate, radius) {
                         low = middle;
@@ -134,6 +143,7 @@ impl CollisionWorld {
                 }
                 result.position.z += step_z * low;
                 result.blocked_z = true;
+                remaining_z = 0.0;
             }
         }
         result
