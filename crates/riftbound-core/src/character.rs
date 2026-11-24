@@ -41,6 +41,15 @@ impl Default for VerticalMotionConfig {
     }
 }
 
+/// High-level locomotion state suitable for animation selection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CharacterMovementState {
+    Idle,
+    Moving,
+    Jumping,
+    Falling,
+}
+
 /// Converts logical input into smooth horizontal and vertical movement.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CharacterController {
@@ -144,6 +153,22 @@ impl CharacterController {
         }
     }
 
+    /// Returns the current locomotion state for animation and gameplay systems.
+    #[must_use]
+    pub fn movement_state(&self) -> CharacterMovementState {
+        if !self.grounded {
+            if self.vertical_velocity > 0.0 {
+                CharacterMovementState::Jumping
+            } else {
+                CharacterMovementState::Falling
+            }
+        } else if self.velocity.x * self.velocity.x + self.velocity.z * self.velocity.z > 0.01 {
+            CharacterMovementState::Moving
+        } else {
+            CharacterMovementState::Idle
+        }
+    }
+
     /// Current horizontal velocity.
     #[must_use]
     pub const fn velocity(&self) -> Vec3 {
@@ -208,6 +233,29 @@ fn approach(current: f32, target: f32, max_delta: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn movement_state_tracks_idle_move_jump_and_fall() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert_eq!(controller.movement_state(), CharacterMovementState::Idle);
+
+        input.set_button(Button::MoveForward, true);
+        controller.update(&mut transform, &input, 1.0 / 60.0);
+        assert_eq!(controller.movement_state(), CharacterMovementState::Moving);
+
+        input.set_button(Button::MoveForward, false);
+        input.set_button(Button::Jump, true);
+        controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        assert_eq!(controller.movement_state(), CharacterMovementState::Jumping);
+        input.begin_frame();
+        for _ in 0..60 {
+            controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
+        }
+        assert_eq!(controller.movement_state(), CharacterMovementState::Falling);
+    }
 
     #[test]
     fn movement_accelerates_and_respects_speed_limit() {
