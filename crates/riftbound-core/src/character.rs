@@ -205,10 +205,7 @@ impl CharacterController {
         delta_seconds: f32,
         camera_yaw: f32,
     ) {
-        if !delta_seconds.is_finite()
-            || delta_seconds <= 0.0
-            || !camera_yaw.is_finite()
-        {
+        if !delta_seconds.is_finite() || delta_seconds <= 0.0 || !camera_yaw.is_finite() {
             return;
         }
         let delta = delta_seconds.min(0.1);
