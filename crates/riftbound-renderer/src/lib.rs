@@ -26,6 +26,7 @@ pub struct Renderer {
     cube_mesh: Mesh,
     instance_buffer: wgpu::Buffer,
     instance_count: u32,
+    camera_offset: [f32; 3],
 }
 
 impl Renderer {
@@ -76,7 +77,7 @@ impl Renderer {
         });
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("riftbound-camera-uniform"),
-            contents: &camera_bytes(config.width, config.height),
+            contents: &camera_bytes(config.width, config.height, [0.0; 3]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -115,6 +116,7 @@ impl Renderer {
             cube_mesh,
             instance_buffer,
             instance_count,
+            camera_offset: [0.0; 3],
         })
     }
 
@@ -130,7 +132,22 @@ impl Renderer {
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
         self.queue
-            .write_buffer(&self.camera_buffer, 0, &camera_bytes(width, height));
+            .write_buffer(
+                &self.camera_buffer,
+                0,
+                &camera_bytes(width, height, self.camera_offset),
+            );
+    }
+
+    /// Moves the camera target and eye together across the horizontal world plane.
+    pub fn pan_camera(&mut self, delta_x: f32, delta_z: f32) {
+        self.camera_offset[0] += delta_x;
+        self.camera_offset[2] += delta_z;
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            &camera_bytes(self.config.width, self.config.height, self.camera_offset),
+        );
     }
 
     /// Draws the indexed cube mesh as several transformed instances with depth testing.
@@ -346,11 +363,11 @@ fn create_depth_target(
     (texture, view)
 }
 
-fn camera_bytes(width: u32, height: u32) -> [u8; 64] {
+fn camera_bytes(width: u32, height: u32, offset: [f32; 3]) -> [u8; 64] {
     #[allow(clippy::cast_precision_loss)]
     let aspect = width.max(1) as f32 / height.max(1) as f32;
-    let eye = [3.2_f32, 2.4, 4.8];
-    let target = [0.0_f32, 0.0, 0.0];
+    let eye = [3.2_f32 + offset[0], 2.4 + offset[1], 4.8 + offset[2]];
+    let target = offset;
     let forward = normalize([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
     let side = normalize(cross(forward, [0.0, 1.0, 0.0]));
     let up = cross(side, forward);
@@ -438,7 +455,7 @@ mod tests {
 
     #[test]
     fn camera_uniform_is_finite_for_landscape_and_portrait_targets() {
-        for bytes in [camera_bytes(1280, 720), camera_bytes(720, 1280)] {
+        for bytes in [camera_bytes(1280, 720, [0.0; 3]), camera_bytes(720, 1280, [1.0, 0.0, -1.0])] {
             for chunk in bytes.chunks_exact(4) {
                 let value = f32::from_ne_bytes(chunk.try_into().expect("four-byte float"));
                 assert!(value.is_finite());
