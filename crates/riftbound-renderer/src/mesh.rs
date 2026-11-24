@@ -103,11 +103,18 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-crystal-mesh")
     }
 
-    /// Creates one of four terrain quadrants sampled in shared world space.
+    /// Creates one of four detailed terrain quadrants sampled in shared world space.
     #[must_use]
     pub fn terrain_chunk(device: &wgpu::Device, chunk_x: u8, chunk_z: u8) -> Option<Self> {
-        let (vertices, indices) = terrain_chunk_data(chunk_x, chunk_z)?;
+        let (vertices, indices) = terrain_chunk_data(chunk_x, chunk_z, 9)?;
         Self::from_data(device, &vertices, &indices, "riftbound-terrain-chunk-mesh")
+    }
+
+    /// Creates a simplified terrain quadrant with matching outer-edge samples.
+    #[must_use]
+    pub fn terrain_chunk_lod(device: &wgpu::Device, chunk_x: u8, chunk_z: u8) -> Option<Self> {
+        let (vertices, indices) = terrain_chunk_data(chunk_x, chunk_z, 5)?;
+        Self::from_data(device, &vertices, &indices, "riftbound-terrain-chunk-lod-mesh")
     }
 
     /// Returns the GPU vertex buffer.
@@ -240,20 +247,22 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-fn terrain_chunk_data(chunk_x: u8, chunk_z: u8) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
-    const SIDE: usize = 9;
-    const CELLS_PER_CHUNK: usize = SIDE - 1;
+fn terrain_chunk_data(chunk_x: u8, chunk_z: u8, side: usize) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
+    if side < 2 || side > 9 || (8 % (side - 1)) != 0 {
+        return None;
+    }
+    let cells_per_chunk = side - 1;
     let chunk_x = usize::from(chunk_x);
     let chunk_z = usize::from(chunk_z);
     if chunk_x >= 2 || chunk_z >= 2 {
         return None;
     }
-    let mut vertices = Vec::with_capacity(SIDE * SIDE);
-    let mut indices = Vec::with_capacity(CELLS_PER_CHUNK * CELLS_PER_CHUNK * 6);
-    for z in 0..SIDE {
-        for x in 0..SIDE {
-            let global_x = chunk_x * CELLS_PER_CHUNK + x;
-            let global_z = chunk_z * CELLS_PER_CHUNK + z;
+    let mut vertices = Vec::with_capacity(side * side);
+    let mut indices = Vec::with_capacity(cells_per_chunk * cells_per_chunk * 6);
+    for z in 0..side {
+        for x in 0..side {
+            let global_x = chunk_x * 8 + x * (8 / cells_per_chunk);
+            let global_z = chunk_z * 8 + z * (8 / cells_per_chunk);
             let world_x = -10.0
                 + f32::from(u8::try_from(global_x).expect("terrain x coordinate fits u8")) * 1.25;
             let world_z = -10.0
@@ -276,11 +285,11 @@ fn terrain_chunk_data(chunk_x: u8, chunk_z: u8) -> Option<(Vec<MeshVertex>, Vec<
             });
         }
     }
-    for z in 0..CELLS_PER_CHUNK {
-        for x in 0..CELLS_PER_CHUNK {
-            let top_left = u16::try_from(z * SIDE + x).expect("terrain vertex index fits u16");
+    for z in 0..cells_per_chunk {
+        for x in 0..cells_per_chunk {
+            let top_left = u16::try_from(z * side + x).expect("terrain vertex index fits u16");
             let top_right = top_left + 1;
-            let bottom_left = top_left + u16::try_from(SIDE).expect("terrain side fits u16");
+            let bottom_left = top_left + u16::try_from(side).expect("terrain side fits u16");
             let bottom_right = bottom_left + 1;
             indices.extend_from_slice(&[
                 top_left,
@@ -408,10 +417,10 @@ mod tests {
     #[test]
     fn terrain_chunks_have_valid_grids_and_matching_shared_edges() {
         let chunks = [
-            terrain_chunk_data(0, 0).expect("north-west chunk"),
-            terrain_chunk_data(1, 0).expect("north-east chunk"),
-            terrain_chunk_data(0, 1).expect("south-west chunk"),
-            terrain_chunk_data(1, 1).expect("south-east chunk"),
+            terrain_chunk_data(0, 0, 9).expect("north-west chunk"),
+            terrain_chunk_data(1, 0, 9).expect("north-east chunk"),
+            terrain_chunk_data(0, 1, 9).expect("south-west chunk"),
+            terrain_chunk_data(1, 1, 9).expect("south-east chunk"),
         ];
         for (vertices, indices) in &chunks {
             assert_eq!(vertices.len(), 9 * 9);
@@ -445,8 +454,8 @@ mod tests {
         };
         assert_eq!(south_edge(&chunks[0].0, 8), south_edge(&chunks[2].0, 0));
         assert_eq!(south_edge(&chunks[1].0, 8), south_edge(&chunks[3].0, 0));
-        assert!(terrain_chunk_data(2, 0).is_none());
-        assert!(terrain_chunk_data(0, 2).is_none());
+        assert!(terrain_chunk_data(2, 0, 9).is_none());
+        assert!(terrain_chunk_data(0, 2, 9).is_none());
     }
 
     #[test]
