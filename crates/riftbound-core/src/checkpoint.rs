@@ -17,7 +17,9 @@ impl Checkpoint {
             && position.y.is_finite()
             && position.z.is_finite()
             && radius.is_finite();
-        finite.then_some(Self { position, radius }).filter(|_| radius > 0.0)
+        finite
+            .then_some(Self { position, radius })
+            .filter(|_| radius > 0.0)
     }
 
     /// Safe world-space respawn position.
@@ -54,13 +56,11 @@ impl CheckpointProgress {
     /// Creates checkpoint progress with a validated initial spawn position.
     #[must_use]
     pub fn new(mission_start: Vec3) -> Option<Self> {
-        (mission_start.x.is_finite()
-            && mission_start.y.is_finite()
-            && mission_start.z.is_finite())
-        .then_some(Self {
-            mission_start,
-            active: None,
-        })
+        (mission_start.x.is_finite() && mission_start.y.is_finite() && mission_start.z.is_finite())
+            .then_some(Self {
+                mission_start,
+                active: None,
+            })
     }
 
     /// Activates a checkpoint only when the player interacts inside its zone.
