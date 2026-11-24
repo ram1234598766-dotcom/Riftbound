@@ -370,18 +370,16 @@ mod tests {
         for _ in 0..120 {
             controller.update(&mut transform, &input, 1.0 / 60.0);
         }
-        let sprint_speed = (controller.velocity().x.powi(2)
-            + controller.velocity().z.powi(2))
-        .sqrt();
+        let sprint_speed =
+            (controller.velocity().x.powi(2) + controller.velocity().z.powi(2)).sqrt();
         assert!((sprint_speed - 7.2).abs() < 0.001);
 
         input.set_button(Button::Sprint, false);
         for _ in 0..120 {
             controller.update(&mut transform, &input, 1.0 / 60.0);
         }
-        let normal_speed = (controller.velocity().x.powi(2)
-            + controller.velocity().z.powi(2))
-        .sqrt();
+        let normal_speed =
+            (controller.velocity().x.powi(2) + controller.velocity().z.powi(2)).sqrt();
         assert!((normal_speed - 4.5).abs() < 0.001);
     }
 
