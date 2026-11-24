@@ -254,10 +254,12 @@ fn terrain_chunk_data(chunk_x: u8, chunk_z: u8) -> Option<(Vec<MeshVertex>, Vec<
         for x in 0..SIDE {
             let global_x = chunk_x * CELLS_PER_CHUNK + x;
             let global_z = chunk_z * CELLS_PER_CHUNK + z;
-            let world_x = -10.0 + global_x as f32 * 1.25;
-            let world_z = -10.0 + global_z as f32 * 1.25;
-            let local_x = x as f32 / 4.0 - 1.0;
-            let local_z = z as f32 / 4.0 - 1.0;
+            let world_x = -10.0
+                + f32::from(u8::try_from(global_x).expect("terrain x coordinate fits u8")) * 1.25;
+            let world_z = -10.0
+                + f32::from(u8::try_from(global_z).expect("terrain z coordinate fits u8")) * 1.25;
+            let local_x = f32::from(u8::try_from(x).expect("terrain x fits u8")) / 4.0 - 1.0;
+            let local_z = f32::from(u8::try_from(z).expect("terrain z fits u8")) / 4.0 - 1.0;
             let variation = ((global_x * 13 + global_z * 7) % 5) as f32 * 0.012;
             let height = terrain_height(world_x, world_z);
             let elevation_tint = height.max(0.0) * 0.22;
