@@ -81,7 +81,7 @@ impl Renderer {
             }],
         });
 
-        let cube_pipeline = create_cube_pipeline(device.as_ref(), &camera_layout, config.format);
+        let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
 
         let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
@@ -91,7 +91,7 @@ impl Renderer {
             device,
             queue,
             config,
-            _depth_texture: depth_texture,
+            depth_texture: depth_texture,
             depth_view,
             camera_buffer,
             camera_bind_group,
@@ -108,7 +108,7 @@ impl Renderer {
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
         let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
-        self._depth_texture = depth_texture;
+        self.depth_texture = depth_texture;
         self.depth_view = depth_view;
         self.queue
             .write_buffer(&self.camera_buffer, 0, &camera_bytes(width, height));
@@ -183,7 +183,7 @@ impl Renderer {
         self.surface.configure(&self.device, &self.config);
         let (depth_texture, depth_view) =
             create_depth_target(&self.device, self.config.width, self.config.height);
-        self._depth_texture = depth_texture;
+        self.depth_texture = depth_texture;
         self.depth_view = depth_view;
     }
 }
