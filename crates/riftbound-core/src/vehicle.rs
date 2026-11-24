@@ -176,9 +176,150 @@ impl VehicleState {
     }
 }
 
+
+/// Tunable four-corner spring approximation for visual chassis response.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SuspensionConfig {
+    /// Maximum spring compression in world units.
+    pub max_travel: f32,
+    /// Spring acceleration per unit of compression error.
+    pub spring_strength: f32,
+    /// Velocity damping applied to each spring.
+    pub damping: f32,
+    /// Rest distance between chassis reference and wheel contact.
+    pub rest_length: f32,
+    /// Distance between left and right wheel contact points.
+    pub track_width: f32,
+    /// Distance between front and rear wheel contact points.
+    pub wheelbase: f32,
+}
+
+impl Default for SuspensionConfig {
+    fn default() -> Self {
+        Self {
+            max_travel: 0.42,
+            spring_strength: 34.0,
+            damping: 8.5,
+            rest_length: 0.58,
+            track_width: 1.55,
+            wheelbase: 2.65,
+        }
+    }
+}
+
+/// Chassis response derived from the four suspension corners.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SuspensionPose {
+    /// Mean spring compression across all wheels.
+    pub average_compression: f32,
+    /// Front-to-rear chassis angle in radians.
+    pub pitch: f32,
+    /// Left-to-right chassis angle in radians.
+    pub roll: f32,
+}
+
+/// Allocation-free suspension state; corner order is front-left, front-right,
+/// rear-left, rear-right.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SuspensionState {
+    compression: [f32; 4],
+    compression_velocity: [f32; 4],
+}
+
+impl SuspensionState {
+    /// Advances the spring approximation from four sampled ground heights.
+    /// Invalid inputs are ignored and the timestep is capped at 100 ms.
+    pub fn update(
+        &mut self,
+        wheel_ground_heights: [f32; 4],
+        chassis_height: f32,
+        config: SuspensionConfig,
+        delta_seconds: f32,
+    ) -> SuspensionPose {
+        if !delta_seconds.is_finite()
+            || delta_seconds <= 0.0
+            || !chassis_height.is_finite()
+            || wheel_ground_heights.iter().any(|height| !height.is_finite())
+            || !config.max_travel.is_finite()
+            || !config.spring_strength.is_finite()
+            || !config.damping.is_finite()
+            || !config.rest_length.is_finite()
+            || !config.track_width.is_finite()
+            || !config.wheelbase.is_finite()
+            || config.max_travel <= 0.0
+            || config.spring_strength < 0.0
+            || config.damping < 0.0
+            || config.rest_length < 0.0
+            || config.track_width <= 0.0
+            || config.wheelbase <= 0.0
+        {
+            return self.pose(config);
+        }
+
+        let dt = delta_seconds.min(0.1);
+        for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
+            let target = (ground_height + config.rest_length - chassis_height)
+                .clamp(0.0, config.max_travel);
+            let acceleration = (target - self.compression[index]) * config.spring_strength
+                - self.compression_velocity[index] * config.damping;
+            self.compression_velocity[index] += acceleration * dt;
+            self.compression[index] = (self.compression[index]
+                + self.compression_velocity[index] * dt)
+                .clamp(0.0, config.max_travel);
+            if self.compression[index] == 0.0
+                || self.compression[index] == config.max_travel
+            {
+                self.compression_velocity[index] = 0.0;
+            }
+        }
+        self.pose(config)
+    }
+
+    /// Returns the current visual chassis response without advancing simulation.
+    #[must_use]
+    pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
+        let front = (self.compression[0] + self.compression[1]) * 0.5;
+        let rear = (self.compression[2] + self.compression[3]) * 0.5;
+        let left = (self.compression[0] + self.compression[2]) * 0.5;
+        let right = (self.compression[1] + self.compression[3]) * 0.5;
+        SuspensionPose {
+            average_compression: self.compression.iter().sum::<f32>() * 0.25,
+            pitch: ((front - rear) / config.wheelbase.max(f32::EPSILON)).atan(),
+            roll: ((left - right) / config.track_width.max(f32::EPSILON)).atan(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn suspension_compresses_over_a_bump_and_returns_a_finite_pose() {
+        let mut suspension = SuspensionState::default();
+        let config = SuspensionConfig::default();
+        let mut pose = SuspensionPose::default();
+        for _ in 0..20 {
+            pose = suspension.update([0.2, 0.0, 0.0, 0.0], 0.58, config, 0.05);
+        }
+        assert!(pose.average_compression > 0.0);
+        assert!(pose.roll.is_finite() && pose.pitch.is_finite());
+    }
+
+    #[test]
+    fn suspension_ignores_invalid_samples() {
+        let mut suspension = SuspensionState::default();
+        let before = suspension;
+        let pose = suspension.update(
+            [f32::NAN, 0.0, 0.0, 0.0],
+            0.58,
+            SuspensionConfig::default(),
+            0.05,
+        );
+        assert_eq!(suspension, before);
+        assert_eq!(pose, SuspensionPose::default());
+    }
 
     #[test]
     fn throttle_accelerates_and_moves_forward() {
