@@ -264,6 +264,12 @@ impl Renderer {
         self.write_camera();
     }
 
+    /// Returns the current horizontal orbit-camera yaw in radians.
+    #[must_use]
+    pub const fn camera_yaw(&self) -> f32 {
+        self.camera_yaw
+    }
+
     /// Adjusts orbit camera distance, clamped to a useful third-person range.
     pub fn zoom_camera(&mut self, distance_delta: f32) {
         if !distance_delta.is_finite() {
