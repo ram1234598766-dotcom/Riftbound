@@ -96,15 +96,21 @@ pub struct WorldChunkChanges {
 impl WorldChunkChanges {
     /// Chunks that entered the active window.
     #[must_use]
-    pub fn added(&self) -> &[WorldChunkRequest] { &self.added }
+    pub fn added(&self) -> &[WorldChunkRequest] {
+        &self.added
+    }
 
     /// Chunk coordinates that left the active window.
     #[must_use]
-    pub fn removed(&self) -> &[WorldChunkCoord] { &self.removed }
+    pub fn removed(&self) -> &[WorldChunkCoord] {
+        &self.removed
+    }
 
     /// Existing chunks whose requested LOD changed.
     #[must_use]
-    pub fn updated(&self) -> &[WorldChunkRequest] { &self.updated }
+    pub fn updated(&self) -> &[WorldChunkRequest] {
+        &self.updated
+    }
 
     /// Returns true when no GPU-side chunk changes are required.
     #[must_use]
@@ -238,7 +244,11 @@ impl WorldChunkStreamer {
             }
         }
         for previous in &self.previous {
-            if !self.active.iter().any(|request| request.coord == previous.coord) {
+            if !self
+                .active
+                .iter()
+                .any(|request| request.coord == previous.coord)
+            {
                 self.changes.removed.push(previous.coord);
             }
         }
@@ -305,7 +315,10 @@ mod tests {
                 && (i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&chunk.coord.z)
         }));
         let before = chunks.to_vec();
-        assert!(!streamer.update_focus(f32::from(i16::try_from(MAX_SAMPLED_CHUNK).unwrap_or_default()) * WORLD_CHUNK_SIZE, 0.0));
+        assert!(!streamer.update_focus(
+            f32::from(i16::try_from(MAX_SAMPLED_CHUNK).unwrap_or_default()) * WORLD_CHUNK_SIZE,
+            0.0
+        ));
         assert_eq!(streamer.active_chunks(), before);
     }
 
