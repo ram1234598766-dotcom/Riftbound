@@ -11,8 +11,8 @@ mod input;
 mod math;
 mod pickup;
 mod scene;
-mod transform;
 mod terrain;
+mod transform;
 
 pub use character::{
     CharacterController, CharacterMovementState, MovementConfig, VerticalMotionConfig,
@@ -24,5 +24,5 @@ pub use input::{Button, InputState};
 pub use math::{Vec2, Vec3};
 pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
-pub use transform::Transform3;
 pub use terrain::terrain_height;
+pub use transform::Transform3;
