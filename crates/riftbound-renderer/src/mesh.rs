@@ -172,7 +172,7 @@ mod tests {
     fn cube_faces_have_independent_material_colors() {
         let vertices = cube_vertices();
         for face in vertices.chunks_exact(6) {
-            assert!(face.iter().all(|vertex| vertex.color == face[0].color));
+            assert!(face.iter().all(|vertex| vertex.color.map(f32::to_bits) == face[0].color.map(f32::to_bits)));
         }
         let distinct_colors: std::collections::HashSet<[u32; 3]> = vertices
             .chunks_exact(6)
