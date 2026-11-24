@@ -132,10 +132,34 @@ pub async fn serve() {
         shards: Arc::new(Mutex::new([false; 5])),
         extracted: Arc::new(Mutex::new(false)),
         enemies: Arc::new(Mutex::new(vec![
-            EnemyState { id: 0, x: 700.0, y: 500.0, hp: 2, stun: 0.0 },
-            EnemyState { id: 1, x: 1500.0, y: 700.0, hp: 2, stun: 0.0 },
-            EnemyState { id: 2, x: 900.0, y: 1080.0, hp: 2, stun: 0.0 },
-            EnemyState { id: 3, x: 1840.0, y: 930.0, hp: 2, stun: 0.0 },
+            EnemyState {
+                id: 0,
+                x: 700.0,
+                y: 500.0,
+                hp: 2,
+                stun: 0.0,
+            },
+            EnemyState {
+                id: 1,
+                x: 1500.0,
+                y: 700.0,
+                hp: 2,
+                stun: 0.0,
+            },
+            EnemyState {
+                id: 2,
+                x: 900.0,
+                y: 1080.0,
+                hp: 2,
+                stun: 0.0,
+            },
+            EnemyState {
+                id: 3,
+                x: 1840.0,
+                y: 930.0,
+                hp: 2,
+                stun: 0.0,
+            },
         ])),
     };
     let app = Router::new()
@@ -274,8 +298,10 @@ async fn handle_client_message(
                             let speed = if distance > 100.0 { 85.0 } else { 0.0 };
                             let step = speed * elapsed;
                             if distance > 0.001 {
-                                enemy.x = (enemy.x + dx / distance * step).clamp(50.0, WORLD_WIDTH - 50.0);
-                                enemy.y = (enemy.y + dy / distance * step).clamp(50.0, WORLD_HEIGHT - 50.0);
+                                enemy.x = (enemy.x + dx / distance * step)
+                                    .clamp(50.0, WORLD_WIDTH - 50.0);
+                                enemy.y = (enemy.y + dy / distance * step)
+                                    .clamp(50.0, WORLD_HEIGHT - 50.0);
                             }
                         }
                     }
@@ -283,12 +309,23 @@ async fn handle_client_message(
             }
         }
         "attack" => {
-            let Some(index) = input.enemy else { return false; };
+            let Some(index) = input.enemy else {
+                return false;
+            };
             let players = state.players.lock().await;
-            let Some(player) = players.get(&id) else { return false; };
+            let Some(player) = players.get(&id) else {
+                return false;
+            };
             let mut enemies = state.enemies.lock().await;
-            let Some(enemy) = enemies.iter_mut().find(|enemy| enemy.id == index && enemy.hp > 0) else { return false; };
-            if (player.x - enemy.x).hypot(player.y - enemy.y) > 75.0 { return false; }
+            let Some(enemy) = enemies
+                .iter_mut()
+                .find(|enemy| enemy.id == index && enemy.hp > 0)
+            else {
+                return false;
+            };
+            if (player.x - enemy.x).hypot(player.y - enemy.y) > 75.0 {
+                return false;
+            }
             enemy.hp = enemy.hp.saturating_sub(1);
             enemy.stun = 0.9;
         }
