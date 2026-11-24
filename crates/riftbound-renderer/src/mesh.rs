@@ -140,14 +140,38 @@ fn valid_index_data(vertex_count: usize, indices: &[u16]) -> bool {
 fn cube_lod_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let color = [0.12, 0.48, 0.82];
     let vertices = vec![
-        MeshVertex { position: [-1.0, -1.0, -1.0], color },
-        MeshVertex { position: [1.0, -1.0, -1.0], color },
-        MeshVertex { position: [1.0, 1.0, -1.0], color },
-        MeshVertex { position: [-1.0, 1.0, -1.0], color },
-        MeshVertex { position: [-1.0, -1.0, 1.0], color },
-        MeshVertex { position: [1.0, -1.0, 1.0], color },
-        MeshVertex { position: [1.0, 1.0, 1.0], color },
-        MeshVertex { position: [-1.0, 1.0, 1.0], color },
+        MeshVertex {
+            position: [-1.0, -1.0, -1.0],
+            color,
+        },
+        MeshVertex {
+            position: [1.0, -1.0, -1.0],
+            color,
+        },
+        MeshVertex {
+            position: [1.0, 1.0, -1.0],
+            color,
+        },
+        MeshVertex {
+            position: [-1.0, 1.0, -1.0],
+            color,
+        },
+        MeshVertex {
+            position: [-1.0, -1.0, 1.0],
+            color,
+        },
+        MeshVertex {
+            position: [1.0, -1.0, 1.0],
+            color,
+        },
+        MeshVertex {
+            position: [1.0, 1.0, 1.0],
+            color,
+        },
+        MeshVertex {
+            position: [-1.0, 1.0, 1.0],
+            color,
+        },
     ];
     let indices = vec![
         4, 5, 6, 4, 6, 7, 1, 0, 3, 1, 3, 2, 5, 1, 2, 5, 2, 6, 0, 4, 7, 0, 7, 3,
