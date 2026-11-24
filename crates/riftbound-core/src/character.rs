@@ -251,6 +251,9 @@ mod tests {
         assert_eq!(controller.movement_state(), CharacterMovementState::Moving);
 
         input.set_button(Button::MoveForward, false);
+        for _ in 0..60 {
+            controller.update(&mut transform, &input, 1.0 / 60.0);
+        }
         input.set_button(Button::Jump, true);
         controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
         assert_eq!(controller.movement_state(), CharacterMovementState::Jumping);
