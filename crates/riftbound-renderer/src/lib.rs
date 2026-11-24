@@ -27,6 +27,8 @@ use winit::{event_loop::OwnedDisplayHandle, window::Window};
 
 const CUBE_SHADER: &str = include_str!("../shaders/cube.wgsl");
 
+const HUD_BUFFER_CAPACITY: u64 = 512 * 1024;
+
 /// Owns the GPU device, presentation surface, depth target, and scene pipeline.
 pub struct Renderer {
     _instance: wgpu::Instance,
@@ -123,7 +125,6 @@ impl Renderer {
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
         let hud_pipeline = create_hud_pipeline(&device, config.format);
         // Reuse a bounded dynamic buffer instead of allocating a GPU buffer every frame.
-        const HUD_BUFFER_CAPACITY: u64 = 512 * 1024;
         let hud_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("riftbound-hud-vertices"),
             size: HUD_BUFFER_CAPACITY,
