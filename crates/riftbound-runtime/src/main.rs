@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    terrain_height, Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
-    MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3,
+    Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
+    MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
