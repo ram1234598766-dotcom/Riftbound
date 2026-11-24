@@ -190,3 +190,8 @@ The platform-independent core now includes `VehicleState`, `VehicleInput`, `Vehi
 ### Native driving slice — first runtime integration
 
 The native runtime now spawns an explicitly prototype-grade blockout vehicle with a body and four child wheel meshes. Press **V** to enter or exit the driving prototype; **W/S** accelerate and reverse, **A/D** steer, and **Space** brakes. The existing vehicle core simulation now advances from native keyboard input, and the orbit camera follows the vehicle while driving. Wheel spin and front-wheel steering are animated from vehicle speed and steering input. This is the first visible runtime integration, not a finished car: the prototype still uses primitive meshes, currently treats the ground as asphalt, and does not yet connect suspension samples, vehicle collision, terrain-specific surfaces, wheel contact, audio, or touch/gamepad controls. The player and existing arena encounter remain separate from the vehicle, and the arena is still not the open world. CI and hardware performance validation are pending for this change.
+
+
+### Terrain-sampled suspension runtime integration
+
+The native driving prototype now samples the existing shared arena terrain at all four wheel contact positions, advances the allocation-free spring/damper state, adjusts wheel heights to the sampled ground, and applies suspension-derived chassis pitch and roll. This connects the earlier suspension simulation to visible runtime transforms. The current terrain is still the small arena height field, not the planned open-world biome system; vehicle collision, surface classification, wheel-ground collision resolution, and physical validation remain future work.
