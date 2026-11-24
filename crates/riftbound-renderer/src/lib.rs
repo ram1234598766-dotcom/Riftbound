@@ -280,41 +280,8 @@ impl InstanceRaw {
         }
     }
 
-    fn from_transform(transform: Transform3) -> Self {
-        let rotation = transform.rotation_radians;
-        let (sx, cx) = rotation.x.sin_cos();
-        let (sy, cy) = rotation.y.sin_cos();
-        let (sz, cz) = rotation.z.sin_cos();
-        let scale = transform.scale;
-        let r00 = cz * cy;
-        let r01 = cz * sy * sx - sz * cx;
-        let r02 = cz * sy * cx + sz * sx;
-        let r10 = sz * cy;
-        let r11 = sz * sy * sx + cz * cx;
-        let r12 = sz * sy * cx - cz * sx;
-        let r20 = -sy;
-        let r21 = cy * sx;
-        let r22 = cy * cx;
-        Self {
-            model: [
-                r00 * scale.x,
-                r10 * scale.x,
-                r20 * scale.x,
-                0.0,
-                r01 * scale.y,
-                r11 * scale.y,
-                r21 * scale.y,
-                0.0,
-                r02 * scale.z,
-                r12 * scale.z,
-                r22 * scale.z,
-                0.0,
-                transform.translation.x,
-                transform.translation.y,
-                transform.translation.z,
-                1.0,
-            ],
-        }
+    fn from_matrix(model: [f32; 16]) -> Self {
+        Self { model }
     }
 }
 
@@ -348,7 +315,12 @@ fn starter_scene() -> Scene {
 fn scene_instances(scene: &Scene) -> Vec<InstanceRaw> {
     scene
         .iter()
-        .map(|object| InstanceRaw::from_transform(object.transform))
+        .map(|object| {
+            let world = scene
+                .world_matrix(object.id)
+                .expect("iterated scene objects must have valid hierarchy");
+            InstanceRaw::from_matrix(world)
+        })
         .collect()
 }
 
