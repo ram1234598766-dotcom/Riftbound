@@ -160,6 +160,10 @@ impl Renderer {
     }
 
     /// Replaces the scene and uploads its transforms to the GPU instance buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scene contains more instances than a GPU draw call can address.
     pub fn set_scene(&mut self, scene: Scene) -> Result<(), std::num::TryFromIntError> {
         let instances = scene_instances(&scene);
         let instance_count = u32::try_from(instances.len())?;
