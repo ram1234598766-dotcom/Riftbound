@@ -17,6 +17,29 @@ pub enum EnemyState {
     Return,
 }
 
+
+/// Behaviour profile used to build a distinct enemy encounter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnemyArchetype {
+    /// Balanced enemy with a readable close-range pulse.
+    Sentinel,
+    /// Fast pursuer with a short attack reach.
+    Skirmisher,
+    /// Slow guardian with a wider attack zone and longer recovery.
+    Warden,
+}
+
+/// Global tuning preset applied to an enemy archetype.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnemyDifficulty {
+    /// More reaction time and less aggressive pursuit.
+    Easy,
+    /// Intended baseline tuning.
+    Standard,
+    /// Faster pursuit and shorter attack wind-up.
+    Hard,
+}
+
 /// Tunable distances and timings for a lightweight enemy.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EnemyConfig {
@@ -50,6 +73,52 @@ impl Default for EnemyConfig {
             telegraph_seconds: 0.65,
             recovery_seconds: 0.8,
         }
+    }
+}
+
+impl EnemyConfig {
+    /// Builds a profile for an archetype and difficulty.
+    #[must_use]
+    pub fn for_profile(archetype: EnemyArchetype, difficulty: EnemyDifficulty) -> Self {
+        let mut config = match archetype {
+            EnemyArchetype::Sentinel => Self::default(),
+            EnemyArchetype::Skirmisher => Self {
+                awareness_radius: 9.0,
+                attack_radius: 1.35,
+                leash_radius: 13.0,
+                patrol_speed: 1.45,
+                patrol_radius: 2.0,
+                chase_speed: 3.2,
+                telegraph_seconds: 0.48,
+                recovery_seconds: 0.62,
+            },
+            EnemyArchetype::Warden => Self {
+                awareness_radius: 7.0,
+                attack_radius: 2.15,
+                leash_radius: 10.5,
+                patrol_speed: 0.72,
+                patrol_radius: 1.2,
+                chase_speed: 1.65,
+                telegraph_seconds: 0.9,
+                recovery_seconds: 1.1,
+            },
+        };
+        match difficulty {
+            EnemyDifficulty::Easy => {
+                config.awareness_radius *= 0.9;
+                config.chase_speed *= 0.82;
+                config.telegraph_seconds *= 1.25;
+                config.recovery_seconds *= 1.15;
+            }
+            EnemyDifficulty::Standard => {}
+            EnemyDifficulty::Hard => {
+                config.awareness_radius *= 1.1;
+                config.chase_speed *= 1.2;
+                config.telegraph_seconds *= 0.82;
+                config.recovery_seconds *= 0.85;
+            }
+        }
+        config
     }
 }
 
@@ -243,6 +312,34 @@ mod tests {
 
     fn brain() -> EnemyBrain {
         EnemyBrain::new(Vec3::new(0.0, 0.0, 0.0), EnemyConfig::default())
+    }
+
+    #[test]
+    fn archetypes_have_distinct_movement_and_attack_profiles() {
+        let sentinel = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
+        let skirmisher = EnemyConfig::for_profile(EnemyArchetype::Skirmisher, EnemyDifficulty::Standard);
+        let warden = EnemyConfig::for_profile(EnemyArchetype::Warden, EnemyDifficulty::Standard);
+        assert!(skirmisher.chase_speed > sentinel.chase_speed);
+        assert!(skirmisher.telegraph_seconds < sentinel.telegraph_seconds);
+        assert!(warden.chase_speed < sentinel.chase_speed);
+        assert!(warden.attack_radius > sentinel.attack_radius);
+        assert!(warden.recovery_seconds > sentinel.recovery_seconds);
+    }
+
+    #[test]
+    fn difficulty_presets_adjust_threat_without_invalid_values() {
+        let easy = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Easy);
+        let standard = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
+        let hard = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Hard);
+        assert!(easy.chase_speed < standard.chase_speed);
+        assert!(easy.telegraph_seconds > standard.telegraph_seconds);
+        assert!(hard.chase_speed > standard.chase_speed);
+        assert!(hard.telegraph_seconds < standard.telegraph_seconds);
+        for config in [easy, standard, hard] {
+            assert!(config.awareness_radius.is_finite() && config.awareness_radius > 0.0);
+            assert!(config.leash_radius >= config.awareness_radius);
+            assert!(config.telegraph_seconds > 0.0 && config.recovery_seconds > 0.0);
+        }
     }
 
     #[test]
