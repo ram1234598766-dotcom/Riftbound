@@ -47,6 +47,9 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [x] Add a deterministic secondary-objective model for collect, interact, visit, and defeat goals, with saturation and completion tests.
 - [ ] Wire secondary objectives into native runtime encounters and HUD feedback.
 - [ ] Add progression and rewards with deterministic save data.
+- [x] Add a deterministic player health model with validated damage, bounded protection timing, lethal-health handling, and unit tests.
+- [x] Apply sentinel pulse damage using a bounded proximity check; add temporary hit protection and checkpoint recovery after lethal damage.
+- [x] Display current/max player health and a low-health warning bar in the native HUD.
 - [ ] Add gameplay tests for movement, combat state transitions, and objective progression.
 
 ### 4. Content and world building
@@ -82,3 +85,6 @@ The core objective model now supports collect, interact, visit, and defeat count
 
 
 The core now contains a lightweight enemy state machine with bounded pursuit, a telegraphed close-range pulse, recovery, and return-to-home behavior. The native arena spawns one amber sentinel and updates its brain alongside the scene transform. A low-cost pulsing ground indicator marks the telegraph and briefly expands on pulse release; the player can disable the sentinel during its recovery window, advancing the secondary defeat objective. Pulse visuals are feedback only at this milestone; they do not yet apply player damage or use a health/combat system. The encounter currently exists in the native runtime, not the separate browser multiplayer prototype.
+
+
+The native sentinel pulse now checks player proximity when released and applies 25 damage on a hit. A one-second protection window prevents repeated hits while the player remains close. Player health is managed by a small core model with tests for damage, protection expiry, lethal damage, restoration, and invalid inputs. The native HUD displays current/max health and changes the bar to a warning colour at low health. Lethal damage restores the player at the active checkpoint (or mission start) and refills health. This combat milestone is native-runtime only; it does not yet affect the separate browser multiplayer prototype.
