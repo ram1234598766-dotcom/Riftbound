@@ -14,7 +14,7 @@ pub struct HudData {
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HudVertex {
     /// Clip-space vertex position.
     pub position: [f32; 2],
@@ -201,6 +201,26 @@ fn bitmap(ch: char) -> [u8; 7] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reusable_builder_rewrites_geometry_without_growing_after_warmup() {
+        let data = HudData {
+            collected: 3,
+            total: 5,
+            status: "RETURN TO BEACON".into(),
+            prompt: Some("F - EXTRACT".into()),
+        };
+        let mut reused = Vec::with_capacity(4_096);
+        build_vertices_into(&data, 1280, 720, &mut reused);
+        let expected = build_vertices(&data, 1280, 720);
+        assert_eq!(reused, expected);
+        let warmed_capacity = reused.capacity();
+
+        build_vertices_into(&data, 1280, 720, &mut reused);
+
+        assert_eq!(reused, expected);
+        assert_eq!(reused.capacity(), warmed_capacity);
+    }
 
     #[test]
     fn hud_geometry_is_non_empty_and_finite() {
