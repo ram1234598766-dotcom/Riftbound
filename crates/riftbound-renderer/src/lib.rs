@@ -175,10 +175,14 @@ impl Renderer {
             Mesh::terrain_chunk(&device, 1, 1)
                 .ok_or("Failed to create south-east terrain chunk")?,
             Mesh::cube_lod(&device).ok_or("Failed to create the compact cube LOD mesh")?,
-            Mesh::terrain_chunk_lod(&device, 0, 0).ok_or("Failed to create north-west terrain LOD mesh")?,
-            Mesh::terrain_chunk_lod(&device, 1, 0).ok_or("Failed to create north-east terrain LOD mesh")?,
-            Mesh::terrain_chunk_lod(&device, 0, 1).ok_or("Failed to create south-west terrain LOD mesh")?,
-            Mesh::terrain_chunk_lod(&device, 1, 1).ok_or("Failed to create south-east terrain LOD mesh")?,
+            Mesh::terrain_chunk_lod(&device, 0, 0)
+                .ok_or("Failed to create north-west terrain LOD mesh")?,
+            Mesh::terrain_chunk_lod(&device, 1, 0)
+                .ok_or("Failed to create north-east terrain LOD mesh")?,
+            Mesh::terrain_chunk_lod(&device, 0, 1)
+                .ok_or("Failed to create south-west terrain LOD mesh")?,
+            Mesh::terrain_chunk_lod(&device, 1, 1)
+                .ok_or("Failed to create south-east terrain LOD mesh")?,
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
@@ -613,9 +617,15 @@ impl Renderer {
             *value = f32::from_ne_bytes(camera[start..start + 4].try_into().expect("matrix float"));
         }
         for object in self.scene.iter() {
-            let Ok(mesh_index) = usize::try_from(object.mesh.index()) else { continue; };
-            if mesh_index != 0 && !(3..=6).contains(&mesh_index) { continue; }
-            let world = self.scene.world_matrix(object.id)
+            let Ok(mesh_index) = usize::try_from(object.mesh.index()) else {
+                continue;
+            };
+            if mesh_index != 0 && !(3..=6).contains(&mesh_index) {
+                continue;
+            }
+            let world = self
+                .scene
+                .world_matrix(object.id)
                 .expect("iterated scene objects must have valid hierarchy");
             // Terrain chunks share one LOD tier so adjacent chunks never form T-junctions.
             // Their common arena-centre distance keeps all four edges on matching samples.
@@ -635,8 +645,11 @@ impl Renderer {
             } else {
                 select_terrain_lod(distance, was_low)
             };
-            if let Some(index) = state_index { self.lod_states[index].1 = use_low; }
-            else { self.lod_states.push((object.id, use_low)); }
+            if let Some(index) = state_index {
+                self.lod_states[index].1 = use_low;
+            } else {
+                self.lod_states.push((object.id, use_low));
+            }
         }
         let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
         let mut visible_instances = 0_u32;
@@ -649,15 +662,21 @@ impl Renderer {
             for object in self.scene.iter() {
                 let object_mesh = usize::try_from(object.mesh.index()).unwrap_or(usize::MAX);
                 let use_low = (object_mesh == 0 || (3..=6).contains(&object_mesh))
-                    && self.lod_states.iter().find(|(id, _)| *id == object.id)
+                    && self
+                        .lod_states
+                        .iter()
+                        .find(|(id, _)| *id == object.id)
                         .is_some_and(|(_, low)| *low);
                 let lod_mesh_index = if object_mesh == 0 {
                     CUBE_LOD_MESH_INDEX
                 } else {
                     TERRAIN_LOD_BASE_INDEX + object_mesh - 3
                 };
-                let matches_batch = if use_low { batch.mesh_index == lod_mesh_index }
-                    else { object_mesh == batch.mesh_index };
+                let matches_batch = if use_low {
+                    batch.mesh_index == lod_mesh_index
+                } else {
+                    object_mesh == batch.mesh_index
+                };
                 if !matches_batch {
                     continue;
                 }
@@ -867,9 +886,14 @@ fn select_cube_lod(distance: f32, was_low_detail: bool) -> bool {
 }
 
 fn select_terrain_lod(distance: f32, was_low_detail: bool) -> bool {
-    if !distance.is_finite() { return false; }
-    if was_low_detail { distance >= TERRAIN_LOD_EXIT_DISTANCE }
-    else { distance > TERRAIN_LOD_ENTER_DISTANCE }
+    if !distance.is_finite() {
+        return false;
+    }
+    if was_low_detail {
+        distance >= TERRAIN_LOD_EXIT_DISTANCE
+    } else {
+        distance > TERRAIN_LOD_ENTER_DISTANCE
+    }
 }
 
 fn material_tint(material: MaterialId) -> [f32; 4] {
