@@ -10,7 +10,8 @@ mod mesh;
 
 pub use hud::HudData;
 use hud::HudVertex;
-use mesh::{Mesh, MeshVertex};
+pub use mesh::Mesh;
+use mesh::MeshVertex;
 
 const HUD_SHADER: &str = r"
 struct VertexInput { @location(0) position: vec2<f32>, @location(1) color: vec4<f32> };
