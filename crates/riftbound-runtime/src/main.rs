@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
+    terrain_height, Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
     MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3,
 };
 use riftbound_renderer::{HudData, Renderer};
@@ -833,17 +833,6 @@ fn build_crystal_markers(scene: &mut Scene) {
 
 /// Height of the native arena's procedural ground, in world-space Y units.
 /// Keep this formula aligned with the renderer's terrain vertex generator.
-fn terrain_height(world_x: f32, world_z: f32) -> f32 {
-    let u = (world_x / 10.0 + 1.0) * 0.5;
-    let v = (world_z / 10.0 + 1.0) * 0.5;
-    if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
-        return 0.0;
-    }
-    let edge_fade = (std::f32::consts::PI * u).sin() * (std::f32::consts::PI * v).sin();
-    let ridges = (u * std::f32::consts::TAU * 2.0).sin() * (v * std::f32::consts::TAU * 1.5).cos();
-    edge_fade * ridges * 0.075
-}
-
 fn arena_collision_world() -> CollisionWorld {
     let mut world = CollisionWorld::new(Aabb2::new(-9.5, 9.5, -9.5, 9.5));
     world.add_obstacle(Aabb2::new(-2.75, -1.25, -1.75, -0.25));
