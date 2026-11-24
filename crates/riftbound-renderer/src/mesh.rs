@@ -211,8 +211,12 @@ fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
             let bottom_left = top_left + SIDE as u16;
             let bottom_right = bottom_left + 1;
             indices.extend_from_slice(&[
-                top_left, bottom_left, top_right,
-                top_right, bottom_left, bottom_right,
+                top_left,
+                bottom_left,
+                top_right,
+                top_right,
+                bottom_left,
+                bottom_right,
             ]);
         }
     }
@@ -321,9 +325,17 @@ mod tests {
         assert_eq!(indices.len(), 16 * 16 * 6);
         assert!(valid_index_data(vertices.len(), &indices));
         assert!(vertices.iter().all(|vertex| {
-            vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            vertex
+                .position
+                .iter()
+                .chain(vertex.color.iter())
+                .all(|value| value.is_finite())
         }));
-        assert!(vertices.iter().any(|vertex| vertex.color != vertices[0].color));
+        assert!(
+            vertices
+                .iter()
+                .any(|vertex| vertex.color != vertices[0].color)
+        );
     }
 
     #[test]
