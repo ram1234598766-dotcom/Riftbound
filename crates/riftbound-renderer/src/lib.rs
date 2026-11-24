@@ -155,17 +155,25 @@ impl Renderer {
 
     /// Returns the current CPU-side scene.
     #[must_use]
-    pub const fn scene(&self) -> &Scene { &self.scene }
+    pub const fn scene(&self) -> &Scene {
+        &self.scene
+    }
 
     /// Replaces the scene and uploads its transforms to the GPU instance buffer.
     pub fn set_scene(&mut self, scene: Scene) -> Result<(), std::num::TryFromIntError> {
         let instances = scene_instances(&scene);
         let instance_count = u32::try_from(instances.len())?;
         let mut bytes = instance_bytes(&instances);
-        if bytes.is_empty() { bytes.resize(64, 0); }
-        self.instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("riftbound-scene-instances"), contents: &bytes, usage: wgpu::BufferUsages::VERTEX,
-        });
+        if bytes.is_empty() {
+            bytes.resize(64, 0);
+        }
+        self.instance_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("riftbound-scene-instances"),
+                contents: &bytes,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
         self.instance_count = instance_count;
         self.scene = scene;
         Ok(())
@@ -283,12 +291,26 @@ impl InstanceRaw {
         let r20 = -sy;
         let r21 = cy * sx;
         let r22 = cy * cx;
-        Self { model: [
-            r00 * scale.x, r10 * scale.x, r20 * scale.x, 0.0,
-            r01 * scale.y, r11 * scale.y, r21 * scale.y, 0.0,
-            r02 * scale.z, r12 * scale.z, r22 * scale.z, 0.0,
-            transform.translation.x, transform.translation.y, transform.translation.z, 1.0,
-        ] }
+        Self {
+            model: [
+                r00 * scale.x,
+                r10 * scale.x,
+                r20 * scale.x,
+                0.0,
+                r01 * scale.y,
+                r11 * scale.y,
+                r21 * scale.y,
+                0.0,
+                r02 * scale.z,
+                r12 * scale.z,
+                r22 * scale.z,
+                0.0,
+                transform.translation.x,
+                transform.translation.y,
+                transform.translation.z,
+                1.0,
+            ],
+        }
     }
 }
 
