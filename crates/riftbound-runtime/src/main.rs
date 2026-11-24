@@ -7,8 +7,8 @@ use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld,
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
-    ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, Transform3, Vec3,
-    terrain_height, VehicleConfig, VehicleInput, VehicleState, VehicleSurface,
+    ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, Transform3, Vec3, VehicleConfig,
+    VehicleInput, VehicleState, VehicleSurface, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -255,7 +255,9 @@ impl ApplicationHandler for RiftboundApp {
                     if event.state == ElementState::Pressed && key == KeyCode::KeyV {
                         self.driving = !self.driving;
                         if self.driving {
-                            log::info!("Driving prototype active: W/S throttle, A/D steering, Space brake, V exit");
+                            log::info!(
+                                "Driving prototype active: W/S throttle, A/D steering, Space brake, V exit"
+                            );
                         } else {
                             log::info!("Exited vehicle prototype");
                         }
@@ -292,10 +294,15 @@ impl ApplicationHandler for RiftboundApp {
                             renderer.camera_yaw(),
                         );
                     }
-                    let horizontal_velocity = if self.driving { Vec3::default() } else { self.controller.velocity() };
-                    if !self.driving && horizontal_velocity.x * horizontal_velocity.x
-                        + horizontal_velocity.z * horizontal_velocity.z
-                        > 0.01
+                    let horizontal_velocity = if self.driving {
+                        Vec3::default()
+                    } else {
+                        self.controller.velocity()
+                    };
+                    if !self.driving
+                        && horizontal_velocity.x * horizontal_velocity.x
+                            + horizontal_velocity.z * horizontal_velocity.z
+                            > 0.01
                     {
                         transform.rotation_radians.y =
                             horizontal_velocity.x.atan2(-horizontal_velocity.z);
@@ -332,12 +339,20 @@ impl ApplicationHandler for RiftboundApp {
                     self.animated_transforms.clear();
                     self.animated_transforms.push((player, transform));
                     if self.driving {
-                        let throttle = if self.input.is_held(Button::MoveForward) { 1.0 }
-                            else if self.input.is_held(Button::MoveBackward) { -1.0 }
-                            else { 0.0 };
-                        let steering = if self.input.is_held(Button::MoveLeft) { -1.0 }
-                            else if self.input.is_held(Button::MoveRight) { 1.0 }
-                            else { 0.0 };
+                        let throttle = if self.input.is_held(Button::MoveForward) {
+                            1.0
+                        } else if self.input.is_held(Button::MoveBackward) {
+                            -1.0
+                        } else {
+                            0.0
+                        };
+                        let steering = if self.input.is_held(Button::MoveLeft) {
+                            -1.0
+                        } else if self.input.is_held(Button::MoveRight) {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         self.vehicle_state.update(
                             VehicleInput { throttle, brake: if self.input.is_held(Button::Jump) { 1.0 } else { 0.0 }, steering },
                             VehicleSurface::Asphalt,
@@ -633,10 +648,17 @@ impl ApplicationHandler for RiftboundApp {
                     match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
-                            let camera_position = if self.driving { self.vehicle_state.position } else { transform.translation };
-                            self.camera_target.x += (camera_position.x - self.camera_target.x) * camera_blend;
-                            self.camera_target.y += (camera_position.y - self.camera_target.y) * camera_blend;
-                            self.camera_target.z += (camera_position.z - self.camera_target.z) * camera_blend;
+                            let camera_position = if self.driving {
+                                self.vehicle_state.position
+                            } else {
+                                transform.translation
+                            };
+                            self.camera_target.x +=
+                                (camera_position.x - self.camera_target.x) * camera_blend;
+                            self.camera_target.y +=
+                                (camera_position.y - self.camera_target.y) * camera_blend;
+                            self.camera_target.z +=
+                                (camera_position.z - self.camera_target.z) * camera_blend;
                             renderer.follow_camera(self.camera_target);
                             let collected = self.pickups.collect_nearby(
                                 transform.translation,
@@ -1318,24 +1340,31 @@ fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
 }
 
 fn build_vehicle(scene: &mut Scene) -> (EntityId, [EntityId; 4]) {
-    let body = scene.spawn(Transform3::new(
-        Vec3::new(0.0, 0.62, -1.2),
-        Vec3::default(),
-        Vec3::new(1.75, 0.55, 3.25),
-    )).expect("vehicle body entity ID space available");
+    let body = scene
+        .spawn(Transform3::new(
+            Vec3::new(0.0, 0.62, -1.2),
+            Vec3::default(),
+            Vec3::new(1.75, 0.55, 3.25),
+        ))
+        .expect("vehicle body entity ID space available");
     scene.set_material(body, MaterialId::RIFT);
     let mut wheels = Vec::with_capacity(4);
     for (x, z) in [(-0.95, -0.95), (0.95, -0.95), (-0.95, 0.95), (0.95, 0.95)] {
-        let wheel = scene.spawn(Transform3::new(
-            Vec3::new(x, -0.30, z),
-            Vec3::new(0.0, 0.0, std::f32::consts::FRAC_PI_2),
-            Vec3::new(0.34, 0.68, 0.68),
-        )).expect("vehicle wheel entity ID space available");
+        let wheel = scene
+            .spawn(Transform3::new(
+                Vec3::new(x, -0.30, z),
+                Vec3::new(0.0, 0.0, std::f32::consts::FRAC_PI_2),
+                Vec3::new(0.34, 0.68, 0.68),
+            ))
+            .expect("vehicle wheel entity ID space available");
         scene.set_material(wheel, MaterialId::AMBER);
         assert!(scene.set_parent(wheel, Some(body)));
         wheels.push(wheel);
     }
-    (body, wheels.try_into().expect("four vehicle wheels were created"))
+    (
+        body,
+        wheels.try_into().expect("four vehicle wheels were created"),
+    )
 }
 
 fn movement_button(key: KeyCode) -> Option<Button> {
