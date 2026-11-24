@@ -267,6 +267,8 @@ mod tests {
             total: 5,
             status: "RETURN TO BEACON".into(),
             prompt: Some("F - EXTRACT".into()),
+            health: 100,
+            max_health: 100,
         };
         let vertices = build_vertices(&data, 1280, 720);
         assert_ne!(vertices.len(), 0);
