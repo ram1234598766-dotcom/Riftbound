@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId, Scene,
-    Transform3, Vec3,
+    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId, MeshId,
+    Pickup, PickupTracker, Scene, Transform3, Vec3,
 };
 use riftbound_renderer::Renderer;
 use winit::{
@@ -28,6 +28,8 @@ struct RiftboundApp {
     controller: CharacterController,
     last_frame: Option<Instant>,
     camera_target: Vec3,
+    pickups: PickupTracker,
+    pickup_entities: Vec<EntityId>,
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -62,6 +64,7 @@ impl ApplicationHandler for RiftboundApp {
                     .spawn(player_transform)
                     .expect("player entity ID space available");
                 scene.set_material(player, MaterialId::RIFT);
+                let (pickups, pickup_entities) = build_pickups(&mut scene);
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -75,6 +78,8 @@ impl ApplicationHandler for RiftboundApp {
                 self.renderer = Some(renderer);
                 self.player = Some(player);
                 self.collision = Some(arena_collision_world());
+                self.pickups = pickups;
+                self.pickup_entities = pickup_entities;
                 self.last_frame = Some(Instant::now());
             }
             Err(error) => {
@@ -89,6 +94,8 @@ impl ApplicationHandler for RiftboundApp {
         self.window = None;
         self.player = None;
         self.collision = None;
+        self.pickups = PickupTracker::new();
+        self.pickup_entities.clear();
         self.last_frame = None;
         self.camera_target = Vec3::new(0.0, 0.0, 0.0);
         self.controller = CharacterController::default();
@@ -187,6 +194,31 @@ impl ApplicationHandler for RiftboundApp {
                             self.camera_target.z +=
                                 (transform.translation.z - self.camera_target.z) * camera_blend;
                             renderer.follow_camera(self.camera_target);
+                            let collected = self.pickups.collect_nearby(
+                                transform.translation,
+                                self.input.was_pressed(Button::Interact),
+                            );
+                            if !collected.is_empty() {
+                                let mut updated_scene = renderer.scene().clone();
+                                for index in collected {
+                                    if let Some(entity) = self.pickup_entities.get(index) {
+                                        updated_scene.despawn(*entity);
+                                    }
+                                }
+                                if let Err(error) = renderer.set_scene(updated_scene) {
+                                    log::error!("Could not update collected pickups: {error}");
+                                    event_loop.exit();
+                                    return;
+                                }
+                                let progress = format!(
+                                    "RIFTBOUND — Shards: {}/{}{}",
+                                    self.pickups.collected(),
+                                    self.pickups.total(),
+                                    if self.pickups.is_complete() { " — Objective complete!" } else { "" },
+                                );
+                                window.set_title(&progress);
+                                log::info!("{progress}");
+                            }
                         }
                         Ok(false) => {
                             log::error!("The player entity could not be updated");
@@ -215,6 +247,33 @@ impl ApplicationHandler for RiftboundApp {
             window.request_redraw();
         }
     }
+}
+
+
+fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
+    let positions = [
+        Vec3::new(-5.0, 0.65, -4.0),
+        Vec3::new(5.0, 0.65, -4.0),
+        Vec3::new(-5.0, 0.65, 5.0),
+        Vec3::new(5.0, 0.65, 5.0),
+        Vec3::new(0.0, 0.65, 7.0),
+    ];
+    let mut tracker = PickupTracker::new();
+    let mut entities = Vec::with_capacity(positions.len());
+    for position in positions {
+        tracker.add(Pickup::new(position, 1.7).expect("pickup data is valid"));
+        let transform = Transform3::new(
+            position,
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.28, 0.42, 0.28),
+        );
+        let id = scene
+            .spawn_with_mesh(transform, MeshId::PYRAMID)
+            .expect("pickup entity ID space available");
+        scene.set_material(id, MaterialId::RIFT);
+        entities.push(id);
+    }
+    (tracker, entities)
 }
 
 fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialId) {
@@ -309,6 +368,7 @@ fn movement_button(key: KeyCode) -> Option<Button> {
         KeyCode::KeyA | KeyCode::ArrowLeft => Some(Button::MoveLeft),
         KeyCode::KeyD | KeyCode::ArrowRight => Some(Button::MoveRight),
         KeyCode::Space => Some(Button::Jump),
+        KeyCode::KeyF => Some(Button::Interact),
         _ => None,
     }
 }
