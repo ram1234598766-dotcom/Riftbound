@@ -176,6 +176,64 @@ impl VehicleState {
     }
 }
 
+
+/// Stores the most recent traversable vehicle state for fall recovery.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VehicleRecovery {
+    last_safe_state: VehicleState,
+}
+
+impl VehicleRecovery {
+    /// Creates recovery state from the vehicle's initial spawn.
+    #[must_use]
+    pub const fn new(initial_state: VehicleState) -> Self {
+        Self { last_safe_state: initial_state }
+    }
+
+    /// Records a state only when it is within the allowed clearance above ground.
+    pub fn record_safe_state(
+        &mut self,
+        state: VehicleState,
+        ground_height: f32,
+        max_clearance: f32,
+    ) -> bool {
+        let clearance = state.position.y - ground_height;
+        if !state.position.x.is_finite()
+            || !state.position.y.is_finite()
+            || !state.position.z.is_finite()
+            || !state.heading.is_finite()
+            || !state.speed.is_finite()
+            || !ground_height.is_finite()
+            || !max_clearance.is_finite()
+            || max_clearance < 0.0
+            || clearance < 0.0
+            || clearance > max_clearance
+        {
+            return false;
+        }
+        self.last_safe_state = state;
+        true
+    }
+
+    /// Restores the last safe location below the recovery plane or on invalid height.
+    pub fn recover_if_fallen(&self, state: &mut VehicleState, minimum_height: f32) -> bool {
+        if !minimum_height.is_finite()
+            || (state.position.y.is_finite() && state.position.y >= minimum_height)
+        {
+            return false;
+        }
+        *state = self.last_safe_state;
+        state.speed = 0.0;
+        true
+    }
+
+    /// Returns the last accepted safe state.
+    #[must_use]
+    pub const fn last_safe_state(&self) -> VehicleState {
+        self.last_safe_state
+    }
+}
+
 /// Tunable four-corner spring approximation for visual chassis response.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SuspensionConfig {
@@ -293,6 +351,51 @@ impl SuspensionState {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn vehicle_recovery_restores_last_safe_state_and_resets_speed() {
+        let initial = VehicleState {
+            position: Vec3::new(1.0, 0.6, 2.0),
+            heading: 0.4,
+            speed: 5.0,
+        };
+        let mut recovery = VehicleRecovery::new(initial);
+        let safe = VehicleState {
+            position: Vec3::new(4.0, 0.8, 6.0),
+            heading: 1.2,
+            speed: 9.0,
+        };
+        assert!(recovery.record_safe_state(safe, 0.0, 1.0));
+        let mut fallen = VehicleState {
+            position: Vec3::new(4.0, -5.0, 6.0),
+            heading: 0.0,
+            speed: 12.0,
+        };
+        assert!(recovery.recover_if_fallen(&mut fallen, -3.0));
+        assert_eq!(fallen.position, safe.position);
+        assert_eq!(fallen.heading, safe.heading);
+        assert_eq!(fallen.speed, 0.0);
+    }
+
+    #[test]
+    fn vehicle_recovery_rejects_unsafe_samples_and_preserves_valid_state() {
+        let initial = VehicleState::default();
+        let mut recovery = VehicleRecovery::new(initial);
+        let unsafe_state = VehicleState {
+            position: Vec3::new(0.0, 8.0, 0.0),
+            ..VehicleState::default()
+        };
+        assert!(!recovery.record_safe_state(unsafe_state, 0.0, 2.0));
+        let mut valid = VehicleState {
+            position: Vec3::new(0.0, 0.5, 0.0),
+            speed: 3.0,
+            ..VehicleState::default()
+        };
+        assert!(!recovery.recover_if_fallen(&mut valid, -3.0));
+        assert_eq!(valid.speed, 3.0);
+        assert_eq!(recovery.last_safe_state(), initial);
+    }
+
+
     use super::*;
 
     #[test]
