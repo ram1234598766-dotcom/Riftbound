@@ -217,22 +217,52 @@ impl ApplicationHandler for RiftboundApp {
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     let mut animated_transforms = vec![(player, transform)];
                     if let Some(parts) = self.player_parts {
-                        let movement = (horizontal_velocity.x * horizontal_velocity.x
+                        let movement = ((horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
                             .sqrt()
-                            / 4.5
+                            / 4.5)
                             .clamp(0.0, 1.0);
                         let gait = self.animation_time * 8.0;
                         let leg_swing = gait.sin() * 0.72 * movement;
                         let arm_swing = -leg_swing * 0.78;
                         let bob = gait.mul_add(2.0, 0.0).sin() * 0.045 * movement;
                         animated_transforms.extend([
-                            (parts.torso, character_part_transform(0.0, 0.48 + bob, 0.0, 0.0, 0.0, 0.0, 0.58, 0.72, 0.34)),
-                            (parts.head, character_part_transform(0.0, 1.15 + bob, 0.0, 0.0, 0.0, 0.0, 0.38, 0.38, 0.38)),
-                            (parts.left_arm, character_part_transform(-0.43, 0.48 + bob, 0.0, arm_swing, 0.0, -0.08, 0.20, 0.62, 0.22)),
-                            (parts.right_arm, character_part_transform(0.43, 0.48 + bob, 0.0, -arm_swing, 0.0, 0.08, 0.20, 0.62, 0.22)),
-                            (parts.left_leg, character_part_transform(-0.19, -0.32, 0.0, leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26)),
-                            (parts.right_leg, character_part_transform(0.19, -0.32, 0.0, -leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26)),
+                            (
+                                parts.torso,
+                                character_part_transform(
+                                    0.0, 0.48 + bob, 0.0, 0.0, 0.0, 0.0, 0.58, 0.72, 0.34,
+                                ),
+                            ),
+                            (
+                                parts.head,
+                                character_part_transform(
+                                    0.0, 1.15 + bob, 0.0, 0.0, 0.0, 0.0, 0.38, 0.38, 0.38,
+                                ),
+                            ),
+                            (
+                                parts.left_arm,
+                                character_part_transform(
+                                    -0.43, 0.48 + bob, 0.0, arm_swing, 0.0, -0.08, 0.20, 0.62, 0.22,
+                                ),
+                            ),
+                            (
+                                parts.right_arm,
+                                character_part_transform(
+                                    0.43, 0.48 + bob, 0.0, -arm_swing, 0.0, 0.08, 0.20, 0.62, 0.22,
+                                ),
+                            ),
+                            (
+                                parts.left_leg,
+                                character_part_transform(
+                                    -0.19, -0.32, 0.0, leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
+                                ),
+                            ),
+                            (
+                                parts.right_leg,
+                                character_part_transform(
+                                    0.19, -0.32, 0.0, -leg_swing, 0.0, 0.0, 0.22, 0.62, 0.26,
+                                ),
+                            ),
                         ]);
                     }
 
@@ -396,9 +426,15 @@ struct CharacterParts {
 }
 
 fn character_part_transform(
-    x: f32, y: f32, z: f32,
-    rotation_x: f32, rotation_y: f32, rotation_z: f32,
-    scale_x: f32, scale_y: f32, scale_z: f32,
+    x: f32,
+    y: f32,
+    z: f32,
+    rotation_x: f32,
+    rotation_y: f32,
+    rotation_z: f32,
+    scale_x: f32,
+    scale_y: f32,
+    scale_z: f32,
 ) -> Transform3 {
     Transform3::new(
         Vec3::new(x, y, z),
@@ -413,7 +449,9 @@ fn spawn_character_part(
     transform: Transform3,
     material: MaterialId,
 ) -> EntityId {
-    let id = scene.spawn(transform).expect("character part entity ID space available");
+    let id = scene
+        .spawn(transform)
+        .expect("character part entity ID space available");
     assert!(scene.set_parent(id, Some(player)));
     assert!(scene.set_material(id, material));
     id
@@ -426,46 +464,61 @@ fn build_player_character(scene: &mut Scene, player: EntityId) -> CharacterParts
     }
 
     let torso = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.0, 0.48, 0.0, 0.0, 0.0, 0.0, 0.58, 0.72, 0.34),
         MaterialId::RIFT,
     );
     let head = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.0, 1.15, 0.0, 0.0, 0.0, 0.0, 0.38, 0.38, 0.38),
         MaterialId::DEFAULT,
     );
     let left_arm = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(-0.43, 0.48, 0.0, 0.0, 0.0, -0.08, 0.20, 0.62, 0.22),
         MaterialId::DEFAULT,
     );
     let right_arm = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.43, 0.48, 0.0, 0.0, 0.0, 0.08, 0.20, 0.62, 0.22),
         MaterialId::DEFAULT,
     );
     let left_leg = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(-0.19, -0.32, 0.0, 0.0, 0.0, 0.0, 0.22, 0.62, 0.26),
         MaterialId::AMBER,
     );
     let right_leg = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.19, -0.32, 0.0, 0.0, 0.0, 0.0, 0.22, 0.62, 0.26),
         MaterialId::AMBER,
     );
     let _backpack = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.0, 0.48, 0.30, 0.0, 0.0, 0.0, 0.34, 0.48, 0.18),
         MaterialId::AMBER,
     );
     let _visor = spawn_character_part(
-        scene, player,
+        scene,
+        player,
         character_part_transform(0.0, 1.18, -0.17, 0.0, 0.0, 0.0, 0.27, 0.12, 0.08),
         MaterialId::RIFT,
     );
-    CharacterParts { torso, head, left_arm, right_arm, left_leg, right_leg }
+    CharacterParts {
+        torso,
+        head,
+        left_arm,
+        right_arm,
+        left_leg,
+        right_leg,
+    }
 }
 
 fn distance_squared(a: Vec3, b: Vec3) -> f32 {
