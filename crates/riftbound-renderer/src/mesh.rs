@@ -126,11 +126,7 @@ impl Mesh {
     ///
     /// Chunks are 64 world units wide. Adjacent chunks sample identical border coordinates.
     #[must_use]
-    pub fn world_terrain_chunk(
-        device: &wgpu::Device,
-        chunk_x: i32,
-        chunk_z: i32,
-    ) -> Option<Self> {
+    pub fn world_terrain_chunk(device: &wgpu::Device, chunk_x: i32, chunk_z: i32) -> Option<Self> {
         let (vertices, indices) = world_terrain_chunk_data(chunk_x, chunk_z, 9)?;
         Self::from_data(
             device,
@@ -532,22 +528,12 @@ mod tests {
         let southwest = world_terrain_chunk_data(-3, 3, 9).expect("southwest world chunk");
         let southeast = world_terrain_chunk_data(-2, 3, 9).expect("southeast world chunk");
 
-        let east_edge = |vertices: &[MeshVertex]| {
-            (0..9)
-                .map(|row| vertices[row * 9 + 8])
-                .collect::<Vec<_>>()
-        };
-        let west_edge = |vertices: &[MeshVertex]| {
-            (0..9)
-                .map(|row| vertices[row * 9])
-                .collect::<Vec<_>>()
-        };
-        let south_edge = |vertices: &[MeshVertex]| {
-            vertices[72..81].to_vec()
-        };
-        let north_edge = |vertices: &[MeshVertex]| {
-            vertices[0..9].to_vec()
-        };
+        let east_edge =
+            |vertices: &[MeshVertex]| (0..9).map(|row| vertices[row * 9 + 8]).collect::<Vec<_>>();
+        let west_edge =
+            |vertices: &[MeshVertex]| (0..9).map(|row| vertices[row * 9]).collect::<Vec<_>>();
+        let south_edge = |vertices: &[MeshVertex]| vertices[72..81].to_vec();
+        let north_edge = |vertices: &[MeshVertex]| vertices[0..9].to_vec();
 
         assert_eq!(east_edge(&northwest.0), west_edge(&northeast.0));
         assert_eq!(east_edge(&southwest.0), west_edge(&southeast.0));
