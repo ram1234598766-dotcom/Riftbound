@@ -1,11 +1,11 @@
 [workspace]
-members = ["crates/riftbound-core"]
+members = ["crates/riftbound-core", "crates/riftbound-runtime"]
 resolver = "2"
 
 [workspace.package]
 edition = "2024"
 license = "MIT"
-rust-version = "1.85"
+rust-version = "1.87"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
