@@ -52,11 +52,25 @@ pub struct Renderer {
     changed_ids: Vec<riftbound_core::EntityId>,
     affected_meshes: Vec<bool>,
     visibility_dirty: bool,
+    render_stats: RenderStats,
     scene: Scene,
     camera_offset: [f32; 3],
     camera_yaw: f32,
     camera_pitch: f32,
     camera_distance: f32,
+}
+
+/// Snapshot of the most recent visibility rebuild; counters update when the view changes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RenderStats {
+    /// Scene instances considered by the visibility pass.
+    pub submitted_instances: u32,
+    /// Instances retained for drawing after frustum testing.
+    pub visible_instances: u32,
+    /// Instances rejected by the frustum test.
+    pub culled_instances: u32,
+    /// Mesh batches containing at least one visible instance.
+    pub visible_batches: u32,
 }
 
 struct MeshBatch {
@@ -175,6 +189,7 @@ impl Renderer {
             changed_ids: Vec::with_capacity(16),
             affected_meshes,
             visibility_dirty: true,
+            render_stats: RenderStats::default(),
             scene,
             camera_offset: [0.0; 3],
             camera_yaw: 0.588,
@@ -405,6 +420,12 @@ impl Renderer {
         );
     }
 
+    /// Returns counters from the most recent camera/scene visibility rebuild.
+    #[must_use]
+    pub const fn render_stats(&self) -> RenderStats {
+        self.render_stats
+    }
+
     /// Returns the current CPU-side scene.
     #[must_use]
     pub const fn scene(&self) -> &Scene {
@@ -564,6 +585,9 @@ impl Renderer {
             let start = index * 4;
             *value = f32::from_ne_bytes(camera[start..start + 4].try_into().expect("matrix float"));
         }
+        let submitted = u32::try_from(self.scene.iter().count()).unwrap_or(u32::MAX);
+        let mut visible_instances = 0_u32;
+        let mut visible_batches = 0_u32;
         for batch in &mut self.mesh_batches {
             batch.instance_staging.clear();
             let mut count = 0_u32;
@@ -585,6 +609,10 @@ impl Renderer {
                 count = count.saturating_add(1);
             }
             batch.instance_count = count;
+            visible_instances = visible_instances.saturating_add(count);
+            if count > 0 {
+                visible_batches = visible_batches.saturating_add(1);
+            }
             if batch.instance_staging.is_empty() {
                 continue;
             }
@@ -601,6 +629,12 @@ impl Renderer {
             self.queue
                 .write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
         }
+        self.render_stats = RenderStats {
+            submitted_instances: submitted,
+            visible_instances,
+            culled_instances: submitted.saturating_sub(visible_instances),
+            visible_batches,
+        };
     }
 
     fn reconfigure(&mut self) {
