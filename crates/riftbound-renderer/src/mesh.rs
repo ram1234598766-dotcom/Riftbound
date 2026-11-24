@@ -81,6 +81,13 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-cube-mesh")
     }
 
+    /// Creates a low-poly pyramid mesh with a square base and four triangular sides.
+    #[must_use]
+    pub fn pyramid(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = pyramid_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-pyramid-mesh")
+    }
+
     /// Returns the GPU vertex buffer.
     #[must_use]
     pub const fn vertex_buffer(&self) -> &wgpu::Buffer {
@@ -106,6 +113,19 @@ fn valid_index_data(vertex_count: usize, indices: &[u16]) -> bool {
         && indices
             .iter()
             .all(|index| usize::from(*index) < vertex_count)
+}
+
+
+fn pyramid_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let vertices = vec![
+        MeshVertex { position: [-1.0, -1.0, -1.0], color: [0.08, 0.30, 0.82] },
+        MeshVertex { position: [1.0, -1.0, -1.0], color: [0.08, 0.30, 0.82] },
+        MeshVertex { position: [1.0, -1.0, 1.0], color: [0.08, 0.30, 0.82] },
+        MeshVertex { position: [-1.0, -1.0, 1.0], color: [0.08, 0.30, 0.82] },
+        MeshVertex { position: [0.0, 1.0, 0.0], color: [0.62, 0.22, 1.0] },
+    ];
+    let indices = vec![0, 2, 1, 0, 3, 2, 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4];
+    (vertices, indices)
 }
 
 fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
@@ -181,6 +201,14 @@ fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pyramid_has_valid_indexed_triangles() {
+        let (vertices, indices) = pyramid_data();
+        assert_eq!(vertices.len(), 5);
+        assert_eq!(indices.len(), 18);
+        assert!(valid_index_data(vertices.len(), &indices));
+    }
 
     #[test]
     fn cube_uses_shared_face_vertices_and_indexed_triangles() {
