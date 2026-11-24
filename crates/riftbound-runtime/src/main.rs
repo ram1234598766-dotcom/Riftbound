@@ -107,7 +107,6 @@ impl ApplicationHandler for RiftboundApp {
         if window.id() != window_id {
             return;
         }
-
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
@@ -157,7 +156,6 @@ impl ApplicationHandler for RiftboundApp {
                         + horizontal_velocity.z * horizontal_velocity.z
                         > 0.01
                     {
-                        // Local forward is -Z; yaw follows the actual resolved travel direction.
                         transform.rotation_radians.y =
                             horizontal_velocity.x.atan2(-horizontal_velocity.z);
                     }
