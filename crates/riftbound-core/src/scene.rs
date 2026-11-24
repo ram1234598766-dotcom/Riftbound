@@ -326,7 +326,11 @@ mod tests {
         assert!(scene.set_mesh(cube, MeshId::PYRAMID));
         assert!(scene.set_material(cube, MaterialId::RIFT));
         assert_eq!(
-            scene.iter().find(|object| object.id == cube).expect("cube remains live").material,
+            scene
+                .iter()
+                .find(|object| object.id == cube)
+                .expect("cube remains live")
+                .material,
             MaterialId::RIFT
         );
         assert_eq!(
