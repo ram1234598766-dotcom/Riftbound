@@ -18,18 +18,23 @@ struct RiftboundApp {
 
 impl ApplicationHandler for RiftboundApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.renderer.is_some() { return; }
+        if self.renderer.is_some() {
+            return;
+        }
 
         let window = Arc::new(
-            event_loop.create_window(
-                Window::default_attributes()
-                    .with_title("RIFTBOUND — Native Runtime")
-                    .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0)),
-            ).expect("window creation should succeed"),
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_title("RIFTBOUND — Native Runtime")
+                        .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0)),
+                )
+                .expect("window creation should succeed"),
         );
 
         match pollster::block_on(Renderer::new(
-            event_loop.owned_display_handle(), window.clone(),
+            event_loop.owned_display_handle(),
+            window.clone(),
         )) {
             Ok(renderer) => {
                 log::info!("Riftbound GPU surface initialized");
@@ -49,9 +54,18 @@ impl ApplicationHandler for RiftboundApp {
         self.window = None;
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        let Some(window) = self.window.as_ref() else { return; };
-        if window.id() != window_id { return; }
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+        if window.id() != window_id {
+            return;
+        }
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -59,10 +73,14 @@ impl ApplicationHandler for RiftboundApp {
                 if let Some(renderer) = self.renderer.as_mut() {
                     renderer.resize(size.width, size.height);
                 }
-                if size.width > 0 && size.height > 0 { window.request_redraw(); }
+                if size.width > 0 && size.height > 0 {
+                    window.request_redraw();
+                }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(renderer) = self.renderer.as_mut() { renderer.render(); }
+                if let Some(renderer) = self.renderer.as_mut() {
+                    renderer.render();
+                }
             }
             _ => {}
         }
@@ -74,5 +92,7 @@ fn main() {
     let event_loop = EventLoop::new().expect("event loop creation should succeed");
     event_loop.set_control_flow(ControlFlow::Wait);
     let mut app = RiftboundApp::default();
-    event_loop.run_app(&mut app).expect("Riftbound event loop should run");
+    event_loop
+        .run_app(&mut app)
+        .expect("Riftbound event loop should run");
 }
