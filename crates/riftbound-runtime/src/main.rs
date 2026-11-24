@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, CollisionWorld, EntityId, InputState, MaterialId, MeshId,
-    Pickup, PickupTracker, Scene, Transform3, Vec3,
+    Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
+    MaterialId, MeshId, Pickup, PickupTracker, Scene, Transform3, Vec3,
 };
 use riftbound_renderer::Renderer;
 use winit::{
@@ -30,6 +30,8 @@ struct RiftboundApp {
     camera_target: Vec3,
     pickups: PickupTracker,
     pickup_entities: Vec<EntityId>,
+    extraction: Option<ExtractionZone>,
+    mission_complete: bool,
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -65,6 +67,7 @@ impl ApplicationHandler for RiftboundApp {
                     .expect("player entity ID space available");
                 scene.set_material(player, MaterialId::RIFT);
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
+                let extraction = build_extraction_beacon(&mut scene);
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -80,6 +83,8 @@ impl ApplicationHandler for RiftboundApp {
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
                 self.pickup_entities = pickup_entities;
+                self.extraction = Some(extraction);
+                self.mission_complete = false;
                 self.last_frame = Some(Instant::now());
             }
             Err(error) => {
@@ -96,6 +101,8 @@ impl ApplicationHandler for RiftboundApp {
         self.collision = None;
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
+        self.extraction = None;
+        self.mission_complete = false;
         self.last_frame = None;
         self.camera_target = Vec3::new(0.0, 0.0, 0.0);
         self.controller = CharacterController::default();
@@ -210,18 +217,34 @@ impl ApplicationHandler for RiftboundApp {
                                     event_loop.exit();
                                     return;
                                 }
-                                let progress = format!(
-                                    "RIFTBOUND — Shards: {}/{}{}",
-                                    self.pickups.collected(),
-                                    self.pickups.total(),
-                                    if self.pickups.is_complete() {
-                                        " — Objective complete!"
-                                    } else {
-                                        ""
-                                    },
-                                );
+                                let progress = if self.pickups.is_complete() {
+                                    format!(
+                                        "RIFTBOUND — Return to extraction beacon ({}/{})",
+                                        self.pickups.collected(),
+                                        self.pickups.total(),
+                                    )
+                                } else {
+                                    format!(
+                                        "RIFTBOUND — Shards: {}/{}",
+                                        self.pickups.collected(),
+                                        self.pickups.total(),
+                                    )
+                                };
                                 window.set_title(&progress);
                                 log::info!("{progress}");
+                            }
+                            if !self.mission_complete
+                                && self.extraction.is_some_and(|zone| {
+                                    zone.can_extract(
+                                        transform.translation,
+                                        self.input.was_pressed(Button::Interact),
+                                        self.pickups.is_complete(),
+                                    )
+                                })
+                            {
+                                self.mission_complete = true;
+                                window.set_title("RIFTBOUND — Mission complete!");
+                                log::info!("Shardfall mission completed: all shards recovered and extraction reached");
                             }
                         }
                         Ok(false) => {
@@ -251,6 +274,21 @@ impl ApplicationHandler for RiftboundApp {
             window.request_redraw();
         }
     }
+}
+
+
+fn build_extraction_beacon(scene: &mut Scene) -> ExtractionZone {
+    let position = Vec3::new(0.0, 0.55, -8.0);
+    let transform = Transform3::new(
+        position,
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.62, 0.78, 0.62),
+    );
+    let id = scene
+        .spawn_with_mesh(transform, MeshId::PYRAMID)
+        .expect("extraction beacon entity ID space available");
+    scene.set_material(id, MaterialId::AMBER);
+    ExtractionZone::new(position, 1.9).expect("extraction zone data is valid")
 }
 
 fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
