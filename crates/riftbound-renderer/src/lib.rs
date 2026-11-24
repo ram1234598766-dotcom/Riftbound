@@ -824,8 +824,7 @@ fn create_mesh_batches(
     let groups = scene_instances_by_mesh(scene, mesh_count);
     let mut batches = Vec::new();
     for (mesh_index, instances) in groups.iter().enumerate() {
-        let is_lod_batch = mesh_index == CUBE_LOD_MESH_INDEX
-            || (TERRAIN_LOD_BASE_INDEX..TERRAIN_LOD_BASE_INDEX + 4).contains(&mesh_index);
+        let is_lod_batch = is_lod_batch_index(mesh_index);
         if instances.is_empty() && !is_lod_batch {
             continue;
         }
@@ -862,6 +861,11 @@ fn create_mesh_batches(
         });
     }
     Ok(batches)
+}
+
+fn is_lod_batch_index(mesh_index: usize) -> bool {
+    mesh_index == CUBE_LOD_MESH_INDEX
+        || (TERRAIN_LOD_BASE_INDEX..TERRAIN_LOD_BASE_INDEX + 4).contains(&mesh_index)
 }
 
 fn select_cube_lod(distance: f32, was_low_detail: bool) -> bool {
@@ -1169,6 +1173,17 @@ fn normalize(value: [f32; 3]) -> [f32; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_lod_mesh_has_a_batch_even_when_initially_empty() {
+        for mesh_index in CUBE_LOD_MESH_INDEX..TERRAIN_LOD_BASE_INDEX + 4 {
+            assert!(is_lod_batch_index(mesh_index));
+        }
+        assert!(!is_lod_batch_index(0));
+        assert!(!is_lod_batch_index(1));
+        assert!(!is_lod_batch_index(2));
+        assert!(!is_lod_batch_index(12));
+    }
 
     #[test]
     fn cube_lod_uses_hysteresis_at_distance_boundaries() {
