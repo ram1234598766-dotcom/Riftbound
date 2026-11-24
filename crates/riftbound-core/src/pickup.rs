@@ -106,7 +106,6 @@ impl PickupTracker {
     }
 }
 
-
 /// A world-space zone that completes a mission after its prerequisites are met.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ExtractionZone {
