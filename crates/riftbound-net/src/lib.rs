@@ -38,6 +38,20 @@ const SHARD_POSITIONS: [(f32, f32); 5] = [
 const EXTRACTION_POSITION: (f32, f32) = (1100.0, 750.0);
 const PLAYER_SPEED: f32 = 230.0;
 const MAX_INPUT_DELTA: f32 = 0.1;
+const PLAYER_RADIUS: f32 = 15.0;
+const WORLD_OBSTACLES: [(f32, f32, f32, f32); 11] = [
+    (650.0, 170.0, 42.0, 350.0),
+    (650.0, 520.0, 320.0, 42.0),
+    (1450.0, 180.0, 42.0, 340.0),
+    (1450.0, 520.0, 330.0, 42.0),
+    (250.0, 700.0, 370.0, 42.0),
+    (1580.0, 820.0, 370.0, 42.0),
+    (780.0, 980.0, 42.0, 300.0),
+    (1380.0, 980.0, 42.0, 300.0),
+    (960.0, 580.0, 280.0, 36.0),
+    (960.0, 900.0, 280.0, 36.0),
+    (1008.0, 620.0, 36.0, 280.0),
+];
 
 #[derive(Clone)]
 struct HostState {
@@ -218,14 +232,14 @@ async fn handle_client_message(
                 } else {
                     1.0
                 };
-                player.x = clamp_world_position(
-                    player.x + dx * scale * PLAYER_SPEED * elapsed,
-                    WORLD_WIDTH,
+                let (next_x, next_y) = move_player(
+                    player.x,
+                    player.y,
+                    dx * scale * PLAYER_SPEED * elapsed,
+                    dy * scale * PLAYER_SPEED * elapsed,
                 );
-                player.y = clamp_world_position(
-                    player.y + dy * scale * PLAYER_SPEED * elapsed,
-                    WORLD_HEIGHT,
-                );
+                player.x = next_x;
+                player.y = next_y;
                 player.face = face;
             }
         }
@@ -274,6 +288,33 @@ async fn publish_snapshot(state: &HostState) {
     }) {
         let _ = state.updates.send(message);
     }
+}
+
+fn move_player(x: f32, y: f32, dx: f32, dy: f32) -> (f32, f32) {
+    let mut next_x = (x + dx).clamp(50.0, WORLD_WIDTH - 50.0);
+    if WORLD_OBSTACLES
+        .iter()
+        .any(|wall| circle_intersects_rect(next_x, y, PLAYER_RADIUS, *wall))
+    {
+        next_x = x;
+    }
+    let mut next_y = (y + dy).clamp(50.0, WORLD_HEIGHT - 50.0);
+    if WORLD_OBSTACLES
+        .iter()
+        .any(|wall| circle_intersects_rect(next_x, next_y, PLAYER_RADIUS, *wall))
+    {
+        next_y = y;
+    }
+    (next_x, next_y)
+}
+
+fn circle_intersects_rect(x: f32, y: f32, radius: f32, rect: (f32, f32, f32, f32)) -> bool {
+    let (left, top, width, height) = rect;
+    let closest_x = x.clamp(left, left + width);
+    let closest_y = y.clamp(top, top + height);
+    let dx = x - closest_x;
+    let dy = y - closest_y;
+    dx * dx + dy * dy < radius * radius
 }
 
 fn discover_lan_ip() -> Option<String> {
@@ -327,6 +368,16 @@ mod tests {
             clamp_world_position(WORLD_WIDTH + step, WORLD_WIDTH),
             WORLD_WIDTH
         );
+    }
+
+    #[test]
+    fn host_collision_blocks_walls_and_allows_wall_sliding() {
+        let (blocked_x, blocked_y) = move_player(630.0, 400.0, 40.0, 0.0);
+        assert_eq!(blocked_x, 630.0);
+        assert_eq!(blocked_y, 400.0);
+        let (slide_x, slide_y) = move_player(630.0, 400.0, 40.0, 50.0);
+        assert_eq!(slide_x, 630.0);
+        assert_eq!(slide_y, 450.0);
     }
 
     #[test]
