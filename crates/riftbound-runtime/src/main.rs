@@ -155,7 +155,7 @@ impl ApplicationHandler for RiftboundApp {
                         > 0.01
                     {
                         // Local forward is -Z; yaw follows the actual resolved travel direction.
-                        transform.rotation.y = horizontal_velocity.x.atan2(-horizontal_velocity.z);
+                        transform.rotation_radians.y = horizontal_velocity.x.atan2(-horizontal_velocity.z);
                     }
                     self.controller.update_vertical(
                         &mut transform,
