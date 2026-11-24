@@ -91,3 +91,6 @@ The native sentinel pulse now checks player proximity when released and applies 
 
 
 The enemy brain now moves between two deterministic waypoints around its home position while idle. The route uses the existing fixed-size state and vector math, allocates no per-frame memory, and is bounded by a configurable patrol radius. A core unit test verifies the sentinel begins moving along the route without leaving its patrol state. The native HUD health test fixture has also been updated for the new health fields.
+
+
+Enemy encounter authoring now has three lightweight behaviour profiles: Sentinel (balanced), Skirmisher (faster pursuit and shorter attack wind-up), and Warden (slower pursuit, wider attack zone, longer recovery). Each can be combined with Easy, Standard, or Hard difficulty tuning. The native arena explicitly selects the Standard Sentinel profile, preserving the established encounter feel. Core tests cover archetype distinctions and difficulty ordering. Skirmisher and Warden are currently authoring presets for future encounters; they are not yet spawned as additional arena enemies.
