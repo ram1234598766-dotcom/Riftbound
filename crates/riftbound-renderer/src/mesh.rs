@@ -450,9 +450,9 @@ mod tests {
         for color in colors {
             assert!(color.iter().all(|component| (0.0..=1.0).contains(component)));
         }
-        for first in 0..colors.len() {
-            for second in first + 1..colors.len() {
-                assert_ne!(colors[first], colors[second]);
+        for (index, first) in colors.iter().enumerate() {
+            for second in colors.iter().skip(index + 1) {
+                assert_ne!(first, second);
             }
         }
     }
