@@ -27,6 +27,7 @@ struct RiftboundApp {
     input: InputState,
     controller: CharacterController,
     last_frame: Option<Instant>,
+    camera_target: Vec3,
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -67,6 +68,7 @@ impl ApplicationHandler for RiftboundApp {
                     return;
                 }
                 renderer.follow_camera(player_transform.translation);
+                self.camera_target = player_transform.translation;
                 log::info!("Riftbound arena, player, and collision world initialized");
                 window.request_redraw();
                 self.window = Some(window);
@@ -88,6 +90,9 @@ impl ApplicationHandler for RiftboundApp {
         self.player = None;
         self.collision = None;
         self.last_frame = None;
+        self.camera_target = Vec3::new(0.0, 0.0, 0.0);
+        self.controller = CharacterController::default();
+        self.input = InputState::default();
     }
 
     fn window_event(
@@ -144,6 +149,12 @@ impl ApplicationHandler for RiftboundApp {
                     };
                     let previous_position = transform.translation;
                     self.controller.update(&mut transform, &self.input, delta);
+                    self.controller.update_vertical(
+                        &mut transform,
+                        &self.input,
+                        delta,
+                        PLAYER_RADIUS + 0.01,
+                    );
                     let displacement = Vec3::new(
                         transform.translation.x - previous_position.x,
                         0.0,
@@ -156,7 +167,16 @@ impl ApplicationHandler for RiftboundApp {
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     match renderer.set_object_transform(player, transform) {
-                        Ok(true) => renderer.follow_camera(transform.translation),
+                        Ok(true) => {
+                            let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
+                            self.camera_target.x +=
+                                (transform.translation.x - self.camera_target.x) * camera_blend;
+                            self.camera_target.y +=
+                                (transform.translation.y - self.camera_target.y) * camera_blend;
+                            self.camera_target.z +=
+                                (transform.translation.z - self.camera_target.z) * camera_blend;
+                            renderer.follow_camera(self.camera_target);
+                        },
                         Ok(false) => {
                             log::error!("The player entity could not be updated");
                             event_loop.exit();
@@ -170,6 +190,7 @@ impl ApplicationHandler for RiftboundApp {
                     }
                     renderer.render();
                 }
+                self.input.begin_frame();
             }
             _ => {}
         }
@@ -263,6 +284,7 @@ fn movement_button(key: KeyCode) -> Option<Button> {
         KeyCode::KeyS | KeyCode::ArrowDown => Some(Button::MoveBackward),
         KeyCode::KeyA | KeyCode::ArrowLeft => Some(Button::MoveLeft),
         KeyCode::KeyD | KeyCode::ArrowRight => Some(Button::MoveRight),
+        KeyCode::Space => Some(Button::Jump),
         _ => None,
     }
 }
