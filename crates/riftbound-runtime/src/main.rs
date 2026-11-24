@@ -126,6 +126,17 @@ impl ApplicationHandler for RiftboundApp {
                     return;
                 }
                 if let PhysicalKey::Code(key) = event.physical_key {
+                    if event.state == ElementState::Pressed {
+                        if let Some(renderer) = self.renderer.as_mut() {
+                            match key {
+                                KeyCode::KeyQ => renderer.orbit_camera(-0.12, 0.0),
+                                KeyCode::KeyE => renderer.orbit_camera(0.12, 0.0),
+                                KeyCode::Minus => renderer.zoom_camera(0.6),
+                                KeyCode::Equal => renderer.zoom_camera(-0.6),
+                                _ => {}
+                            }
+                        }
+                    }
                     if let Some(button) = movement_button(key) {
                         self.input
                             .set_button(button, event.state == ElementState::Pressed);
