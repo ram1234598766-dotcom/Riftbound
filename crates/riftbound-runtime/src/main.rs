@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EnemyBrain,
     EnemyConfig, EnemyEvent, EnemyState, EntityId, ExtractionZone, InputState, MaterialId, MeshId,
-    MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker, Scene,
+    MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene,
     Transform3, Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
@@ -52,6 +52,7 @@ struct RiftboundApp {
     sentinel_brain: Option<EnemyBrain>,
     sentinel_objective: Option<ObjectiveProgress>,
     sentinel_pulse_timer: f32,
+    player_health: PlayerHealth,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -162,6 +163,7 @@ impl ApplicationHandler for RiftboundApp {
         self.sentinel_brain = None;
         self.sentinel_objective = None;
         self.sentinel_pulse_timer = 0.0;
+        self.player_health = PlayerHealth::default();
         self.animation_time = 0.0;
         self.mission = MissionProgress::new(0);
         self.last_frame = None;
@@ -218,6 +220,7 @@ impl ApplicationHandler for RiftboundApp {
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
                 self.animation_time += delta.min(0.1);
+                self.player_health.update(delta);
                 if let (Some(renderer), Some(player), Some(collision)) =
                     (self.renderer.as_mut(), self.player, self.collision.as_ref())
                 {
@@ -416,6 +419,23 @@ impl ApplicationHandler for RiftboundApp {
                             self.animated_transforms.push((sentinel, enemy_transform));
                             if event == Some(EnemyEvent::PulseReleased) {
                                 self.sentinel_pulse_timer = 0.32;
+                                let pulse_distance = distance_squared(transform.translation, enemy_position);
+                                if pulse_distance <= 2.2 * 2.2
+                                    && self.player_health.apply_damage(25, 1.0)
+                                {
+                                    log::info!("Sentinel pulse hit the player");
+                                    if !self.player_health.is_alive() {
+                                        if let Some(progress) = self.checkpoint_progress {
+                                            transform.translation = progress.respawn_position();
+                                        }
+                                        self.controller = CharacterController::default();
+                                        self.player_health.restore();
+                                        self.animated_transforms.push((player, transform));
+                                        log::info!("Player recovered at the active checkpoint");
+                                    }
+                                } else {
+                                    log::info!("Sentinel pulse missed or was blocked by damage protection");
+                                }
                                 log::info!("Sentinel released its pulse; close in during recovery");
                             }
                             self.sentinel_pulse_timer =
@@ -625,6 +645,8 @@ impl ApplicationHandler for RiftboundApp {
                                 total: self.pickups.total(),
                                 status: String::from(status),
                                 prompt,
+                                health: self.player_health.current(),
+                                max_health: self.player_health.maximum(),
                             });
                         }
                         Ok(false) => {
