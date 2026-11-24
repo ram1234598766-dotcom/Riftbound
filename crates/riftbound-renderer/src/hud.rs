@@ -37,7 +37,8 @@ impl HudVertex {
     }
 }
 
-/// Builds screen-space triangles for the current mission HUD.
+/// Builds screen-space triangles for the current mission HUD in tests.
+#[cfg(test)]
 pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex> {
     let mut out = Vec::new();
     build_vertices_into(data, width, height, &mut out);
@@ -89,7 +90,7 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
             width,
             height,
         );
-        text(out, prompt, 40.0, panel_y + 16.0, 2.0, white, width, height)
+        text(out, prompt, 40.0, panel_y + 16.0, 2.0, white, width, height);
     }
 }
 
@@ -231,7 +232,7 @@ mod tests {
             prompt: Some("F - EXTRACT".into()),
         };
         let vertices = build_vertices(&data, 1280, 720);
-        assert!(!vertices.is_empty());
+        assert_ne!(vertices.len(), 0);
         assert!(
             vertices
                 .iter()
