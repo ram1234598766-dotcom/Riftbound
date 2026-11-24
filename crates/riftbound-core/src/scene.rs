@@ -17,14 +17,14 @@ impl MeshId {
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
-    pub const const fn new(index: u32) -> Self {
+    pub const fn new(index: u32) -> Self {
         Self(index)
     }
 
     /// Returns the registry index represented by this ID.
     #[must_use]
-    pub const fn index(self) -> usize {
-        self.0 as usize
+    pub const fn index(self) -> u32 {
+        self.0
     }
 }
 
@@ -270,8 +270,8 @@ mod tests {
         let pyramid = scene
             .spawn_with_mesh(Transform3::IDENTITY, MeshId::PYRAMID)
             .expect("pyramid ID");
-        assert_eq!(scene.iter().find(|object| object.id == cube).unwrap().mesh, MeshId::CUBE);
-        assert_eq!(scene.iter().find(|object| object.id == pyramid).unwrap().mesh, MeshId::PYRAMID);
+        assert_eq!(scene.iter().find(|object| object.id == cube).expect("cube remains live").mesh, MeshId::CUBE);
+        assert_eq!(scene.iter().find(|object| object.id == pyramid).expect("pyramid remains live").mesh, MeshId::PYRAMID);
         assert!(scene.set_mesh(cube, MeshId::PYRAMID));
         assert_eq!(scene.iter().find(|object| object.id == cube).unwrap().mesh, MeshId::PYRAMID);
         assert!(scene.despawn(cube));
