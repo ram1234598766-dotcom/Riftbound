@@ -210,3 +210,8 @@ The deterministic core collision world now supports a rectangular vehicle footpr
 ### Heading-aware vehicle footprint
 
 The vehicle collision API now uses an oriented-rectangle separating-axis test against axis-aligned obstacle footprints, with heading-aware bounds checks, bounded substeps, and binary refinement. The runtime supplies the current heading. This avoids false collisions at the corners of a conservative axis-aligned envelope while retaining deterministic, allocation-free movement. Wheel/contact response, dynamic obstacles, and streamed open-world collision chunks remain planned.
+
+
+### Terrain surface handling foundation
+
+The shared terrain module now exposes a deterministic surface query for the starter region. The initial layout has a paved north-south road spine plus gravel, mud, sand, snow, and rock zones. The native vehicle simulation samples this query at its current position, so grip, speed cap, and rolling resistance change with the terrain instead of always using asphalt. This is a gameplay/data foundation only: the current arena renderer still does not paint these regions as matching material zones, and the small arena is not yet an explorable open world. The renderer should consume the same surface query when terrain material blending and streamed region data are introduced.
