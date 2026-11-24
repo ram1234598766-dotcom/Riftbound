@@ -4,9 +4,13 @@
 //! networking integrations belong in separate crates.
 
 mod clock;
+mod entity;
 mod input;
 mod math;
+mod transform;
 
 pub use clock::{FixedClock, TickBatch};
+pub use entity::{EntityArena, EntityId};
 pub use input::{Button, InputState};
 pub use math::{Vec2, Vec3};
+pub use transform::Transform3;
