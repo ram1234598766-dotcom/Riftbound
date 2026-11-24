@@ -8,7 +8,8 @@ use wgpu::util::DeviceExt;
 mod hud;
 mod mesh;
 
-use hud::{HudData, HudVertex};
+pub use hud::HudData;
+use hud::HudVertex;
 use mesh::{Mesh, MeshVertex};
 
 const HUD_SHADER: &str = r#"
