@@ -314,7 +314,6 @@ impl InstanceRaw {
     }
 }
 
-
 fn starter_scene() -> Scene {
     let mut scene = Scene::new();
     let objects = [
@@ -335,7 +334,9 @@ fn starter_scene() -> Scene {
         ),
     ];
     for transform in objects {
-        let _ = scene.spawn(transform);
+        scene
+            .spawn(transform)
+            .expect("starter scene entity ID space available");
     }
     scene
 }
