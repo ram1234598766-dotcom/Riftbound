@@ -1,32 +1,48 @@
-# Riftbound Engine
+# Riftbound
 
-A custom Rust game-engine project for Riftbound. The engine is built from project-owned systems; low-level crates provide platform and GPU access rather than an existing game engine.
+A custom Rust engine project with a playable browser mission while the engine is developed.
 
-## Status
+## Play the current build
 
-Early foundation. The current milestone is a tested engine core and a minimal window/render loop. This is not yet a playable open-world game.
+Open [index.html](./index.html) from the repository in a modern browser, or serve the repository root with any static file server. The game has no external runtime dependencies.
 
-## Planned milestones
+**Mission: The Shardfall**
+- Recover all five rift shards.
+- Avoid or phase-dash through sentinel enemies.
+- Return to the extraction beacon after collecting every shard.
+- Keyboard: WASD / arrow keys to move, Space to phase-dash.
+- Touch: on-screen directional pad and Phase button.
+- Press R after a result screen to restart.
 
-1. Core types, fixed-step timing, input state, and deterministic tests.
-2. Window and GPU initialization with a minimal renderer.
-3. Scene representation, camera, and basic geometry.
-4. Character controller, collision, and traversal test course.
-5. Asset pipeline, audio, vehicles, and multiplayer after the single-player foundation is stable.
+The browser mission is an early playable vertical slice, not the final open-world game.
 
-## Quality bar
+## Rust engine
 
-- Keep modules small and APIs explicit.
-- Prefer tests for deterministic systems.
-- Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test` in CI.
-- Avoid placeholder features and unverified claims.
+The custom engine foundation lives in `crates/riftbound-core`. It currently contains deterministic fixed-step timing, logical input state, and vector primitives. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
 
-## Development
+## Development checks
 
-Install a current stable Rust toolchain. Then run:
+Install a current stable Rust toolchain, then run:
 
 ```sh
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+GitHub Actions runs these checks on pushes and pull requests.
+
+## Roadmap
+
+1. Verify the Rust core in CI and add integration tests.
+2. Add window creation and GPU presentation through low-level platform crates.
+3. Build a project-owned renderer, scene graph, camera, and asset pipeline.
+4. Port the player controller and the Shardfall mission into the Rust runtime.
+5. Expand into traversal, vehicles, larger environments, audio, save data, and multiplayer only after the single-player foundation is stable.
+
+## Quality principles
+
+- No fake feature claims: unfinished systems are marked as unfinished.
+- Small modules, explicit APIs, deterministic tests where practical.
+- Third-party crates are infrastructure dependencies, not a substitute game engine.
+- Keep assets licensed, documented, and reproducible.
