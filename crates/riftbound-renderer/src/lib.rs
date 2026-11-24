@@ -330,7 +330,10 @@ fn scene_instances_by_mesh(scene: &Scene, mesh_count: usize) -> Vec<Vec<Instance
         let world = scene
             .world_matrix(object.id)
             .expect("iterated scene objects must have valid hierarchy");
-        group.push(InstanceRaw::from_matrix(world, material_tint(object.material)));
+        group.push(InstanceRaw::from_matrix(
+            world,
+            material_tint(object.material),
+        ));
     }
     groups
 }
