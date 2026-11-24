@@ -25,7 +25,7 @@ pub use character::{
 pub use checkpoint::{Checkpoint, CheckpointProgress};
 pub use clock::{FixedClock, TickBatch};
 pub use collision::{Aabb2, CollisionResult, CollisionWorld};
-pub use enemy::{EnemyBrain, EnemyConfig, EnemyEvent, EnemyState};
+pub use enemy::{EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState};
 pub use entity::{EntityArena, EntityId};
 pub use health::PlayerHealth;
 pub use input::{Button, InputState};
