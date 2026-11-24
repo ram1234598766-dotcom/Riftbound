@@ -528,17 +528,57 @@ mod tests {
         let southwest = world_terrain_chunk_data(-3, 3, 9).expect("southwest world chunk");
         let southeast = world_terrain_chunk_data(-2, 3, 9).expect("southeast world chunk");
 
-        let east_edge =
-            |vertices: &[MeshVertex]| (0..9).map(|row| vertices[row * 9 + 8]).collect::<Vec<_>>();
-        let west_edge =
-            |vertices: &[MeshVertex]| (0..9).map(|row| vertices[row * 9]).collect::<Vec<_>>();
-        let south_edge = |vertices: &[MeshVertex]| vertices[72..81].to_vec();
-        let north_edge = |vertices: &[MeshVertex]| vertices[0..9].to_vec();
+        let world_vertex = |vertex: MeshVertex, center_x: f32, center_z: f32| {
+            (
+                [
+                    vertex.position[0] + center_x,
+                    vertex.position[1],
+                    vertex.position[2] + center_z,
+                ],
+                vertex.color,
+            )
+        };
+        let east_edge = |vertices: &[MeshVertex], center_x: f32, center_z: f32| {
+            (0..9)
+                .map(|row| world_vertex(vertices[row * 9 + 8], center_x, center_z))
+                .collect::<Vec<_>>()
+        };
+        let west_edge = |vertices: &[MeshVertex], center_x: f32, center_z: f32| {
+            (0..9)
+                .map(|row| world_vertex(vertices[row * 9], center_x, center_z))
+                .collect::<Vec<_>>()
+        };
+        let south_edge = |vertices: &[MeshVertex], center_x: f32, center_z: f32| {
+            vertices[72..81]
+                .iter()
+                .copied()
+                .map(|vertex| world_vertex(vertex, center_x, center_z))
+                .collect::<Vec<_>>()
+        };
+        let north_edge = |vertices: &[MeshVertex], center_x: f32, center_z: f32| {
+            vertices[0..9]
+                .iter()
+                .copied()
+                .map(|vertex| world_vertex(vertex, center_x, center_z))
+                .collect::<Vec<_>>()
+        };
 
-        assert_eq!(east_edge(&northwest.0), west_edge(&northeast.0));
-        assert_eq!(east_edge(&southwest.0), west_edge(&southeast.0));
-        assert_eq!(south_edge(&northwest.0), north_edge(&southwest.0));
-        assert_eq!(south_edge(&northeast.0), north_edge(&southeast.0));
+        assert_eq!(
+            east_edge(&northwest.0, -192.0, 128.0),
+            west_edge(&northeast.0, -128.0, 128.0)
+        );
+        assert_eq!(
+            east_edge(&southwest.0, -192.0, 192.0),
+            west_edge(&southeast.0, -128.0, 192.0)
+        );
+        assert_eq!(
+            south_edge(&northwest.0, -192.0, 128.0),
+            north_edge(&southwest.0, -192.0, 192.0)
+        );
+        assert_eq!(
+            south_edge(&northeast.0, -128.0, 128.0),
+            north_edge(&southeast.0, -128.0, 192.0)
+        );
     }
 
     #[test]
