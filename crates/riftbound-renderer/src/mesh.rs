@@ -616,7 +616,11 @@ mod tests {
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
             assert!(vertices.iter().all(|vertex| {
-                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+                vertex
+                    .position
+                    .iter()
+                    .chain(vertex.color.iter())
+                    .all(|value| value.is_finite())
             }));
         }
         let base_vertex_count = 25;
