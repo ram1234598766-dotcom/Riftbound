@@ -38,10 +38,12 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 
 ### 3. Gameplay depth
 - [ ] Improve movement responsiveness, camera follow smoothing, and collision edge cases.
-- [x] Add an allocation-free deterministic enemy brain with patrol, chase, telegraph, recovery, and return states; validate inputs and expose transition events.\n- [ ] Connect enemy brains to native scene entities, encounter feedback, and defeat objectives.
+- [x] Add an allocation-free deterministic enemy brain with patrol, chase, telegraph, recovery, and return states; validate inputs and expose transition events.
+- [ ] Connect enemy brains to native scene entities, encounter feedback, and defeat objectives.
 - [x] Add an explicit deterministic mission phase machine for shard recovery, extraction unlock, and one-time mission completion; drive native HUD prompts and mission status from its phase.
 - [x] Add validated checkpoint activation, remember the latest active safe position, and recover the native player there after falling out of the arena.
-- [x] Add a deterministic secondary-objective model for collect, interact, visit, and defeat goals, with saturation and completion tests.\n- [ ] Wire secondary objectives into native runtime encounters and HUD feedback.
+- [x] Add a deterministic secondary-objective model for collect, interact, visit, and defeat goals, with saturation and completion tests.
+- [ ] Wire secondary objectives into native runtime encounters and HUD feedback.
 - [ ] Add progression and rewards with deterministic save data.
 - [ ] Add gameplay tests for movement, combat state transitions, and objective progression.
 
@@ -72,4 +74,9 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 ## Current implementation note
 
 The native renderer now retains instance buffers and only rebuilds visibility lists when scene transforms or camera/projection state changes. LOD state is keyed by generational entity IDs for constant-time lookups, all five compact-mesh batches are created even when empty at startup, and visibility rebuilds distribute objects into reusable batch staging buffers in a single scene traversal. Frustum testing uses conservative world-space bounding spheres for the built-in meshes. The arena floor is split into four independently culled quadrants; each chunk samples the shared world-space terrain function and deterministic global colour pattern so adjacent edges match. Cube LOD currently has one compact tier. Terrain chunks now have detailed 9×9 and simplified 5×5 grids; all four chunks switch together with hysteresis so adjacent edges use matching samples. The native world shader now adds low-cost cool fill, warm key accents, a view-dependent cyan rim, and deep-blue distance haze without adding textures or extra render passes. The native Shardfall mission now uses a deterministic core state machine so recovery, extraction unlock, and completion are explicit, tested phases rather than a runtime boolean. The native runtime also has a validated checkpoint zone; interacting activates its safe respawn position, and falling below the arena restores the player and resets movement velocity. Checkpoint progress is currently session-only and is not yet written to disk. These are initial scalability foundations, not substitutes for profiling or future mesh-specific bounds.
-\n\nThe core objective model now supports collect, interact, visit, and defeat counters with bounded progress, completion transitions, and zero-target handling. Runtime encounter wiring remains a separate gameplay task; the model is not yet presented as active in the arena.\n\n\nThe core now contains a lightweight enemy state machine with bounded pursuit, a telegraphed close-range pulse, recovery, and return-to-home behavior. It performs no per-update allocation and emits transition events for runtime presentation. This is a tested gameplay model, not yet a live enemy spawned in the native arena.\n
+
+
+The core objective model now supports collect, interact, visit, and defeat counters with bounded progress, completion transitions, and zero-target handling. Runtime encounter wiring remains a separate gameplay task; the model is not yet presented as active in the arena.
+
+
+The core now contains a lightweight enemy state machine with bounded pursuit, a telegraphed close-range pulse, recovery, and return-to-home behavior. It performs no per-update allocation and emits transition events for runtime presentation. This is a tested gameplay model, not yet a live enemy spawned in the native arena.
