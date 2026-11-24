@@ -95,6 +95,13 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-crystal-mesh")
     }
 
+    /// Creates a subdivided, flat terrain surface with deterministic ground colour variation.
+    #[must_use]
+    pub fn terrain(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = terrain_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-terrain-mesh")
+    }
+
     /// Returns the GPU vertex buffer.
     #[must_use]
     pub const fn vertex_buffer(&self) -> &wgpu::Buffer {
@@ -179,6 +186,36 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let indices = vec![
         0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2, 1, 3, 2, 1, 4, 3, 1, 5, 4, 1, 2, 5,
     ];
+    (vertices, indices)
+}
+
+fn terrain_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    const SIDE: usize = 17;
+    let mut vertices = Vec::with_capacity(SIDE * SIDE);
+    let mut indices = Vec::with_capacity((SIDE - 1) * (SIDE - 1) * 6);
+    for z in 0..SIDE {
+        for x in 0..SIDE {
+            let u = x as f32 / (SIDE - 1) as f32;
+            let v = z as f32 / (SIDE - 1) as f32;
+            let variation = ((x * 13 + z * 7) % 5) as f32 * 0.012;
+            vertices.push(MeshVertex {
+                position: [u * 2.0 - 1.0, 0.0, v * 2.0 - 1.0],
+                color: [0.055 + variation, 0.13 + variation, 0.22 + variation * 1.5],
+            });
+        }
+    }
+    for z in 0..(SIDE - 1) {
+        for x in 0..(SIDE - 1) {
+            let top_left = (z * SIDE + x) as u16;
+            let top_right = top_left + 1;
+            let bottom_left = top_left + SIDE as u16;
+            let bottom_right = bottom_left + 1;
+            indices.extend_from_slice(&[
+                top_left, bottom_left, top_right,
+                top_right, bottom_left, bottom_right,
+            ]);
+        }
+    }
     (vertices, indices)
 }
 
@@ -275,6 +312,18 @@ mod tests {
                 .iter()
                 .all(|vertex| vertex.position.iter().all(|v| v.is_finite()))
         );
+    }
+
+    #[test]
+    fn terrain_is_a_subdivided_valid_grid_with_colour_variation() {
+        let (vertices, indices) = terrain_data();
+        assert_eq!(vertices.len(), 17 * 17);
+        assert_eq!(indices.len(), 16 * 16 * 6);
+        assert!(valid_index_data(vertices.len(), &indices));
+        assert!(vertices.iter().all(|vertex| {
+            vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+        }));
+        assert!(vertices.iter().any(|vertex| vertex.color != vertices[0].color));
     }
 
     #[test]
