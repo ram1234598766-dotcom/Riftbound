@@ -76,21 +76,35 @@ impl EnemyBrain {
     /// Creates an enemy at its home position.
     #[must_use]
     pub const fn new(home: Vec3, config: EnemyConfig) -> Self {
-        Self {\n            home,\n            state: EnemyState::Patrol,\n            timer: 0.0,\n            config,\n        }
+        Self {
+            home,
+            state: EnemyState::Patrol,
+            timer: 0.0,
+            config,
+        }
     }
 
     /// Current state.
     #[must_use]
-    pub const fn state(self) -> EnemyState {\n        self.state\n    }
+    pub const fn state(self) -> EnemyState {
+        self.state
+    }
 
     /// Home position used to bound pursuit.
     #[must_use]
-    pub const fn home(self) -> Vec3 {\n        self.home\n    }
+    pub const fn home(self) -> Vec3 {
+        self.home
+    }
 
     /// Advances the state machine and returns at most one transition event.
     ///
     /// Invalid positions, configuration values, and time steps leave state unchanged.
-    pub fn update(\n        &mut self,\n        position: &mut Vec3,\n        player: Vec3,\n        delta_seconds: f32,\n    ) -> Option<EnemyEvent> {
+    pub fn update(
+        &mut self,
+        position: &mut Vec3,
+        player: Vec3,
+        delta_seconds: f32,
+    ) -> Option<EnemyEvent> {
         let c = self.config;
         if !valid_position(*position) || !valid_position(player) || !valid_position(self.home)
             || !delta_seconds.is_finite() || delta_seconds <= 0.0
@@ -208,7 +222,10 @@ mod tests {
         let mut brain = brain();
         let mut position = Vec3::new(0.0, 0.0, 0.0);
         let player = Vec3::new(5.0, 0.0, 0.0);
-        assert_eq!(\n            brain.update(&mut position, player, 1.0 / 60.0),\n            Some(EnemyEvent::PlayerDetected)\n        );
+        assert_eq!(
+            brain.update(&mut position, player, 1.0 / 60.0),
+            Some(EnemyEvent::PlayerDetected)
+        );
         assert_eq!(brain.state(), EnemyState::Chase);
         brain.update(&mut position, player, 0.1);
         assert!(position.x > 0.0 && position.x < player.x);
@@ -220,7 +237,10 @@ mod tests {
         let mut position = Vec3::new(0.0, 0.0, 0.0);
         let near = Vec3::new(1.0, 0.0, 0.0);
         brain.update(&mut position, near, 0.01);
-        assert_eq!(\n            brain.update(&mut position, near, 0.01),\n            Some(EnemyEvent::AttackTelegraphed)\n        );
+        assert_eq!(
+            brain.update(&mut position, near, 0.01),
+            Some(EnemyEvent::AttackTelegraphed)
+        );
         brain.update(&mut position, Vec3::new(5.0, 0.0, 0.0), 0.05);
         assert_eq!(brain.state(), EnemyState::Chase);
     }
@@ -244,7 +264,10 @@ mod tests {
     fn invalid_delta_does_not_change_state_or_position() {
         let mut brain = brain();
         let mut position = Vec3::new(0.0, 0.0, 0.0);
-        assert_eq!(\n            brain.update(&mut position, Vec3::new(2.0, 0.0, 0.0), f32::NAN),\n            None\n        );
+        assert_eq!(
+            brain.update(&mut position, Vec3::new(2.0, 0.0, 0.0), f32::NAN),
+            None
+        );
         assert_eq!(brain.state(), EnemyState::Patrol);
         assert_eq!(position, Vec3::new(0.0, 0.0, 0.0));
     }
