@@ -190,6 +190,7 @@ impl Renderer {
         }
         self.config.width = width;
         self.config.height = height;
+        self.visibility_dirty = true;
         self.surface.configure(&self.device, &self.config);
         let (depth_texture, depth_view) = create_depth_target(&self.device, width, height);
         self.depth_texture = depth_texture;
@@ -385,6 +386,7 @@ impl Renderer {
             return;
         }
         self.camera_distance = (self.camera_distance + distance_delta).clamp(3.0, 12.0);
+        self.visibility_dirty = true;
         self.write_camera();
     }
 
