@@ -31,6 +31,8 @@ struct RiftboundApp {
     pickups: PickupTracker,
     pickup_entities: Vec<EntityId>,
     extraction: Option<ExtractionZone>,
+    beacon_entity: Option<EntityId>,
+    animation_time: f32,
     mission_complete: bool,
 }
 
@@ -67,7 +69,7 @@ impl ApplicationHandler for RiftboundApp {
                     .expect("player entity ID space available");
                 scene.set_material(player, MaterialId::RIFT);
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
-                let extraction = build_extraction_beacon(&mut scene);
+                let (beacon_entity, extraction) = build_extraction_beacon(&mut scene);
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -84,6 +86,8 @@ impl ApplicationHandler for RiftboundApp {
                 self.pickups = pickups;
                 self.pickup_entities = pickup_entities;
                 self.extraction = Some(extraction);
+                self.beacon_entity = Some(beacon_entity);
+                self.animation_time = 0.0;
                 self.mission_complete = false;
                 self.last_frame = Some(Instant::now());
             }
@@ -102,6 +106,8 @@ impl ApplicationHandler for RiftboundApp {
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
         self.extraction = None;
+        self.beacon_entity = None;
+        self.animation_time = 0.0;
         self.mission_complete = false;
         self.last_frame = None;
         self.camera_target = Vec3::new(0.0, 0.0, 0.0);
@@ -156,6 +162,7 @@ impl ApplicationHandler for RiftboundApp {
                     .last_frame
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
+                self.animation_time += delta.min(0.1);
                 if let (Some(renderer), Some(player), Some(collision)) =
                     (self.renderer.as_mut(), self.player, self.collision.as_ref())
                 {
@@ -191,7 +198,40 @@ impl ApplicationHandler for RiftboundApp {
                     transform.translation.z = resolved.position.z;
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
-                    match renderer.set_object_transform(player, transform) {
+                    let mut animated_transforms = vec![(player, transform)];
+                    const PICKUP_POSITIONS: [Vec3; 5] = [
+                        Vec3::new(-5.0, 0.65, -4.0),
+                        Vec3::new(5.0, 0.65, -4.0),
+                        Vec3::new(-5.0, 0.65, 5.0),
+                        Vec3::new(5.0, 0.65, 5.0),
+                        Vec3::new(0.0, 0.65, 7.0),
+                    ];
+                    const PICKUP_PHASES: [f32; 5] = [0.0, 1.2, 2.4, 3.6, 4.8];
+                    for (index, entity) in self.pickup_entities.iter().enumerate() {
+                        if renderer.scene().get(*entity).is_none() {
+                            continue;
+                        }
+                        let base = PICKUP_POSITIONS[index];
+                        let phase = self.animation_time * 2.4 + PICKUP_PHASES[index];
+                        let animated = Transform3::new(
+                            Vec3::new(base.x, base.y + phase.sin() * 0.14, base.z),
+                            Vec3::new(0.0, self.animation_time * 1.35 + PICKUP_PHASES[index], 0.0),
+                            Vec3::new(0.28, 0.42, 0.28),
+                        );
+                        animated_transforms.push((*entity, animated));
+                    }
+                    if let Some(beacon) = self.beacon_entity {
+                        let pulse = 1.0 + (self.animation_time * 2.0).sin() * 0.06;
+                        animated_transforms.push((
+                            beacon,
+                            Transform3::new(
+                                Vec3::new(0.0, 0.55, -8.0),
+                                Vec3::new(0.0, self.animation_time * 0.45, 0.0),
+                                Vec3::new(0.62 * pulse, 0.78 * pulse, 0.62 * pulse),
+                            ),
+                        ));
+                    }
+                    match renderer.set_object_transforms(&animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
                             self.camera_target.x +=
@@ -278,7 +318,7 @@ impl ApplicationHandler for RiftboundApp {
     }
 }
 
-fn build_extraction_beacon(scene: &mut Scene) -> ExtractionZone {
+fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
     let position = Vec3::new(0.0, 0.55, -8.0);
     let transform = Transform3::new(
         position,
@@ -289,7 +329,10 @@ fn build_extraction_beacon(scene: &mut Scene) -> ExtractionZone {
         .spawn_with_mesh(transform, MeshId::PYRAMID)
         .expect("extraction beacon entity ID space available");
     scene.set_material(id, MaterialId::AMBER);
-    ExtractionZone::new(position, 1.9).expect("extraction zone data is valid")
+    (
+        id,
+        ExtractionZone::new(position, 1.9).expect("extraction zone data is valid"),
+    )
 }
 
 fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
