@@ -237,8 +237,7 @@ async fn handle_client_message(
             let Some(player) = players.get(&id) else {
                 return false;
             };
-            if index >= SHARD_POSITIONS.len() || !within_pickup_range(player.x, player.y, index)
-            {
+            if index >= SHARD_POSITIONS.len() || !within_pickup_range(player.x, player.y, index) {
                 return false;
             }
             drop(players);
