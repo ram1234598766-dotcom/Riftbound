@@ -97,8 +97,8 @@ impl WorldChunkStreamer {
     /// Creates a streamer with a bounded, pre-reserved active list.
     #[must_use]
     pub fn new(config: WorldChunkConfig) -> Self {
-        let config = WorldChunkConfig::new(config.detailed_radius, config.active_radius)
-            .unwrap_or_default();
+        let config =
+            WorldChunkConfig::new(config.detailed_radius, config.active_radius).unwrap_or_default();
         let mut active = Vec::with_capacity(config.max_active_chunks());
         active.clear();
         Self {
@@ -252,6 +252,16 @@ mod tests {
         let before = chunks.to_vec();
         assert!(!streamer.update_focus(f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE, 0.0));
         assert_eq!(streamer.active_chunks(), before);
+    }
+
+    #[test]
+    fn streamer_sanitizes_directly_constructed_invalid_configuration() {
+        let mut streamer = WorldChunkStreamer::new(WorldChunkConfig {
+            detailed_radius: 4,
+            active_radius: 99,
+        });
+        assert!(streamer.update_focus(0.0, 0.0));
+        assert_eq!(streamer.active_chunks().len(), 25);
     }
 
     #[test]
