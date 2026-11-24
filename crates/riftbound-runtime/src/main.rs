@@ -504,6 +504,7 @@ fn movement_button(key: KeyCode) -> Option<Button> {
         KeyCode::KeyA | KeyCode::ArrowLeft => Some(Button::MoveLeft),
         KeyCode::KeyD | KeyCode::ArrowRight => Some(Button::MoveRight),
         KeyCode::Space => Some(Button::Jump),
+        KeyCode::ShiftLeft | KeyCode::ShiftRight => Some(Button::Sprint),
         KeyCode::KeyF => Some(Button::Interact),
         _ => None,
     }
