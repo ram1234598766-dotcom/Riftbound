@@ -39,7 +39,9 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 ### 3. Gameplay depth
 - [ ] Improve movement responsiveness, camera follow smoothing, and collision edge cases.
 - [x] Add an allocation-free deterministic enemy brain with patrol, chase, telegraph, recovery, and return states; validate inputs and expose transition events.
-- [ ] Connect enemy brains to native scene entities, encounter feedback, and defeat objectives.
+- [x] Spawn a native arena sentinel and connect its deterministic brain to the scene transform update loop.
+- [x] Add a pulsing telegraph indicator and short-lived pulse visual; allow the player to disable the sentinel during its recovery window.
+- [x] Advance the secondary defeat objective when the sentinel is disabled and surface encounter prompts/status in the native HUD.
 - [x] Add an explicit deterministic mission phase machine for shard recovery, extraction unlock, and one-time mission completion; drive native HUD prompts and mission status from its phase.
 - [x] Add validated checkpoint activation, remember the latest active safe position, and recover the native player there after falling out of the arena.
 - [x] Add a deterministic secondary-objective model for collect, interact, visit, and defeat goals, with saturation and completion tests.
@@ -79,4 +81,4 @@ The native renderer now retains instance buffers and only rebuilds visibility li
 The core objective model now supports collect, interact, visit, and defeat counters with bounded progress, completion transitions, and zero-target handling. Runtime encounter wiring remains a separate gameplay task; the model is not yet presented as active in the arena.
 
 
-The core now contains a lightweight enemy state machine with bounded pursuit, a telegraphed close-range pulse, recovery, and return-to-home behavior. It performs no per-update allocation and emits transition events for runtime presentation. This is a tested gameplay model, not yet a live enemy spawned in the native arena.
+The core now contains a lightweight enemy state machine with bounded pursuit, a telegraphed close-range pulse, recovery, and return-to-home behavior. The native arena spawns one amber sentinel and updates its brain alongside the scene transform. A low-cost pulsing ground indicator marks the telegraph and briefly expands on pulse release; the player can disable the sentinel during its recovery window, advancing the secondary defeat objective. Pulse visuals are feedback only at this milestone; they do not yet apply player damage or use a health/combat system. The encounter currently exists in the native runtime, not the separate browser multiplayer prototype.
