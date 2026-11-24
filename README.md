@@ -18,7 +18,11 @@ The browser mission is an early playable vertical slice, not the final open-worl
 
 ## Rust engine
 
-The custom engine foundation lives in `crates/riftbound-core`. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, and 3D transforms. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype. See [the engine architecture](./docs/ENGINE_ARCHITECTURE.md) for the module boundaries and delivery sequence.
+The custom engine foundation lives in crates/riftbound-core. It currently contains deterministic fixed-step timing, logical input state, vector primitives, generational entity identifiers, and 3D transforms.
+
+The native application shell lives in crates/riftbound-runtime; GPU surface setup and frame presentation are isolated in crates/riftbound-renderer. The native runtime currently opens a window and clears/presents a GPU frame. It is a renderer bootstrap, not yet a 3D game renderer. The game is not yet running on this Rust engine; the browser mission is a separate playable prototype.
+
+See [the engine architecture](./docs/ENGINE_ARCHITECTURE.md) for module boundaries and the delivery sequence.
 
 ## Development checks
 
@@ -35,8 +39,8 @@ GitHub Actions runs these checks on pushes and pull requests.
 ## Roadmap
 
 1. Complete core simulation contracts and integration tests.
-2. Add the native window shell and GPU presentation using low-level platform APIs.
-3. Build the project-owned renderer, scene graph, camera, and asset pipeline.
+2. Expand the native shell with platform input and lifecycle handling.
+3. Build the project-owned renderer: depth buffer, indexed meshes, camera, materials, and shader management.
 4. Port the player controller and Shardfall mission into the Rust runtime.
 5. Expand traversal, vehicles, larger environments, audio, save data, and multiplayer after the single-player foundation is stable.
 
