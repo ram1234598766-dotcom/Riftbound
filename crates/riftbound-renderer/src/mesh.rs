@@ -257,7 +257,7 @@ fn terrain_chunk_data(
     chunk_z: u8,
     side: usize,
 ) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
-    if side < 2 || side > 9 || (8 % (side - 1)) != 0 {
+    if !(2..=9).contains(&side) || (8 % (side - 1)) != 0 {
         return None;
     }
     let cells_per_chunk = side - 1;
