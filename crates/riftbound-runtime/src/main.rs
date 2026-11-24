@@ -9,7 +9,7 @@ use riftbound_core::{
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
-    VehicleSurface, terrain_height,
+    VehicleSurface, terrain_height, terrain_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -373,7 +373,10 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            VehicleSurface::Asphalt,
+                            terrain_surface(
+                                self.vehicle_state.position.x,
+                                self.vehicle_state.position.z,
+                            ),
                             VehicleConfig::default(),
                             delta,
                         );
