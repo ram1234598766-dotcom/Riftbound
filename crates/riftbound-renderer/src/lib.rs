@@ -248,17 +248,49 @@ impl Renderer {
         {
             return Ok(false);
         }
+        let changed_ids: Vec<_> = transforms.iter().map(|(id, _)| *id).collect();
         for (id, transform) in transforms {
             if let Some(current) = self.scene.get_mut(*id) {
                 *current = *transform;
             }
         }
-        self.update_mesh_batch_buffers()?;
+
+        // Only upload mesh batches whose objects (or parent hierarchies) changed.
+        let mut affected_meshes = vec![false; self.meshes.len()];
+        for object in self.scene.iter() {
+            let mut ancestor = Some(object.id);
+            let mut affected = false;
+            while let Some(id) = ancestor {
+                if changed_ids.contains(&id) {
+                    affected = true;
+                    break;
+                }
+                ancestor = self
+                    .scene
+                    .iter()
+                    .find(|candidate| candidate.id == id)
+                    .and_then(|candidate| candidate.parent);
+            }
+            if affected {
+                if let Ok(mesh_index) = usize::try_from(object.mesh.index()) {
+                    if let Some(flag) = affected_meshes.get_mut(mesh_index) {
+                        *flag = true;
+                    }
+                }
+            }
+        }
+        self.update_mesh_batch_buffers(&affected_meshes)?;
         Ok(true)
     }
 
-    fn update_mesh_batch_buffers(&mut self) -> Result<(), std::num::TryFromIntError> {
+    fn update_mesh_batch_buffers(
+        &mut self,
+        affected_meshes: &[bool],
+    ) -> Result<(), std::num::TryFromIntError> {
         for batch in &mut self.mesh_batches {
+            if !affected_meshes.get(batch.mesh_index).copied().unwrap_or(false) {
+                continue;
+            }
             batch.instance_staging.clear();
             let mut instance_count = 0_usize;
             for object in self.scene.iter() {
