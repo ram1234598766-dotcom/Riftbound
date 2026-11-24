@@ -189,9 +189,26 @@ impl CharacterController {
         }
     }
 
-    /// Advances movement by a bounded time step and updates the transform.
+    /// Advances movement relative to world north (the legacy, fixed-axis control mode).
     pub fn update(&mut self, transform: &mut Transform3, input: &InputState, delta_seconds: f32) {
-        if !delta_seconds.is_finite() || delta_seconds <= 0.0 {
+        self.update_camera_relative(transform, input, delta_seconds, 0.0);
+    }
+
+    /// Advances movement relative to the horizontal direction the camera faces.
+    ///
+    /// A yaw of zero preserves the legacy mapping: forward moves along negative Z.
+    /// Non-finite yaw values are ignored without changing controller or transform state.
+    pub fn update_camera_relative(
+        &mut self,
+        transform: &mut Transform3,
+        input: &InputState,
+        delta_seconds: f32,
+        camera_yaw: f32,
+    ) {
+        if !delta_seconds.is_finite()
+            || delta_seconds <= 0.0
+            || !camera_yaw.is_finite()
+        {
             return;
         }
         let delta = delta_seconds.min(0.1);
@@ -204,9 +221,13 @@ impl CharacterController {
             z *= inverse_magnitude;
         }
 
+        let sin_yaw = camera_yaw.sin();
+        let cos_yaw = camera_yaw.cos();
+        let world_x = x * cos_yaw + z * sin_yaw;
+        let world_z = -x * sin_yaw + z * cos_yaw;
         let has_input = magnitude_squared > f32::EPSILON;
-        let target_x = x * self.config.max_speed;
-        let target_z = z * self.config.max_speed;
+        let target_x = world_x * self.config.max_speed;
+        let target_z = world_z * self.config.max_speed;
         let rate = if has_input {
             self.config.acceleration
         } else {
@@ -262,6 +283,51 @@ mod tests {
             controller.update_vertical(&mut transform, &input, 1.0 / 60.0, 0.2);
         }
         assert_eq!(controller.movement_state(), CharacterMovementState::Falling);
+    }
+
+    #[test]
+    fn camera_relative_forward_tracks_camera_yaw() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        for _ in 0..30 {
+            controller.update_camera_relative(
+                &mut transform,
+                &input,
+                1.0 / 60.0,
+                std::f32::consts::FRAC_PI_2,
+            );
+        }
+        assert!(controller.velocity().x < -4.49);
+        assert!(controller.velocity().z.abs() < 0.001);
+        assert!(transform.translation.x < 0.0);
+        assert!(transform.translation.z.abs() < 0.001);
+    }
+
+    #[test]
+    fn camera_relative_diagonal_input_remains_normalized() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        input.set_button(Button::MoveRight, true);
+        for _ in 0..120 {
+            controller.update_camera_relative(&mut transform, &input, 1.0 / 60.0, 0.73);
+        }
+        let velocity = controller.velocity();
+        let speed = (velocity.x * velocity.x + velocity.z * velocity.z).sqrt();
+        assert!((speed - 4.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn non_finite_camera_yaw_does_not_change_movement() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let input = InputState::default();
+        controller.update_camera_relative(&mut transform, &input, 1.0 / 60.0, f32::NAN);
+        assert_eq!(transform, Transform3::IDENTITY);
+        assert_eq!(controller.velocity(), Vec3::new(0.0, 0.0, 0.0));
     }
 
     #[test]
