@@ -50,7 +50,9 @@ impl ApplicationHandler for RiftboundApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.lan_server_started {
             self.lan_server_started = true;
-            riftbound_net::spawn();
+            if let Err(error) = riftbound_net::spawn() {
+                log::error!("Could not start LAN server thread: {error}");
+            }
         }
         if self.renderer.is_some() {
             return;
