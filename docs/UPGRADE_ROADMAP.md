@@ -22,7 +22,8 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [x] Camera-frustum culling for native scene instances, recalculated only after camera, scene, viewport, or transform changes.
 - [x] Add renderer counters for submitted, visible, and culled instances.
 - [ ] Profile frame time and memory on representative low-, mid-, and high-tier hardware.
-- [ ] Add a low-memory browser quality preset with explicit limits for DPR, effects, and particle counts.
+- [x] Add an automatic low-memory browser preset using memory/CPU/save-data hints, a 1.0 DPR cap, reduced decorative draw density, and lighter HUD surfaces.
+- [ ] Profile browser frame time and memory on representative low-, mid-, and high-tier devices.
 
 ### 2. Renderer and world quality
 - [x] Add an initial camera-distance cube LOD tier with hysteresis to prevent visual popping.
