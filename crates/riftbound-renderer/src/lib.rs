@@ -42,6 +42,8 @@ pub struct Renderer {
     hud_pipeline: wgpu::RenderPipeline,
     hud_buffer: wgpu::Buffer,
     hud_buffer_capacity: u64,
+    hud_vertices: Vec<HudVertex>,
+    hud_bytes: Vec<u8>,
     hud_data: HudData,
     meshes: Vec<Mesh>,
     mesh_batches: Vec<MeshBatch>,
@@ -121,7 +123,7 @@ impl Renderer {
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
         let hud_pipeline = create_hud_pipeline(&device, config.format);
         // Reuse a bounded dynamic buffer instead of allocating a GPU buffer every frame.
-        const HUD_BUFFER_CAPACITY: u64 = 64 * 1024;
+        const HUD_BUFFER_CAPACITY: u64 = 512 * 1024;
         let hud_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("riftbound-hud-vertices"),
             size: HUD_BUFFER_CAPACITY,
@@ -153,6 +155,8 @@ impl Renderer {
             hud_pipeline,
             hud_buffer,
             hud_buffer_capacity: HUD_BUFFER_CAPACITY,
+            hud_vertices: Vec::with_capacity(4_096),
+            hud_bytes: Vec::with_capacity(4_096 * 24),
             hud_data: HudData {
                 collected: 0,
                 total: 5,
@@ -401,21 +405,25 @@ impl Renderer {
                 pass.draw_indexed(0..mesh.index_count(), 0, 0..batch.instance_count);
             }
         }
-        let hud_vertices =
-            hud::build_vertices(&self.hud_data, self.config.width, self.config.height);
-        if !hud_vertices.is_empty() {
-            let mut bytes = Vec::with_capacity(hud_vertices.len() * 24);
-            for vertex in &hud_vertices {
+        hud::build_vertices_into(
+            &self.hud_data,
+            self.config.width,
+            self.config.height,
+            &mut self.hud_vertices,
+        );
+        if !self.hud_vertices.is_empty() {
+            self.hud_bytes.clear();
+            for vertex in &self.hud_vertices {
                 for value in vertex.position.iter().chain(vertex.color.iter()) {
-                    bytes.extend_from_slice(&value.to_ne_bytes());
+                    self.hud_bytes.extend_from_slice(&value.to_ne_bytes());
                 }
             }
-            if bytes.len() as u64 > self.hud_buffer_capacity {
+            if self.hud_bytes.len() as u64 > self.hud_buffer_capacity {
                 log::warn!(
                     "HUD vertex data exceeds the reusable buffer capacity; skipping HUD draw"
                 );
             } else {
-                self.queue.write_buffer(&self.hud_buffer, 0, &bytes);
+                self.queue.write_buffer(&self.hud_buffer, 0, &self.hud_bytes);
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("riftbound-hud-pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -434,7 +442,7 @@ impl Renderer {
                 });
                 pass.set_pipeline(&self.hud_pipeline);
                 pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
-                pass.draw(0..u32::try_from(hud_vertices.len()).unwrap_or(0), 0..1);
+                pass.draw(0..u32::try_from(self.hud_vertices.len()).unwrap_or(0), 0..1);
             }
         }
         self.queue.submit([encoder.finish()]);
