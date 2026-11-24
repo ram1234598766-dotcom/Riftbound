@@ -55,19 +55,47 @@ pub fn build_vertices(data: &HudData, width: u32, height: u32) -> Vec<HudVertex>
         (data.collected as f32 / data.total as f32).clamp(0.0, 1.0)
     };
     rect(
-        &mut out, 38.0, 86.0, 270.0 * ratio, 9.0, cyan, width, height,
+        &mut out,
+        38.0,
+        86.0,
+        270.0 * ratio,
+        9.0,
+        cyan,
+        width,
+        height,
     );
     text(
-        &mut out, &data.status, 38.0, 108.0, 1.5, white, width, height,
+        &mut out,
+        &data.status,
+        38.0,
+        108.0,
+        1.5,
+        white,
+        width,
+        height,
     );
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
         rect(&mut out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
         rect(
-            &mut out, 22.0, panel_y, 3.0, 48.0, [1.0, 0.62, 0.28, 1.0], width, height,
+            &mut out,
+            22.0,
+            panel_y,
+            3.0,
+            48.0,
+            [1.0, 0.62, 0.28, 1.0],
+            width,
+            height,
         );
         text(
-            &mut out, prompt, 40.0, panel_y + 16.0, 2.0, white, width, height,
+            &mut out,
+            prompt,
+            40.0,
+            panel_y + 16.0,
+            2.0,
+            white,
+            width,
+            height,
         );
     }
     out
@@ -96,7 +124,16 @@ fn rect(
     }
 }
 
-fn text(out: &mut Vec<HudVertex>, value: &str, x: f32, y: f32, scale: f32, color: [f32; 4], sw: f32, sh: f32) {
+fn text(
+    out: &mut Vec<HudVertex>,
+    value: &str,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: [f32; 4],
+    sw: f32,
+    sh: f32,
+) {
     let mut cursor = x;
     for ch in value.chars().take(36) {
         let glyph = bitmap(ch);
