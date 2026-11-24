@@ -316,8 +316,10 @@ mod tests {
 
     #[test]
     fn archetypes_have_distinct_movement_and_attack_profiles() {
-        let sentinel = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
-        let skirmisher = EnemyConfig::for_profile(EnemyArchetype::Skirmisher, EnemyDifficulty::Standard);
+        let sentinel =
+            EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
+        let skirmisher =
+            EnemyConfig::for_profile(EnemyArchetype::Skirmisher, EnemyDifficulty::Standard);
         let warden = EnemyConfig::for_profile(EnemyArchetype::Warden, EnemyDifficulty::Standard);
         assert!(skirmisher.chase_speed > sentinel.chase_speed);
         assert!(skirmisher.telegraph_seconds < sentinel.telegraph_seconds);
@@ -329,7 +331,8 @@ mod tests {
     #[test]
     fn difficulty_presets_adjust_threat_without_invalid_values() {
         let easy = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Easy);
-        let standard = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
+        let standard =
+            EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Standard);
         let hard = EnemyConfig::for_profile(EnemyArchetype::Sentinel, EnemyDifficulty::Hard);
         assert!(easy.chase_speed < standard.chase_speed);
         assert!(easy.telegraph_seconds > standard.telegraph_seconds);
