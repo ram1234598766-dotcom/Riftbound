@@ -12,19 +12,27 @@ pub struct Vec2 {
 impl Vec2 {
     /// Creates a vector.
     #[must_use]
-    pub const fn new(x: f32, y: f32) -> Self { Self { x, y } }
+    pub const fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
 
     /// Returns the squared magnitude.
     #[must_use]
-    pub fn length_squared(self) -> f32 { self.x * self.x + self.y * self.y }
+    pub fn length_squared(self) -> f32 {
+        self.x * self.x + self.y * self.y
+    }
 
     /// Adds another vector.
     #[must_use]
-    pub const fn add(self, rhs: Self) -> Self { Self::new(self.x + rhs.x, self.y + rhs.y) }
+    pub const fn add(self, rhs: Self) -> Self {
+        Self::new(self.x + rhs.x, self.y + rhs.y)
+    }
 
     /// Scales the vector.
     #[must_use]
-    pub const fn scale(self, scalar: f32) -> Self { Self::new(self.x * scalar, self.y * scalar) }
+    pub const fn scale(self, scalar: f32) -> Self {
+        Self::new(self.x * scalar, self.y * scalar)
+    }
 }
 
 /// A three-dimensional vector.
@@ -41,7 +49,9 @@ pub struct Vec3 {
 impl Vec3 {
     /// Creates a vector.
     #[must_use]
-    pub const fn new(x: f32, y: f32, z: f32) -> Self { Self { x, y, z } }
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
 
     /// Adds another vector.
     #[must_use]
@@ -62,7 +72,10 @@ mod tests {
 
     #[test]
     fn vector_operations_are_component_wise() {
-        assert_eq!(Vec3::new(1.0, 2.0, 3.0).add(Vec3::new(4.0, 5.0, 6.0)), Vec3::new(5.0, 7.0, 9.0));
+        assert_eq!(
+            Vec3::new(1.0, 2.0, 3.0).add(Vec3::new(4.0, 5.0, 6.0)),
+            Vec3::new(5.0, 7.0, 9.0)
+        );
         assert_eq!(Vec2::new(3.0, 4.0).length_squared(), 25.0);
     }
 }
