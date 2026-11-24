@@ -260,18 +260,98 @@ impl CollisionWorld {
         half_width: f32,
         half_length: f32,
     ) -> VehicleCollisionResult {
-        if !heading.is_finite() {
+        if !heading.is_finite()
+            || !half_width.is_finite()
+            || !half_length.is_finite()
+            || half_width < 0.0
+            || half_length < 0.0
+            || !start.x.is_finite()
+            || !start.z.is_finite()
+            || !displacement.x.is_finite()
+            || !displacement.z.is_finite()
+        {
             return VehicleCollisionResult {
                 position: start,
                 blocked_x: false,
                 blocked_z: false,
             };
         }
-        let sin = heading.sin().abs();
-        let cos = heading.cos().abs();
-        let world_half_width = half_width * cos + half_length * sin;
-        let world_half_length = half_width * sin + half_length * cos;
-        self.move_vehicle(start, displacement, world_half_width, world_half_length)
+
+        let mut result = VehicleCollisionResult {
+            position: start,
+            blocked_x: false,
+            blocked_z: false,
+        };
+        let mut remaining_x = displacement.x.clamp(-100.0, 100.0);
+        let mut remaining_z = displacement.z.clamp(-100.0, 100.0);
+        while remaining_x.abs() > f32::EPSILON || remaining_z.abs() > f32::EPSILON {
+            let step_x = remaining_x.clamp(-0.1, 0.1);
+            let next_x = result.position.x + step_x;
+            if self.is_oriented_vehicle_walkable(
+                next_x,
+                result.position.z,
+                heading,
+                half_width,
+                half_length,
+            ) {
+                result.position.x = next_x;
+                remaining_x -= step_x;
+            } else {
+                let mut low = 0.0;
+                let mut high = 1.0;
+                for _ in 0..8 {
+                    let middle = f32::midpoint(low, high);
+                    if self.is_oriented_vehicle_walkable(
+                        result.position.x + step_x * middle,
+                        result.position.z,
+                        heading,
+                        half_width,
+                        half_length,
+                    ) {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                result.position.x += step_x * low;
+                result.blocked_x = true;
+                remaining_x = 0.0;
+            }
+
+            let step_z = remaining_z.clamp(-0.1, 0.1);
+            let next_z = result.position.z + step_z;
+            if self.is_oriented_vehicle_walkable(
+                result.position.x,
+                next_z,
+                heading,
+                half_width,
+                half_length,
+            ) {
+                result.position.z = next_z;
+                remaining_z -= step_z;
+            } else {
+                let mut low = 0.0;
+                let mut high = 1.0;
+                for _ in 0..8 {
+                    let middle = f32::midpoint(low, high);
+                    if self.is_oriented_vehicle_walkable(
+                        result.position.x,
+                        result.position.z + step_z * middle,
+                        heading,
+                        half_width,
+                        half_length,
+                    ) {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                result.position.z += step_z * low;
+                result.blocked_z = true;
+                remaining_z = 0.0;
+            }
+        }
+        result
     }
 
     fn is_vehicle_walkable(&self, x: f32, z: f32, half_width: f32, half_length: f32) -> bool {
@@ -287,6 +367,47 @@ impl CollisionWorld {
                 && x < obstacle.max_x + half_width
                 && z > obstacle.min_z - half_length
                 && z < obstacle.max_z + half_length
+        })
+    }
+
+
+    fn is_oriented_vehicle_walkable(
+        &self,
+        x: f32,
+        z: f32,
+        heading: f32,
+        half_width: f32,
+        half_length: f32,
+    ) -> bool {
+        let sin = heading.sin();
+        let cos = heading.cos();
+        let right = (cos, sin);
+        let forward = (sin, -cos);
+        let extent_x = half_width * right.0.abs() + half_length * forward.0.abs();
+        let extent_z = half_width * right.1.abs() + half_length * forward.1.abs();
+        if x - extent_x < self.bounds.min_x
+            || x + extent_x > self.bounds.max_x
+            || z - extent_z < self.bounds.min_z
+            || z + extent_z > self.bounds.max_z
+        {
+            return false;
+        }
+
+        !self.obstacles.iter().any(|obstacle| {
+            let center_x = f32::midpoint(obstacle.min_x, obstacle.max_x) - x;
+            let center_z = f32::midpoint(obstacle.min_z, obstacle.max_z) - z;
+            let obstacle_half_x = (obstacle.max_x - obstacle.min_x) * 0.5;
+            let obstacle_half_z = (obstacle.max_z - obstacle.min_z) * 0.5;
+            let overlaps_axis = |axis_x: f32, axis_z: f32, vehicle_radius: f32| {
+                let distance = (center_x * axis_x + center_z * axis_z).abs();
+                let obstacle_radius = obstacle_half_x * axis_x.abs()
+                    + obstacle_half_z * axis_z.abs();
+                distance < vehicle_radius + obstacle_radius
+            };
+            !overlaps_axis(1.0, 0.0, extent_x)
+                || !overlaps_axis(0.0, 1.0, extent_z)
+                || !overlaps_axis(right.0, right.1, half_width)
+                || !overlaps_axis(forward.0, forward.1, half_length)
         })
     }
 
@@ -372,24 +493,33 @@ mod tests {
     }
 
     #[test]
-    fn oriented_vehicle_expands_footprint_when_heading_is_diagonal() {
-        let world = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
-        let straight = world.move_vehicle_oriented(
-            Vec3::new(3.0, 0.0, 0.0),
-            Vec3::new(3.0, 0.0, 0.0),
-            0.0,
-            0.5,
-            1.5,
-        );
-        let diagonal = world.move_vehicle_oriented(
-            Vec3::new(3.0, 0.0, 0.0),
-            Vec3::new(3.0, 0.0, 0.0),
+    fn oriented_vehicle_clears_obstacle_outside_rotated_corners() {
+        let mut world = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
+        world.add_obstacle(Aabb2::new(1.2, 1.4, 1.2, 1.4));
+        let result = world.move_vehicle_oriented(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.1, 0.0, 0.0),
             std::f32::consts::FRAC_PI_4,
             0.5,
             1.5,
         );
-        assert!(straight.position.x > diagonal.position.x);
-        assert!(diagonal.blocked_x);
+        assert!(!result.blocked_x);
+        assert!((result.position.x - 0.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn oriented_vehicle_still_blocks_obstacle_on_its_long_axis() {
+        let mut world = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
+        world.add_obstacle(Aabb2::new(0.8, 1.2, -0.2, 0.2));
+        let result = world.move_vehicle_oriented(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            0.0,
+            0.5,
+            1.5,
+        );
+        assert!(result.blocked_x);
+        assert!(result.position.x < 0.8);
     }
 
     #[test]
