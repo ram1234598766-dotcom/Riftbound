@@ -211,6 +211,8 @@ impl Renderer {
                 total: 5,
                 status: String::from("COLLECT RIFT SHARDS"),
                 prompt: None,
+                health: 100,
+                max_health: 100,
             },
             meshes,
             mesh_batches,
