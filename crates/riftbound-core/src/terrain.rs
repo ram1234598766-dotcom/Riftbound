@@ -8,7 +8,13 @@
 pub fn terrain_height(world_x: f32, world_z: f32) -> f32 {
     let u = f32::midpoint(world_x / 10.0, 1.0);
     let v = f32::midpoint(world_z / 10.0, 1.0);
-    if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
+    if !(0.0..=1.0).contains(&u)
+        || !(0.0..=1.0).contains(&v)
+        || u <= 0.0
+        || u >= 1.0
+        || v <= 0.0
+        || v >= 1.0
+    {
         return 0.0;
     }
     let edge_fade = (std::f32::consts::PI * u).sin() * (std::f32::consts::PI * v).sin();
