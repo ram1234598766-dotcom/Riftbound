@@ -51,6 +51,7 @@ pub struct Renderer {
     mesh_batches: Vec<MeshBatch>,
     changed_ids: Vec<riftbound_core::EntityId>,
     affected_meshes: Vec<bool>,
+    visibility_dirty: bool,
     scene: Scene,
     camera_offset: [f32; 3],
     camera_yaw: f32,
@@ -173,6 +174,7 @@ impl Renderer {
             mesh_batches,
             changed_ids: Vec::with_capacity(16),
             affected_meshes,
+            visibility_dirty: true,
             scene,
             camera_offset: [0.0; 3],
             camera_yaw: 0.588,
@@ -209,6 +211,7 @@ impl Renderer {
     /// Moves the camera target and eye to follow a world-space position.
     pub fn follow_camera(&mut self, position: Vec3) {
         self.camera_offset = [position.x, position.y, position.z];
+        self.visibility_dirty = true;
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -287,6 +290,7 @@ impl Renderer {
             }
         }
         self.update_mesh_batch_buffers()?;
+        self.visibility_dirty = true;
         Ok(true)
     }
 
@@ -343,6 +347,7 @@ impl Renderer {
     pub fn pan_camera(&mut self, delta_x: f32, delta_z: f32) {
         self.camera_offset[0] += delta_x;
         self.camera_offset[2] += delta_z;
+        self.visibility_dirty = true;
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -364,6 +369,7 @@ impl Renderer {
         }
         self.camera_yaw = (self.camera_yaw + yaw_delta).rem_euclid(std::f32::consts::TAU);
         self.camera_pitch = (self.camera_pitch + pitch_delta).clamp(0.12, 1.15);
+        self.visibility_dirty = true;
         self.write_camera();
     }
 
@@ -423,6 +429,10 @@ impl Renderer {
     /// Draws the world followed by a depth-independent 2D HUD overlay.
     #[allow(clippy::too_many_lines)]
     pub fn render(&mut self) {
+        if self.visibility_dirty {
+            self.update_visible_instance_buffers();
+            self.visibility_dirty = false;
+        }
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
@@ -533,6 +543,58 @@ impl Renderer {
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
+    }
+
+    /// Rebuilds visible instance lists only when the camera or scene changes.
+    /// CPU staging vectors and GPU buffers are retained between updates.
+    fn update_visible_instance_buffers(&mut self) {
+        let camera = camera_bytes(
+            self.config.width,
+            self.config.height,
+            self.camera_offset,
+            self.camera_yaw,
+            self.camera_pitch,
+            self.camera_distance,
+        );
+        let mut view_projection = [0.0_f32; 16];
+        for (index, value) in view_projection.iter_mut().enumerate() {
+            let start = index * 4;
+            *value = f32::from_ne_bytes(camera[start..start + 4].try_into().expect("matrix float"));
+        }
+        for batch in &mut self.mesh_batches {
+            batch.instance_staging.clear();
+            let mut count = 0_u32;
+            for object in self.scene.iter() {
+                if usize::try_from(object.mesh.index()).ok() != Some(batch.mesh_index) {
+                    continue;
+                }
+                let world = self.scene.world_matrix(object.id)
+                    .expect("iterated scene objects must have valid hierarchy");
+                if !sphere_in_frustum(&view_projection, world) {
+                    continue;
+                }
+                append_instance_bytes(
+                    &mut batch.instance_staging,
+                    &InstanceRaw::from_matrix(world, material_tint(object.material)),
+                );
+                count = count.saturating_add(1);
+            }
+            batch.instance_count = count;
+            if batch.instance_staging.is_empty() {
+                continue;
+            }
+            let required = u64::try_from(batch.instance_staging.len()).unwrap_or(u64::MAX);
+            if required > batch.instance_capacity {
+                batch.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("riftbound-visible-instance-batch"),
+                    size: required,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                batch.instance_capacity = required;
+            }
+            self.queue.write_buffer(&batch.instance_buffer, 0, &batch.instance_staging);
+        }
     }
 
     fn reconfigure(&mut self) {
@@ -870,6 +932,38 @@ fn camera_bytes(
     bytes
 }
 
+/// Conservative world-space bounding sphere test against the WebGPU clip volume.
+/// The built-in meshes fit within a unit cube, so sqrt(3) covers their corners.
+fn sphere_in_frustum(matrix: &[f32; 16], model: [f32; 16]) -> bool {
+    let center = [model[12], model[13], model[14]];
+    let scale = [
+        (model[0] * model[0] + model[1] * model[1] + model[2] * model[2]).sqrt(),
+        (model[4] * model[4] + model[5] * model[5] + model[6] * model[6]).sqrt(),
+        (model[8] * model[8] + model[9] * model[9] + model[10] * model[10]).sqrt(),
+    ];
+    let radius = scale.into_iter().fold(0.0_f32, f32::max) * 1.733;
+    let row = |index: usize| [matrix[index], matrix[4 + index], matrix[8 + index], matrix[12 + index]];
+    let r0 = row(0);
+    let r1 = row(1);
+    let r2 = row(2);
+    let r3 = row(3);
+    let planes = [
+        [r3[0] + r0[0], r3[1] + r0[1], r3[2] + r0[2], r3[3] + r0[3]],
+        [r3[0] - r0[0], r3[1] - r0[1], r3[2] - r0[2], r3[3] - r0[3]],
+        [r3[0] + r1[0], r3[1] + r1[1], r3[2] + r1[2], r3[3] + r1[3]],
+        [r3[0] - r1[0], r3[1] - r1[1], r3[2] - r1[2], r3[3] - r1[3]],
+        r2,
+        [r3[0] - r2[0], r3[1] - r2[1], r3[2] - r2[2], r3[3] - r2[3]],
+    ];
+    planes.iter().all(|plane| {
+        let distance = plane[0] * center[0] + plane[1] * center[1]
+            + plane[2] * center[2] + plane[3];
+        let normal_length = (plane[0] * plane[0] + plane[1] * plane[1]
+            + plane[2] * plane[2]).sqrt();
+        distance >= -radius * normal_length
+    })
+}
+
 fn multiply(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
     let mut result = [0.0; 16];
     for (column, b_column) in b.chunks_exact(4).enumerate() {
@@ -934,6 +1028,21 @@ mod tests {
         assert_eq!(instance_bytes(&groups[0]).len(), groups[0].len() * 80);
         assert_eq!(groups[1][0].tint, material_tint(MaterialId::RIFT));
         assert_eq!(material_tint(MaterialId::AMBER), [1.0, 0.62, 0.28, 1.0]);
+    }
+
+    #[test]
+    fn frustum_keeps_visible_objects_and_rejects_distant_objects() {
+        let bytes = camera_bytes(1280, 720, [0.0; 3], 0.588, 0.40, 6.2);
+        let mut matrix = [0.0_f32; 16];
+        for (index, value) in matrix.iter_mut().enumerate() {
+            *value = f32::from_ne_bytes(bytes[index * 4..index * 4 + 4].try_into().unwrap());
+        }
+        let visible = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let mut distant = visible;
+        distant[12] = 10_000.0;
+        assert!(sphere_in_frustum(&matrix, visible));
+        assert!(!sphere_in_frustum(&matrix, distant));
     }
 
     #[test]
