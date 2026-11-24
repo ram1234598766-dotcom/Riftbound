@@ -420,6 +420,7 @@ impl Renderer {
         let mesh_batches = create_mesh_batches(&self.device, &scene, self.meshes.len())?;
         self.mesh_batches = mesh_batches;
         self.scene = scene;
+        self.visibility_dirty = true;
         Ok(())
     }
 
