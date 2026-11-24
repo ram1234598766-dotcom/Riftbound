@@ -5,7 +5,8 @@ use std::time::{Duration, Instant};
 
 use riftbound_core::{
     Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
-    MaterialId, MeshId, MissionPhase, MissionProgress, Pickup, PickupTracker, Scene, Transform3, Vec3, terrain_height,
+    MaterialId, MeshId, MissionPhase, MissionProgress, Pickup, PickupTracker, Scene, Transform3,
+    Vec3, terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -381,14 +382,19 @@ impl ApplicationHandler for RiftboundApp {
                                 window.set_title(&progress);
                                 log::info!("{progress}");
                                 if unlocked {
-                                    log::info!("All rift shards recovered; extraction is now unlocked");
+                                    log::info!(
+                                        "All rift shards recovered; extraction is now unlocked"
+                                    );
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
                             });
-                            if self.mission.try_extract(interact_pressed, inside_extraction) {
+                            if self
+                                .mission
+                                .try_extract(interact_pressed, inside_extraction)
+                            {
                                 window.set_title("RIFTBOUND — Mission complete!");
                                 log::info!(
                                     "Shardfall mission completed: all shards recovered and extraction reached"
