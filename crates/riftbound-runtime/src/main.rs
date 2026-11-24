@@ -383,9 +383,10 @@ impl ApplicationHandler for RiftboundApp {
                                 0.0,
                                 self.vehicle_state.position.z - vehicle_previous_position.z,
                             );
-                            let resolved = collision.move_vehicle(
+                            let resolved = collision.move_vehicle_oriented(
                                 vehicle_previous_position,
                                 movement,
+                                self.vehicle_state.heading,
                                 0.82,
                                 1.38,
                             );
