@@ -5,7 +5,8 @@ use std::sync::Arc;
 use riftbound_renderer::Renderer;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowId},
 };
@@ -74,6 +75,21 @@ impl ApplicationHandler for RiftboundApp {
                     renderer.resize(size.width, size.height);
                 }
                 if size.width > 0 && size.height > 0 {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. }
+                if event.state == ElementState::Pressed =>
+            {
+                let delta = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::ArrowLeft) => Some((-0.25, 0.0)),
+                    PhysicalKey::Code(KeyCode::ArrowRight) => Some((0.25, 0.0)),
+                    PhysicalKey::Code(KeyCode::ArrowUp) => Some((0.0, -0.25)),
+                    PhysicalKey::Code(KeyCode::ArrowDown) => Some((0.0, 0.25)),
+                    _ => None,
+                };
+                if let (Some((dx, dz)), Some(renderer)) = (delta, self.renderer.as_mut()) {
+                    renderer.pan_camera(dx, dz);
                     window.request_redraw();
                 }
             }
