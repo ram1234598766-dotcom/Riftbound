@@ -25,7 +25,8 @@ Riftbound should feel responsive, cohesive, and polished while keeping memory us
 - [ ] Add a low-memory browser quality preset with explicit limits for DPR, effects, and particle counts.
 
 ### 2. Renderer and world quality
-- [ ] Add camera-distance LOD tiers with hysteresis to prevent visual popping.
+- [x] Add an initial camera-distance cube LOD tier with hysteresis to prevent visual popping.
+- [ ] Extend LOD tiers to environment props and additional mesh types.
 - [ ] Add frustum-aware terrain chunking so large worlds do not require one monolithic terrain mesh.
 - [ ] Add a compact lighting model and tone-controlled environment palette.
 - [ ] Add bounded ambient effects with quality-scalable density.
