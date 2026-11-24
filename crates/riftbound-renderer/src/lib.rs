@@ -49,6 +49,8 @@ pub struct Renderer {
     hud_data: HudData,
     meshes: Vec<Mesh>,
     mesh_batches: Vec<MeshBatch>,
+    changed_ids: Vec<riftbound_core::EntityId>,
+    affected_meshes: Vec<bool>,
     scene: Scene,
     camera_offset: [f32; 3],
     camera_yaw: f32,
@@ -141,6 +143,7 @@ impl Renderer {
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
+        let affected_meshes = vec![false; meshes.len()];
 
         let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
@@ -168,6 +171,8 @@ impl Renderer {
             },
             meshes,
             mesh_batches,
+            changed_ids: Vec::with_capacity(16),
+            affected_meshes,
             scene,
             camera_offset: [0.0; 3],
             camera_yaw: 0.588,
@@ -248,7 +253,8 @@ impl Renderer {
         {
             return Ok(false);
         }
-        let changed_ids: Vec<_> = transforms.iter().map(|(id, _)| *id).collect();
+        self.changed_ids.clear();
+        self.changed_ids.extend(transforms.iter().map(|(id, _)| *id));
         for (id, transform) in transforms {
             if let Some(current) = self.scene.get_mut(*id) {
                 *current = *transform;
@@ -256,12 +262,12 @@ impl Renderer {
         }
 
         // Only upload mesh batches whose objects (or parent hierarchies) changed.
-        let mut affected_meshes = vec![false; self.meshes.len()];
+        self.affected_meshes.fill(false);
         for object in self.scene.iter() {
             let mut ancestor = Some(object.id);
             let mut affected = false;
             while let Some(id) = ancestor {
-                if changed_ids.contains(&id) {
+                if self.changed_ids.contains(&id) {
                     affected = true;
                     break;
                 }
@@ -273,22 +279,20 @@ impl Renderer {
             }
             if affected {
                 if let Ok(mesh_index) = usize::try_from(object.mesh.index()) {
-                    if let Some(flag) = affected_meshes.get_mut(mesh_index) {
+                    if let Some(flag) = self.affected_meshes.get_mut(mesh_index) {
                         *flag = true;
                     }
                 }
             }
         }
-        self.update_mesh_batch_buffers(&affected_meshes)?;
+        self.update_mesh_batch_buffers()?;
         Ok(true)
     }
 
-    fn update_mesh_batch_buffers(
-        &mut self,
-        affected_meshes: &[bool],
-    ) -> Result<(), std::num::TryFromIntError> {
+    fn update_mesh_batch_buffers(&mut self) -> Result<(), std::num::TryFromIntError> {
         for batch in &mut self.mesh_batches {
-            if !affected_meshes
+            if !self
+                .affected_meshes
                 .get(batch.mesh_index)
                 .copied()
                 .unwrap_or(false)
