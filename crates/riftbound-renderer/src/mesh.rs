@@ -43,13 +43,7 @@ impl Mesh {
         indices: &[u16],
         label: &str,
     ) -> Option<Self> {
-        if vertices.is_empty() || indices.is_empty() || !indices.len().is_multiple_of(3) {
-            return None;
-        }
-        if indices
-            .iter()
-            .any(|index| usize::from(*index) >= vertices.len())
-        {
+        if vertices.is_empty() || !valid_index_data(vertices.len(), indices) {
             return None;
         }
         let index_count = u32::try_from(indices.len()).ok()?;
@@ -104,6 +98,14 @@ impl Mesh {
     pub const fn index_count(&self) -> u32 {
         self.index_count
     }
+}
+
+fn valid_index_data(vertex_count: usize, indices: &[u16]) -> bool {
+    !indices.is_empty()
+        && indices.len().is_multiple_of(3)
+        && indices
+            .iter()
+            .all(|index| usize::from(*index) < vertex_count)
 }
 
 fn cube_data() -> (Vec<MeshVertex>, Vec<u16>) {
@@ -211,9 +213,10 @@ mod tests {
     }
 
     #[test]
-    fn invalid_index_data_is_rejected_before_gpu_upload() {
-        let (_, indices) = cube_data();
-        assert_eq!(indices.len() % 3, 0);
-        assert!(indices.iter().all(|index| usize::from(*index) < 24));
+    fn mesh_index_validation_rejects_invalid_triangles_and_references() {
+        assert!(valid_index_data(3, &[0, 1, 2]));
+        assert!(!valid_index_data(3, &[]));
+        assert!(!valid_index_data(3, &[0, 1]));
+        assert!(!valid_index_data(3, &[0, 1, 3]));
     }
 }
