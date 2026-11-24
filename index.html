@@ -26,7 +26,8 @@ const hpEl=document.getElementById('hp'),hpbar=document.getElementById('hpbar'),
 let W=0,H=0,DPR=1,last=0,running=false,won=false,lost=false,time=0,shake=0;
 const keys=new Set(),touch=new Set();
 const memoryHint=Number(navigator.deviceMemory);
-const MAX_DPR=Number.isFinite(memoryHint)&&memoryHint>0&&memoryHint<=4?1.25:1.75;
+const LOW_MEMORY_DEVICE=Number.isFinite(memoryHint)&&memoryHint>0&&memoryHint<=4;
+const MAX_DPR=LOW_MEMORY_DEVICE?1.15:1.5;
 const network={socket:null,id:0,players:new Map(),lastSend:0,connected:false,shards:null,enemies:null,extractPending:false};
 function connectMultiplayer(){const scheme=location.protocol==='https:'?'wss:':'ws:';const socket=new WebSocket(scheme+'//'+location.host+'/ws');network.socket=socket;socket.addEventListener('open',()=>{network.connected=true;setNetworkStatus('ONLINE · MULTIPLAYER')});socket.addEventListener('message',event=>{try{const data=JSON.parse(event.data);if(data.kind==='welcome'){network.id=data.self_id;return}if(data.kind!=='snapshot')return;if(Array.isArray(data.enemies)){network.enemies=data.enemies;for(const state of data.enemies){const enemy=enemies[state.id];if(enemy){enemy.x=state.x;enemy.y=state.y;enemy.hp=state.hp;enemy.stun=state.stun;enemy.dead=state.hp<=0}}}network.players.clear();for(const p of data.players){if(p.id===network.id){player.x=p.x;player.y=p.y}else{network.players.set(p.id,p)}}if(Array.isArray(data.shards)){network.shards=data.shards;data.shards.forEach((taken,index)=>{if(shards[index]){shards[index].taken=taken;shards[index].pending=false}});shardEl.textContent=data.shards.filter(Boolean).length+' / 5'}if(data.extracted&&!won&&!lost)finish(true)}catch(error){console.warn('Invalid multiplayer snapshot',error)}});socket.addEventListener('close',()=>{network.connected=false;network.players.clear();setNetworkStatus('OFFLINE · RETRYING');setTimeout(()=>{if(location.host)connectMultiplayer()},2500)});socket.addEventListener('error',()=>socket.close())}
 function setNetworkStatus(value){const el=document.getElementById('network-status');if(el)el.textContent=value}
@@ -66,7 +67,7 @@ hpEl.textContent=Math.ceil(player.hp)+'%';hpbar.style.width=player.hp+'%';}
 function finish(win){if(won||lost)return;won=win;lost=!win;running=false;screen.style.display='grid';screen.querySelector('.eyebrow').textContent=win?'EXTRACTION CONFIRMED':'SIGNAL LOST';screen.querySelector('h1').innerHTML=win?'RIFT<br>STABILIZED':'MISSION<br>FAILED';screen.querySelector('p').textContent=win?'All five shards secured. The extraction beacon has synchronized. Sector 01 cleared.':'Your integrity reached zero. The outpost is still waiting. Regroup and try again.';document.getElementById('start').textContent='REDEPLOY →';document.getElementById('start').onclick=()=>location.reload()}
 
 const sceneCanvas=document.getElementById('scene3d');
-const gl=sceneCanvas.getContext('webgl',{alpha:false,antialias:true,powerPreference:'high-performance'});
+const gl=sceneCanvas.getContext('webgl',{alpha:false,antialias:!LOW_MEMORY_DEVICE,powerPreference:LOW_MEMORY_DEVICE?'low-power':'default'});
 let glReady=false,glProgram=null,glMeshes={};
 function compileShader(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(shader));return shader}
 function initRift3D(){
@@ -90,7 +91,7 @@ function modelMatrix(x,y,z,sx,sy,sz,angle=0){const c=Math.cos(angle),q=Math.sin(
 function drawMesh(name,model,viewProj,color){const mesh=glMeshes[name],mvp=mul4(viewProj,model);gl.bindBuffer(gl.ARRAY_BUFFER,mesh.vb);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.ib);const p=gl.getAttribLocation(glProgram,'p'),n=gl.getAttribLocation(glProgram,'n');gl.enableVertexAttribArray(p);gl.enableVertexAttribArray(n);gl.vertexAttribPointer(p,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(n,3,gl.FLOAT,false,24,12);gl.uniformMatrix4fv(gl.getUniformLocation(glProgram,'mvp'),false,new Float32Array(mvp));gl.uniformMatrix4fv(gl.getUniformLocation(glProgram,'model'),false,new Float32Array(model));gl.uniform4fv(gl.getUniformLocation(glProgram,'tint'),color);gl.drawElements(gl.TRIANGLES,mesh.count,gl.UNSIGNED_SHORT,0)}
 function renderRift3D(){
  if(!glReady||!gl)return;
- const dpr=Math.min(devicePixelRatio||1,1.6),w=Math.max(1,Math.floor(innerWidth*dpr)),h=Math.max(1,Math.floor(innerHeight*dpr));
+ const dpr=Math.min(devicePixelRatio||1,MAX_DPR),w=Math.max(1,Math.floor(innerWidth*dpr)),h=Math.max(1,Math.floor(innerHeight*dpr));
  if(sceneCanvas.width!==w||sceneCanvas.height!==h){sceneCanvas.width=w;sceneCanvas.height=h;gl.viewport(0,0,w,h)}
  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(glProgram);
  const cx=player.x,cz=player.y,eye=[cx+520,760,cz+680],view=lookAt(eye,[cx,0,cz],[0,1,0]),proj=perspective(.92,w/h,1,4000),vp=mul4(proj,view);
