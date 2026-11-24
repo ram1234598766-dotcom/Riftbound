@@ -4,13 +4,25 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObjectiveKind {
     /// Collect a target number of items.
-    Collect { target: u32 },
+    Collect {
+        /// Number of items required.
+        target: u32,
+    },
     /// Activate a target number of world interactions.
-    Interact { target: u32 },
+    Interact {
+        /// Number of interactions required.
+        target: u32,
+    },
     /// Reach a target number of distinct locations.
-    Visit { target: u32 },
+    Visit {
+        /// Number of distinct locations required.
+        target: u32,
+    },
     /// Complete a target number of encounter challenges.
-    Defeat { target: u32 },
+    Defeat {
+        /// Number of encounters required.
+        target: u32,
+    },
 }
 
 /// Progress for one optional or required objective.
@@ -70,6 +82,7 @@ impl ObjectiveProgress {
 
     /// Completion fraction in the inclusive range 0.0..=1.0.
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn fraction(self) -> f32 {
         if self.target() == 0 {
             1.0
