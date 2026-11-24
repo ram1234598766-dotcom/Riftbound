@@ -447,6 +447,7 @@ impl Renderer {
         let mesh_batches = create_mesh_batches(&self.device, &scene, self.meshes.len())?;
         self.mesh_batches = mesh_batches;
         self.scene = scene;
+        self.lod_states.clear();
         self.visibility_dirty = true;
         Ok(())
     }
@@ -1109,6 +1110,8 @@ fn normalize(value: [f32; 3]) -> [f32; 3] {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn cube_lod_uses_hysteresis_at_distance_boundaries() {
         assert!(!select_cube_lod(10.0, false));
@@ -1117,9 +1120,6 @@ mod tests {
         assert!(!select_cube_lod(7.99, true));
         assert!(!select_cube_lod(f32::NAN, true));
     }
-
-
-    use super::*;
 
     #[test]
     fn camera_uniform_is_finite_for_landscape_and_portrait_targets() {
