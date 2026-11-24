@@ -46,7 +46,6 @@ pub struct CollisionResult {
     pub blocked_z: bool,
 }
 
-
 /// Collision result after moving an axis-aligned vehicle footprint.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct VehicleCollisionResult {
@@ -161,7 +160,6 @@ impl CollisionWorld {
         result
     }
 
-
     /// Moves a vehicle using an axis-aligned rectangular footprint.
     /// Small substeps and binary refinement prevent tunnelling through obstacles.
     #[must_use]
@@ -251,13 +249,38 @@ impl CollisionWorld {
         result
     }
 
-    fn is_vehicle_walkable(
+
+    /// Moves a vehicle with a conservative world-space footprint derived from heading.
+    /// This prevents a rotated vehicle from using the narrower unrotated footprint.
+    #[must_use]
+    pub fn move_vehicle_oriented(
         &self,
-        x: f32,
-        z: f32,
+        start: Vec3,
+        displacement: Vec3,
+        heading: f32,
         half_width: f32,
         half_length: f32,
-    ) -> bool {
+    ) -> VehicleCollisionResult {
+        if !heading.is_finite() {
+            return VehicleCollisionResult {
+                position: start,
+                blocked_x: false,
+                blocked_z: false,
+            };
+        }
+        let sin = heading.sin().abs();
+        let cos = heading.cos().abs();
+        let world_half_width = half_width * cos + half_length * sin;
+        let world_half_length = half_width * sin + half_length * cos;
+        self.move_vehicle(
+            start,
+            displacement,
+            world_half_width,
+            world_half_length,
+        )
+    }
+
+    fn is_vehicle_walkable(&self, x: f32, z: f32, half_width: f32, half_length: f32) -> bool {
         if x < self.bounds.min_x + half_width
             || x > self.bounds.max_x - half_width
             || z < self.bounds.min_z + half_length
@@ -333,7 +356,6 @@ mod tests {
         assert!(result.position.x <= -1.25);
     }
 
-
     #[test]
     fn vehicle_footprint_stops_before_obstacle() {
         let result = world().move_vehicle(
@@ -349,14 +371,32 @@ mod tests {
 
     #[test]
     fn vehicle_footprint_respects_outer_bounds() {
-        let result = world().move_vehicle(
-            Vec3::new(3.0, 0.0, 0.0),
-            Vec3::new(3.0, 0.0, 0.0),
-            0.8,
-            1.5,
-        );
+        let result =
+            world().move_vehicle(Vec3::new(3.0, 0.0, 0.0), Vec3::new(3.0, 0.0, 0.0), 0.8, 1.5);
         assert!(result.blocked_x);
         assert!((result.position.x - 4.2).abs() < 0.01);
+    }
+
+
+    #[test]
+    fn oriented_vehicle_expands_footprint_when_heading_is_diagonal() {
+        let world = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
+        let straight = world.move_vehicle_oriented(
+            Vec3::new(3.0, 0.0, 0.0),
+            Vec3::new(3.0, 0.0, 0.0),
+            0.0,
+            0.5,
+            1.5,
+        );
+        let diagonal = world.move_vehicle_oriented(
+            Vec3::new(3.0, 0.0, 0.0),
+            Vec3::new(3.0, 0.0, 0.0),
+            std::f32::consts::FRAC_PI_4,
+            0.5,
+            1.5,
+        );
+        assert!(straight.position.x > diagonal.position.x);
+        assert!(diagonal.blocked_x);
     }
 
     #[test]
