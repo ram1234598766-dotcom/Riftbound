@@ -8,7 +8,7 @@ use riftbound_core::{
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
-    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleState, VehicleSurface,
+    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     terrain_height,
 };
 use riftbound_renderer::{HudData, Renderer};
@@ -40,6 +40,7 @@ struct RiftboundApp {
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_state: VehicleState,
     vehicle_suspension: SuspensionState,
+    vehicle_recovery: VehicleRecovery,
     driving: bool,
     collision: Option<CollisionWorld>,
     input: InputState,
@@ -112,6 +113,7 @@ impl ApplicationHandler for RiftboundApp {
                     ..VehicleState::default()
                 };
                 let vehicle_suspension = SuspensionState::default();
+                let vehicle_recovery = VehicleRecovery::new(vehicle_state);
                 if let Some(transform) = scene.get_mut(vehicle) {
                     transform.translation = vehicle_state.position;
                 }
@@ -158,6 +160,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle_wheels = Some(vehicle_wheels);
                 self.vehicle_state = vehicle_state;
                 self.vehicle_suspension = vehicle_suspension;
+                self.vehicle_recovery = vehicle_recovery;
                 self.driving = false;
                 self.collision = Some(arena_collision_world());
                 self.pickups = pickups;
@@ -198,6 +201,7 @@ impl ApplicationHandler for RiftboundApp {
         self.vehicle_wheels = None;
         self.vehicle_state = VehicleState::default();
         self.vehicle_suspension = SuspensionState::default();
+        self.vehicle_recovery = VehicleRecovery::default();
         self.driving = false;
         self.collision = None;
         self.pickups = PickupTracker::new();
@@ -372,6 +376,10 @@ impl ApplicationHandler for RiftboundApp {
                             VehicleConfig::default(),
                             delta,
                         );
+                        if self.vehicle_recovery.recover_if_fallen(&mut self.vehicle_state, -3.0) {
+                            self.vehicle_suspension = SuspensionState::default();
+                            log::info!("Vehicle recovered at its latest safe terrain position");
+                        }
                         // Sample the same deterministic terrain function used by the arena.
                         // Corner order matches SuspensionState: front-left, front-right,
                         // rear-left, rear-right.
@@ -402,6 +410,11 @@ impl ApplicationHandler for RiftboundApp {
                         self.vehicle_state.position.y = average_ground
                             + suspension_config.rest_length
                             - suspension_pose.average_compression;
+                        let _ = self.vehicle_recovery.record_safe_state(
+                            self.vehicle_state,
+                            average_ground,
+                            2.5,
+                        );
                         let vehicle_transform = Transform3::new(
                             self.vehicle_state.position,
                             Vec3::new(
