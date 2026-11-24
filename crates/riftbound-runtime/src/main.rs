@@ -43,10 +43,24 @@ struct RiftboundApp {
     beacon_entity: Option<EntityId>,
     animation_time: f32,
     mission_complete: bool,
+    lan_server_started: bool,
 }
 
 impl ApplicationHandler for RiftboundApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if !self.lan_server_started {
+            self.lan_server_started = true;
+            std::thread::Builder::new()
+                .name("riftbound-lan-server".to_owned())
+                .spawn(|| {
+                    let runtime = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("LAN server runtime should initialize");
+                    runtime.block_on(riftbound_net::serve());
+                })
+                .expect("LAN server thread should start");
+        }
         if self.renderer.is_some() {
             return;
         }
