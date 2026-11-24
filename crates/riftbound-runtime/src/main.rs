@@ -176,7 +176,7 @@ impl ApplicationHandler for RiftboundApp {
                             self.camera_target.z +=
                                 (transform.translation.z - self.camera_target.z) * camera_blend;
                             renderer.follow_camera(self.camera_target);
-                        },
+                        }
                         Ok(false) => {
                             log::error!("The player entity could not be updated");
                             event_loop.exit();
