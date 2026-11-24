@@ -736,6 +736,7 @@ fn build_arena(scene: &mut Scene) {
         MaterialId::AMBER,
     );
     build_arena_architecture(scene);
+    build_crystal_markers(scene);
 }
 
 fn build_arena_architecture(scene: &mut Scene) {
@@ -788,6 +789,31 @@ fn build_arena_architecture(scene: &mut Scene) {
         Vec3::new(3.4, 0.06, 0.46),
         MaterialId::RIFT,
     );
+}
+
+fn build_crystal_markers(scene: &mut Scene) {
+    for (x, z, scale) in [
+        (-6.8, -6.8, 0.78),
+        (6.8, -6.8, 0.78),
+        (-6.8, 6.8, 0.78),
+        (6.8, 6.8, 0.78),
+        (0.0, 6.9, 0.58),
+    ] {
+        let transform = Transform3::new(
+            Vec3::new(x, 1.05, z),
+            Vec3::new(0.0, 0.0, 0.18),
+            Vec3::new(scale * 0.72, scale * 1.35, scale * 0.72),
+        );
+        if let Some(crystal) = scene.spawn_with_mesh(transform, MeshId::CRYSTAL) {
+            scene.set_material(crystal, MaterialId::RIFT);
+        }
+        spawn_box(
+            scene,
+            Vec3::new(x, 0.16, z),
+            Vec3::new(0.62, 0.32, 0.62),
+            MaterialId::AMBER,
+        );
+    }
 }
 
 fn arena_collision_world() -> CollisionWorld {
