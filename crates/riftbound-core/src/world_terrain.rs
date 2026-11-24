@@ -105,10 +105,22 @@ mod tests {
 
     #[test]
     fn world_surface_zones_include_road_and_distinct_biomes() {
-        assert_eq!(world_terrain_sample(0.0, 0.0).surface, VehicleSurface::Asphalt);
-        assert_eq!(world_terrain_sample(0.0, -800.0).surface, VehicleSurface::Snow);
-        assert_eq!(world_terrain_sample(800.0, 0.0).surface, VehicleSurface::Sand);
-        assert_eq!(world_terrain_sample(-800.0, 0.0).surface, VehicleSurface::Mud);
+        assert_eq!(
+            world_terrain_sample(0.0, 0.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            world_terrain_sample(0.0, -800.0).surface,
+            VehicleSurface::Snow
+        );
+        assert_eq!(
+            world_terrain_sample(800.0, 0.0).surface,
+            VehicleSurface::Sand
+        );
+        assert_eq!(
+            world_terrain_sample(-800.0, 0.0).surface,
+            VehicleSurface::Mud
+        );
     }
 
     #[test]
@@ -120,7 +132,10 @@ mod tests {
 
     #[test]
     fn invalid_or_imprecise_coordinates_return_safe_fallback() {
-        let fallback = WorldTerrainSample { height: 0.0, surface: VehicleSurface::Rock };
+        let fallback = WorldTerrainSample {
+            height: 0.0,
+            surface: VehicleSurface::Rock,
+        };
         assert_eq!(world_terrain_sample(f32::NAN, 0.0), fallback);
         assert_eq!(world_terrain_sample(1_000_001.0, 0.0), fallback);
     }
