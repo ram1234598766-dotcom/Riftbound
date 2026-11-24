@@ -129,10 +129,11 @@ impl WorldChunkStreamer {
         }
         let chunk_x = (world_x / WORLD_CHUNK_SIZE).floor();
         let chunk_z = (world_z / WORLD_CHUNK_SIZE).floor();
-        if chunk_x < f32::from(i16::MIN)
-            || chunk_x > f32::from(i16::MAX)
-            || chunk_z < f32::from(i16::MIN)
-            || chunk_z > f32::from(i16::MAX)
+        let margin = self.config.active_radius as f32;
+        if chunk_x < f32::from(i16::MIN) + margin
+            || chunk_x > f32::from(i16::MAX) - margin
+            || chunk_z < f32::from(i16::MIN) + margin
+            || chunk_z > f32::from(i16::MAX) - margin
         {
             return false;
         }
@@ -215,6 +216,25 @@ mod tests {
         let before = streamer.active_chunks().to_vec();
         assert!(!streamer.update_focus(f32::NAN, 0.0));
         assert!(!streamer.update_focus(2_000_000.0, 0.0));
+        assert_eq!(streamer.active_chunks(), before);
+    }
+
+    #[test]
+    fn focus_reserves_room_for_the_entire_window_at_sampler_limits() {
+        let mut streamer = WorldChunkStreamer::standard();
+        let max_safe = f32::from(i16::MAX - 2) * WORLD_CHUNK_SIZE;
+        let min_safe = f32::from(i16::MIN + 2) * WORLD_CHUNK_SIZE;
+        assert!(streamer.update_focus(max_safe, min_safe));
+        let chunks = streamer.active_chunks();
+        assert!(chunks.iter().all(|chunk| {
+            (i16::MIN..=i16::MAX).contains(&chunk.coord.x)
+                && (i16::MIN..=i16::MAX).contains(&chunk.coord.z)
+        }));
+        let before = chunks.to_vec();
+        assert!(!streamer.update_focus(
+            f32::from(i16::MAX - 1) * WORLD_CHUNK_SIZE,
+            0.0
+        ));
         assert_eq!(streamer.active_chunks(), before);
     }
 
