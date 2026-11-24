@@ -94,3 +94,6 @@ The enemy brain now moves between two deterministic waypoints around its home po
 
 
 Enemy encounter authoring now has three lightweight behaviour profiles: Sentinel (balanced), Skirmisher (faster pursuit and shorter attack wind-up), and Warden (slower pursuit, wider attack zone, longer recovery). Each can be combined with Easy, Standard, or Hard difficulty tuning. The native arena explicitly selects the Standard Sentinel profile, preserving the established encounter feel. Core tests cover archetype distinctions and difficulty ordering. Skirmisher and Warden are currently authoring presets for future encounters; they are not yet spawned as additional arena enemies.
+
+
+The native arena now spawns the Skirmisher and Warden profiles alongside the original Sentinel. Each support enemy owns an independent, allocation-free EnemyBrain state and a compact ground telegraph marker. Their pulses apply a lower 15-point hit than the Sentinel's 25-point pulse and use the same player protection window. Support enemy state is stored in a pre-sized vector and updated in place; this is an initial three-enemy encounter, not yet a scalable crowd/AI scheduler. The support enemies are not yet individually disableable through the interaction objective.
