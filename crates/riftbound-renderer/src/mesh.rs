@@ -150,8 +150,7 @@ fn cube_lod_data() -> (Vec<MeshVertex>, Vec<u16>) {
         MeshVertex { position: [-1.0, 1.0, 1.0], color },
     ];
     let indices = vec![
-        4, 5, 6, 4, 6, 7, 1, 0, 3, 1, 3, 2,
-        5, 1, 2, 5, 2, 6, 0, 4, 7, 0, 7, 3,
+        4, 5, 6, 4, 6, 7, 1, 0, 3, 1, 3, 2, 5, 1, 2, 5, 2, 6, 0, 4, 7, 0, 7, 3,
         7, 6, 2, 7, 2, 3, 0, 1, 5, 0, 5, 4,
     ];
     (vertices, indices)
@@ -341,7 +340,11 @@ mod tests {
         assert_eq!(indices.len(), 36);
         assert!(valid_index_data(vertices.len(), &indices));
         assert!(vertices.iter().all(|vertex| {
-            vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            vertex
+                .position
+                .iter()
+                .chain(vertex.color.iter())
+                .all(|value| value.is_finite())
         }));
     }
 
