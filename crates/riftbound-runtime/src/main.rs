@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use riftbound_core::{
-    Aabb2, Button, CharacterController, CollisionWorld, EntityId, ExtractionZone, InputState,
+    Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld, EntityId, ExtractionZone, InputState,
     MaterialId, MeshId, MissionPhase, MissionProgress, Pickup, PickupTracker, Scene, Transform3,
     Vec3, terrain_height,
 };
@@ -43,6 +43,9 @@ struct RiftboundApp {
     animated_transforms: Vec<(EntityId, Transform3)>,
     extraction: Option<ExtractionZone>,
     beacon_entity: Option<EntityId>,
+    checkpoint_entity: Option<EntityId>,
+    checkpoint: Option<Checkpoint>,
+    checkpoint_progress: Option<CheckpointProgress>,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -89,6 +92,7 @@ impl ApplicationHandler for RiftboundApp {
                 let player_parts = build_player_character(&mut scene, player);
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
                 let (beacon_entity, extraction) = build_extraction_beacon(&mut scene);
+                let (checkpoint_entity, checkpoint) = build_checkpoint(&mut scene);
                 if let Err(error) = renderer.set_scene(scene) {
                     log::error!("Could not create the arena scene: {error}");
                     event_loop.exit();
@@ -109,8 +113,13 @@ impl ApplicationHandler for RiftboundApp {
                 self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
                 self.extraction = Some(extraction);
                 self.beacon_entity = Some(beacon_entity);
+                self.checkpoint_entity = Some(checkpoint_entity);
+                self.checkpoint = Some(checkpoint);
+                self.checkpoint_progress = Some(
+                    CheckpointProgress::new(player_transform.translation)
+                        .expect("player start position is valid"),
+                );
                 self.animation_time = 0.0;
-                self.mission = MissionProgress::new(0);
                 self.last_frame = Some(Instant::now());
             }
             Err(error) => {
@@ -131,6 +140,9 @@ impl ApplicationHandler for RiftboundApp {
         self.animated_transforms.clear();
         self.extraction = None;
         self.beacon_entity = None;
+        self.checkpoint_entity = None;
+        self.checkpoint = None;
+        self.checkpoint_progress = None;
         self.animation_time = 0.0;
         self.mission = MissionProgress::new(0);
         self.last_frame = None;
@@ -230,6 +242,13 @@ impl ApplicationHandler for RiftboundApp {
                     );
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
+                    if transform.translation.y < -3.0 {
+                        if let Some(progress) = self.checkpoint_progress {
+                            transform.translation = progress.respawn_position();
+                            self.controller = CharacterController::default();
+                            log::info!("Player recovered at the latest active checkpoint");
+                        }
+                    }
                     self.animated_transforms.clear();
                     self.animated_transforms.push((player, transform));
                     if let Some(parts) = self.player_parts {
@@ -338,6 +357,18 @@ impl ApplicationHandler for RiftboundApp {
                             ),
                         ));
                     }
+                    if let Some(checkpoint_entity) = self.checkpoint_entity {
+                        let pulse = 1.0 + (self.animation_time * 2.6).sin() * 0.08;
+                        let y = terrain_height(0.0, 2.0) + 0.62;
+                        self.animated_transforms.push((
+                            checkpoint_entity,
+                            Transform3::new(
+                                Vec3::new(0.0, y, 2.0),
+                                Vec3::new(0.0, -self.animation_time * 0.6, 0.0),
+                                Vec3::new(0.48 * pulse, 0.58 * pulse, 0.48 * pulse),
+                            ),
+                        ));
+                    }
                     match renderer.set_object_transforms(&self.animated_transforms) {
                         Ok(true) => {
                             let camera_blend = 1.0 - (-8.0 * delta.min(0.1)).exp();
@@ -388,6 +419,18 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
+                            let checkpoint_activated = match (self.checkpoint, self.checkpoint_progress.as_mut()) {
+                                (Some(checkpoint), Some(progress)) => progress.activate(
+                                    checkpoint,
+                                    transform.translation,
+                                    interact_pressed,
+                                ),
+                                _ => false,
+                            };
+                            if checkpoint_activated {
+                                window.set_title("RIFTBOUND — Checkpoint activated");
+                                log::info!("Checkpoint activated; falling will return the player here");
+                            }
                             let inside_extraction = self.extraction.is_some_and(|zone| {
                                 zone.can_extract(transform.translation, true, true)
                             });
@@ -416,6 +459,14 @@ impl ApplicationHandler for RiftboundApp {
                             let near_beacon =
                                 distance_squared(transform.translation, Vec3::new(0.0, 0.55, -8.0))
                                     <= 1.9 * 1.9;
+                            let near_checkpoint = self.checkpoint.is_some_and(|checkpoint| {
+                                !self.checkpoint_progress.is_some_and(
+                                    CheckpointProgress::has_active_checkpoint,
+                                ) && distance_squared(
+                                    transform.translation,
+                                    checkpoint.position(),
+                                ) <= 1.7 * 1.7
+                            });
                             let status = if self.mission.phase() == MissionPhase::Complete {
                                 "MISSION COMPLETE!"
                             } else if self.mission.extraction_unlocked() {
@@ -427,6 +478,8 @@ impl ApplicationHandler for RiftboundApp {
                                 None
                             } else if self.mission.extraction_unlocked() && near_beacon {
                                 Some(String::from("F - EXTRACT"))
+                            } else if near_checkpoint {
+                                Some(String::from("F - ACTIVATE CHECKPOINT"))
                             } else if !self.mission.extraction_unlocked() && near_pickup {
                                 Some(String::from("F - COLLECT"))
                             } else {
@@ -597,6 +650,28 @@ fn build_extraction_beacon(scene: &mut Scene) -> (EntityId, ExtractionZone) {
     (
         id,
         ExtractionZone::new(position, 1.9).expect("extraction zone data is valid"),
+    )
+}
+
+fn build_checkpoint(scene: &mut Scene) -> (EntityId, Checkpoint) {
+    let position = Vec3::new(
+        0.0,
+        terrain_height(0.0, 2.0) + PLAYER_RADIUS + 0.01,
+        2.0,
+    );
+    let visual_position = Vec3::new(0.0, terrain_height(0.0, 2.0) + 0.62, 2.0);
+    let transform = Transform3::new(
+        visual_position,
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.48, 0.58, 0.48),
+    );
+    let id = scene
+        .spawn_with_mesh(transform, MeshId::CRYSTAL)
+        .expect("checkpoint entity ID space available");
+    scene.set_material(id, MaterialId::RIFT);
+    (
+        id,
+        Checkpoint::new(position, 1.7).expect("checkpoint zone data is valid"),
     )
 }
 
