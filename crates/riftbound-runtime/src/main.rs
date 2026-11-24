@@ -362,6 +362,7 @@ impl ApplicationHandler for RiftboundApp {
                         } else {
                             0.0
                         };
+                        let vehicle_previous_position = self.vehicle_state.position;
                         self.vehicle_state.update(
                             VehicleInput {
                                 throttle,
@@ -376,6 +377,24 @@ impl ApplicationHandler for RiftboundApp {
                             VehicleConfig::default(),
                             delta,
                         );
+                        if let Some(collision) = self.collision.as_ref() {
+                            let movement = Vec3::new(
+                                self.vehicle_state.position.x - vehicle_previous_position.x,
+                                0.0,
+                                self.vehicle_state.position.z - vehicle_previous_position.z,
+                            );
+                            let resolved = collision.move_vehicle(
+                                vehicle_previous_position,
+                                movement,
+                                0.82,
+                                1.38,
+                            );
+                            self.vehicle_state.position.x = resolved.position.x;
+                            self.vehicle_state.position.z = resolved.position.z;
+                            if resolved.blocked_x || resolved.blocked_z {
+                                self.vehicle_state.speed = 0.0;
+                            }
+                        }
                         if self
                             .vehicle_recovery
                             .recover_if_fallen(&mut self.vehicle_state, -3.0)
