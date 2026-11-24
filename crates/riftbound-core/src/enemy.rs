@@ -106,15 +106,26 @@ impl EnemyBrain {
         delta_seconds: f32,
     ) -> Option<EnemyEvent> {
         let c = self.config;
-        if !valid_position(*position) || !valid_position(player) || !valid_position(self.home)
-            || !delta_seconds.is_finite() || delta_seconds <= 0.0
-            || !c.awareness_radius.is_finite() || c.awareness_radius <= 0.0
-            || !c.attack_radius.is_finite() || c.attack_radius <= 0.0
-            || !c.leash_radius.is_finite() || c.leash_radius < c.awareness_radius
-            || !c.patrol_speed.is_finite() || c.patrol_speed < 0.0
-            || !c.chase_speed.is_finite() || c.chase_speed < 0.0
-            || !c.telegraph_seconds.is_finite() || c.telegraph_seconds <= 0.0
-            || !c.recovery_seconds.is_finite() || c.recovery_seconds <= 0.0 {
+        if !valid_position(*position)
+            || !valid_position(player)
+            || !valid_position(self.home)
+            || !delta_seconds.is_finite()
+            || delta_seconds <= 0.0
+            || !c.awareness_radius.is_finite()
+            || c.awareness_radius <= 0.0
+            || !c.attack_radius.is_finite()
+            || c.attack_radius <= 0.0
+            || !c.leash_radius.is_finite()
+            || c.leash_radius < c.awareness_radius
+            || !c.patrol_speed.is_finite()
+            || c.patrol_speed < 0.0
+            || !c.chase_speed.is_finite()
+            || c.chase_speed < 0.0
+            || !c.telegraph_seconds.is_finite()
+            || c.telegraph_seconds <= 0.0
+            || !c.recovery_seconds.is_finite()
+            || c.recovery_seconds <= 0.0
+        {
             return None;
         }
 
