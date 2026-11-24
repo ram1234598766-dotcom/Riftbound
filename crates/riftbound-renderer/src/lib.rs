@@ -93,7 +93,7 @@ impl Renderer {
             label: Some("riftbound-camera-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -690,7 +690,7 @@ fn camera_bytes(
     yaw: f32,
     pitch: f32,
     distance: f32,
-) -> [u8; 64] {
+) -> [u8; 80] {
     #[allow(clippy::cast_precision_loss)]
     let aspect = width.max(1) as f32 / height.max(1) as f32;
     let horizontal = distance * pitch.cos();
@@ -744,9 +744,13 @@ fn camera_bytes(
         0.0,
     ];
     let matrix = multiply(projection, view);
-    let mut bytes = [0_u8; 64];
+    let mut bytes = [0_u8; 80];
     for (index, value) in matrix.iter().enumerate() {
         bytes[index * 4..index * 4 + 4].copy_from_slice(&value.to_ne_bytes());
+    }
+    for (index, value) in eye.into_iter().chain([1.0]).enumerate() {
+        let start = 64 + index * 4;
+        bytes[start..start + 4].copy_from_slice(&value.to_ne_bytes());
     }
     bytes
 }
