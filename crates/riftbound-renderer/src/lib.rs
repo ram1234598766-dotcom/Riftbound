@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use riftbound_core::{Scene, Transform3, Vec3};
+use riftbound_core::{MeshId, Scene, Transform3, Vec3};
 use wgpu::util::DeviceExt;
 
 mod mesh;
@@ -24,11 +24,16 @@ pub struct Renderer {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     cube_pipeline: wgpu::RenderPipeline,
-    cube_mesh: Mesh,
-    instance_buffer: wgpu::Buffer,
-    instance_count: u32,
+    meshes: Vec<Mesh>,
+    mesh_batches: Vec<MeshBatch>,
     scene: Scene,
     camera_offset: [f32; 3],
+}
+
+struct MeshBatch {
+    mesh_index: usize,
+    instance_buffer: wgpu::Buffer,
+    instance_count: u32,
 }
 
 impl Renderer {
@@ -92,16 +97,12 @@ impl Renderer {
         });
 
         let cube_pipeline = create_cube_pipeline(&device, &camera_layout, config.format);
-        let cube_mesh = Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?;
+        let meshes = vec![
+            Mesh::cube(&device).ok_or("Failed to create the built-in cube mesh")?,
+            Mesh::pyramid(&device).ok_or("Failed to create the built-in pyramid mesh")?,
+        ];
         let scene = starter_scene();
-        let instances = scene_instances(&scene);
-        let instance_count = u32::try_from(instances.len())?;
-        let instance_bytes = instance_bytes(&instances);
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("riftbound-scene-instances"),
-            contents: &instance_bytes,
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
 
         let (depth_texture, depth_view) = create_depth_target(&device, config.width, config.height);
 
@@ -116,9 +117,8 @@ impl Renderer {
             camera_buffer,
             camera_bind_group,
             cube_pipeline,
-            cube_mesh,
-            instance_buffer,
-            instance_count,
+            meshes,
+            mesh_batches,
             scene,
             camera_offset: [0.0; 3],
         })
@@ -165,20 +165,8 @@ impl Renderer {
     ///
     /// Returns an error if the scene contains more instances than a GPU draw call can address.
     pub fn set_scene(&mut self, scene: Scene) -> Result<(), std::num::TryFromIntError> {
-        let instances = scene_instances(&scene);
-        let instance_count = u32::try_from(instances.len())?;
-        let mut bytes = instance_bytes(&instances);
-        if bytes.is_empty() {
-            bytes.resize(64, 0);
-        }
-        self.instance_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("riftbound-scene-instances"),
-                contents: &bytes,
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        self.instance_count = instance_count;
+        let mesh_batches = create_mesh_batches(&self.device, &scene, self.meshes.len())?;
+        self.mesh_batches = mesh_batches;
         self.scene = scene;
         Ok(())
     }
@@ -242,13 +230,15 @@ impl Renderer {
             });
             pass.set_pipeline(&self.cube_pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            pass.set_vertex_buffer(0, self.cube_mesh.vertex_buffer().slice(..));
-            pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            pass.set_index_buffer(
-                self.cube_mesh.index_buffer().slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
-            pass.draw_indexed(0..self.cube_mesh.index_count(), 0, 0..self.instance_count);
+            for batch in &self.mesh_batches {
+                let Some(mesh) = self.meshes.get(batch.mesh_index) else {
+                    continue;
+                };
+                pass.set_vertex_buffer(0, mesh.vertex_buffer().slice(..));
+                pass.set_vertex_buffer(1, batch.instance_buffer.slice(..));
+                pass.set_index_buffer(mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
+                pass.draw_indexed(0..mesh.index_count(), 0, 0..batch.instance_count);
+            }
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
@@ -304,24 +294,50 @@ fn starter_scene() -> Scene {
             Vec3::new(0.58, 0.58, 0.58),
         ),
     ];
-    for transform in objects {
+    for (index, transform) in objects.into_iter().enumerate() {
+        let mesh = if index == 1 { MeshId::PYRAMID } else { MeshId::CUBE };
         scene
-            .spawn(transform)
+            .spawn_with_mesh(transform, mesh)
             .expect("starter scene entity ID space available");
     }
     scene
 }
 
-fn scene_instances(scene: &Scene) -> Vec<InstanceRaw> {
-    scene
-        .iter()
-        .map(|object| {
-            let world = scene
-                .world_matrix(object.id)
-                .expect("iterated scene objects must have valid hierarchy");
-            InstanceRaw::from_matrix(world)
-        })
-        .collect()
+fn scene_instances_by_mesh(scene: &Scene, mesh_count: usize) -> Vec<Vec<InstanceRaw>> {
+    let mut groups = (0..mesh_count).map(|_| Vec::new()).collect::<Vec<_>>();
+    for object in scene.iter() {
+        let Some(group) = groups.get_mut(object.mesh.index()) else {
+            continue;
+        };
+        let world = scene
+            .world_matrix(object.id)
+            .expect("iterated scene objects must have valid hierarchy");
+        group.push(InstanceRaw::from_matrix(world));
+    }
+    groups
+}
+
+fn create_mesh_batches(
+    device: &wgpu::Device,
+    scene: &Scene,
+    mesh_count: usize,
+) -> Result<Vec<MeshBatch>, std::num::TryFromIntError> {
+    let groups = scene_instances_by_mesh(scene, mesh_count);
+    let mut batches = Vec::new();
+    for (mesh_index, instances) in groups.iter().enumerate() {
+        if instances.is_empty() {
+            continue;
+        }
+        let instance_count = u32::try_from(instances.len())?;
+        let bytes = instance_bytes(instances);
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("riftbound-mesh-instance-batch"),
+            contents: &bytes,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        batches.push(MeshBatch { mesh_index, instance_buffer, instance_count });
+    }
+    Ok(batches)
 }
 
 fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
@@ -513,16 +529,16 @@ mod tests {
     #[test]
     fn scene_instances_have_distinct_finite_model_transforms() {
         let scene = starter_scene();
-        let instances = scene_instances(&scene);
+        let groups = scene_instances_by_mesh(&scene, 2);
+        assert_eq!(groups[0].len(), 2);
+        assert_eq!(groups[1].len(), 1);
+        let instances = groups.iter().flatten().collect::<Vec<_>>();
         assert_eq!(instances.len(), 3);
         assert_ne!(instances[0].model, instances[1].model);
-        assert_ne!(instances[1].model, instances[2].model);
-        assert!(
-            instances
-                .iter()
-                .all(|instance| { instance.model.iter().all(|component| component.is_finite()) })
-        );
-        assert_eq!(instance_bytes(&instances).len(), instances.len() * 64);
+        assert!(instances.iter().all(|instance| {
+            instance.model.iter().all(|component| component.is_finite())
+        }));
+        assert_eq!(instance_bytes(&groups[0]).len(), groups[0].len() * 64);
     }
 
     #[test]
