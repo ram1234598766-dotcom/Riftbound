@@ -1,5 +1,7 @@
 //! CPU mesh descriptions and their GPU vertex-buffer representation.
 
+use wgpu::util::DeviceExt;
+
 /// One position-and-color vertex in the renderer's standard mesh format.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
