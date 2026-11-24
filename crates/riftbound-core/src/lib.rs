@@ -21,6 +21,6 @@ pub use collision::{Aabb2, CollisionResult, CollisionWorld};
 pub use entity::{EntityArena, EntityId};
 pub use input::{Button, InputState};
 pub use math::{Vec2, Vec3};
-pub use pickup::{Pickup, PickupTracker};
+pub use pickup::{ExtractionZone, Pickup, PickupTracker};
 pub use scene::{MaterialId, MeshId, Scene, SceneObject};
 pub use transform::Transform3;
