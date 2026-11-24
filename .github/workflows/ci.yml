@@ -21,7 +21,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check browser JavaScript syntax
         run: |
-          awk '/^<script>$/ { active = 1; next } /<\/script>/ { active = 0 } active { print }' index.html > "$RUNNER_TEMP/riftbound.js"
+          awk '/^<script>$/ { active = 1; next } index($0, "</script>") { active = 0 } active { print }' index.html > "$RUNNER_TEMP/riftbound.js"
           test -s "$RUNNER_TEMP/riftbound.js"
           node --check "$RUNNER_TEMP/riftbound.js"
       - name: Verify Rust formatting
