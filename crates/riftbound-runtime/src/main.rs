@@ -17,6 +17,14 @@ use winit::{
 };
 
 const PLAYER_RADIUS: f32 = 0.19;
+const PICKUP_POSITIONS: [Vec3; 5] = [
+    Vec3::new(-5.0, 0.65, -4.0),
+    Vec3::new(5.0, 0.65, -4.0),
+    Vec3::new(-5.0, 0.65, 5.0),
+    Vec3::new(5.0, 0.65, 5.0),
+    Vec3::new(0.0, 0.65, 7.0),
+];
+const PICKUP_PHASES: [f32; 5] = [0.0, 1.2, 2.4, 3.6, 4.8];
 
 #[derive(Default)]
 struct RiftboundApp {
@@ -199,14 +207,7 @@ impl ApplicationHandler for RiftboundApp {
                     self.controller
                         .resolve_collision(resolved.blocked_x, resolved.blocked_z);
                     let mut animated_transforms = vec![(player, transform)];
-                    const PICKUP_POSITIONS: [Vec3; 5] = [
-                        Vec3::new(-5.0, 0.65, -4.0),
-                        Vec3::new(5.0, 0.65, -4.0),
-                        Vec3::new(-5.0, 0.65, 5.0),
-                        Vec3::new(5.0, 0.65, 5.0),
-                        Vec3::new(0.0, 0.65, 7.0),
-                    ];
-                    const PICKUP_PHASES: [f32; 5] = [0.0, 1.2, 2.4, 3.6, 4.8];
+
                     for (index, entity) in self.pickup_entities.iter().enumerate() {
                         if renderer.scene().get(*entity).is_none() {
                             continue;
