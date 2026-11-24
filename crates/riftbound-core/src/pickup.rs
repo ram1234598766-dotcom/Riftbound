@@ -121,10 +121,21 @@ mod tests {
     fn collection_requires_interaction_and_proximity() {
         let mut tracker = PickupTracker::new();
         tracker.add(Pickup::new(Vec3::new(1.0, 0.0, 0.0), 1.5).unwrap());
-        assert!(tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), false).is_empty());
-        assert!(tracker.collect_nearby(Vec3::new(5.0, 0.0, 0.0), true).is_empty());
+        assert!(
+            tracker
+                .collect_nearby(Vec3::new(0.0, 0.0, 0.0), false)
+                .is_empty()
+        );
+        assert!(
+            tracker
+                .collect_nearby(Vec3::new(5.0, 0.0, 0.0), true)
+                .is_empty()
+        );
         assert_eq!(tracker.collected(), 0);
-        assert_eq!(tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), true), vec![0]);
+        assert_eq!(
+            tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), true),
+            vec![0]
+        );
         assert_eq!(tracker.collected(), 1);
         assert!(tracker.is_complete());
     }
@@ -135,8 +146,15 @@ mod tests {
         tracker.add(Pickup::new(Vec3::new(0.0, 0.0, 0.0), 2.0).unwrap());
         tracker.add(Pickup::new(Vec3::new(1.0, 0.0, 0.0), 2.0).unwrap());
         tracker.add(Pickup::new(Vec3::new(8.0, 0.0, 0.0), 1.0).unwrap());
-        assert_eq!(tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), true), vec![0, 1]);
-        assert!(tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), true).is_empty());
+        assert_eq!(
+            tracker.collect_nearby(Vec3::new(0.0, 0.0, 0.0), true),
+            vec![0, 1]
+        );
+        assert!(
+            tracker
+                .collect_nearby(Vec3::new(0.0, 0.0, 0.0), true)
+                .is_empty()
+        );
         assert_eq!(tracker.total(), 3);
         assert_eq!(tracker.collected(), 2);
         assert!(!tracker.is_complete());
@@ -146,7 +164,11 @@ mod tests {
     fn non_finite_player_position_never_collects() {
         let mut tracker = PickupTracker::new();
         tracker.add(Pickup::new(Vec3::new(0.0, 0.0, 0.0), 2.0).unwrap());
-        assert!(tracker.collect_nearby(Vec3::new(f32::NAN, 0.0, 0.0), true).is_empty());
+        assert!(
+            tracker
+                .collect_nearby(Vec3::new(f32::NAN, 0.0, 0.0), true)
+                .is_empty()
+        );
         assert_eq!(tracker.collected(), 0);
     }
 }
