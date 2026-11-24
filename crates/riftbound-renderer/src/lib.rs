@@ -139,7 +139,12 @@ impl Renderer {
             camera_bind_group,
             cube_pipeline,
             hud_pipeline,
-            hud_data: HudData { collected: 0, total: 5, status: String::from("COLLECT RIFT SHARDS"), prompt: None },
+            hud_data: HudData {
+                collected: 0,
+                total: 5,
+                status: String::from("COLLECT RIFT SHARDS"),
+                prompt: None,
+            },
             meshes,
             mesh_batches,
             scene,
@@ -391,11 +396,18 @@ impl Renderer {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("riftbound-hud-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view, depth_slice: None, resolve_target: None,
-                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                    view: &view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
                 })],
                 depth_stencil_attachment: None,
-                timestamp_writes: None, occlusion_query_set: None, multiview_mask: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.hud_pipeline);
             pass.set_vertex_buffer(0, hud_buffer.slice(..));
@@ -544,21 +556,47 @@ fn instance_bytes(instances: &[InstanceRaw]) -> Vec<u8> {
     bytes
 }
 
-fn create_hud_pipeline(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+fn create_hud_pipeline(
+    device: &wgpu::Device,
+    surface_format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("riftbound-hud-shader"),
         source: wgpu::ShaderSource::Wgsl(HUD_SHADER.into()),
     });
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("riftbound-hud-layout"), bind_group_layouts: &[], immediate_size: 0,
+        label: Some("riftbound-hud-layout"),
+        bind_group_layouts: &[],
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("riftbound-hud-pipeline"), layout: Some(&layout),
-        vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_main"), compilation_options: wgpu::PipelineCompilationOptions::default(), buffers: &[Some(HudVertex::layout())] },
-        primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleList, cull_mode: None, ..Default::default() },
-        depth_stencil: None, multisample: wgpu::MultisampleState::default(),
-        fragment: Some(wgpu::FragmentState { module: &shader, entry_point: Some("fs_main"), compilation_options: wgpu::PipelineCompilationOptions::default(), targets: &[Some(wgpu::ColorTargetState { format: surface_format, blend: Some(wgpu::BlendState::ALPHA_BLENDING), write_mask: wgpu::ColorWrites::ALL })] }),
-        multiview_mask: None, cache: None,
+        label: Some("riftbound-hud-pipeline"),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[Some(HudVertex::layout())],
+        },
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            cull_mode: None,
+            ..Default::default()
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
     })
 }
 
