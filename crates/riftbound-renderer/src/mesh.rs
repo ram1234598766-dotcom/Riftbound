@@ -415,7 +415,11 @@ mod tests {
             assert_eq!(indices.len(), 8 * 8 * 6);
             assert!(valid_index_data(vertices.len(), indices));
             assert!(vertices.iter().all(|vertex| {
-                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+                vertex
+                    .position
+                    .iter()
+                    .chain(vertex.color.iter())
+                    .all(|value| value.is_finite())
             }));
         }
         let edge = |vertices: &[MeshVertex], x: usize| {
