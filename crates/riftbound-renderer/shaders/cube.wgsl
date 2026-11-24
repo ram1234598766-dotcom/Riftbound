@@ -1,5 +1,6 @@
 struct Camera {
     view_projection: mat4x4<f32>,
+    eye_position: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -44,5 +45,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let diffuse = abs(dot(world_normal, light_direction));
     let ambient = 0.28;
     let lighting = ambient + (1.0 - ambient) * diffuse;
-    return vec4<f32>(input.color * lighting, 1.0);
+    let lit_color = input.color * lighting;
+    let view_distance = distance(input.world_position, camera.eye_position.xyz);
+    let fog_amount = smoothstep(20.0, 72.0, view_distance);
+    let fog_color = vec3<f32>(0.018, 0.032, 0.075);
+    let atmospheric_color = mix(lit_color, fog_color, fog_amount);
+    return vec4<f32>(atmospheric_color, 1.0);
 }
