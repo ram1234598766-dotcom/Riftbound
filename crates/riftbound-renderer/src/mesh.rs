@@ -114,7 +114,12 @@ impl Mesh {
     #[must_use]
     pub fn terrain_chunk_lod(device: &wgpu::Device, chunk_x: u8, chunk_z: u8) -> Option<Self> {
         let (vertices, indices) = terrain_chunk_data(chunk_x, chunk_z, 5)?;
-        Self::from_data(device, &vertices, &indices, "riftbound-terrain-chunk-lod-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-terrain-chunk-lod-mesh",
+        )
     }
 
     /// Returns the GPU vertex buffer.
@@ -247,7 +252,11 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-fn terrain_chunk_data(chunk_x: u8, chunk_z: u8, side: usize) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
+fn terrain_chunk_data(
+    chunk_x: u8,
+    chunk_z: u8,
+    side: usize,
+) -> Option<(Vec<MeshVertex>, Vec<u16>)> {
     if side < 2 || side > 9 || (8 % (side - 1)) != 0 {
         return None;
     }
