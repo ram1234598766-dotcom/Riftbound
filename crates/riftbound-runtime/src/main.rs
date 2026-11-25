@@ -1491,7 +1491,11 @@ fn world_obstacle_footprints(chunks: &[WorldChunkRequest]) -> Vec<Aabb2> {
         hash ^= hash >> 15;
         let origin_x = request.coord.x as f32 * WORLD_CHUNK_SIZE;
         let origin_z = request.coord.z as f32 * WORLD_CHUNK_SIZE;
-        for index in 0..2_u32 {
+        let prop_count = match request.lod {
+            riftbound_core::WorldChunkLod::Detailed => 2_u32,
+            riftbound_core::WorldChunkLod::Distant => 1_u32,
+        };
+        for index in 0..prop_count {
             let selector = hash.rotate_left(index * 11).wrapping_add(index * 0x9E37_79B9);
             let side = if selector & 1 == 0 { -1.0 } else { 1.0 };
             let center_x = origin_x + side * (13.0 + (selector % 9) as f32);
@@ -1529,22 +1533,55 @@ fn spawn_world_obstacle_props(
         let half_x = (footprint.max_x - footprint.min_x) * 0.5;
         let half_z = (footprint.max_z - footprint.min_z) * 0.5;
         let ground = world_terrain_sample(x, z).height;
+        let yaw = ((index % 7) as f32 - 3.0) * 0.11;
 
-        // Use the engine's existing low-cost meshes to give the blockout field
-        // a varied silhouette until dedicated environment assets are available.
-        let (mesh, height, material, yaw) = match index % 3 {
-            0 => (MeshId::PYRAMID, 1.8, MaterialId::AMBER, 0.23),
-            1 => (MeshId::CRYSTAL, 2.1, MaterialId::RIFT, -0.31),
-            _ => (MeshId::CUBE, 1.25, MaterialId::AMBER, 0.0),
-        };
-        let transform = Transform3::new(
-            Vec3::new(x, ground + height * 0.5, z),
-            Vec3::new(0.0, yaw, 0.0),
-            Vec3::new(half_x * 2.0, height, half_z * 2.0),
-        );
-        if let Some(id) = scene.spawn_with_mesh(transform, mesh) {
-            scene.set_material(id, material);
-            entity_ids.push(id);
+        match index % 3 {
+            // A two-part tree silhouette: narrow trunk and broad faceted crown.
+            0 => {
+                let trunk = Transform3::new(
+                    Vec3::new(x, ground + 0.85, z),
+                    Vec3::new(0.0, yaw, 0.0),
+                    Vec3::new(0.28, 1.7, 0.28),
+                );
+                if let Some(id) = scene.spawn_with_mesh(trunk, MeshId::CUBE) {
+                    scene.set_material(id, MaterialId::AMBER);
+                    entity_ids.push(id);
+                }
+                let crown = Transform3::new(
+                    Vec3::new(x, ground + 2.35, z),
+                    Vec3::new(0.0, yaw + 0.18, 0.0),
+                    Vec3::new(half_x * 2.5, 2.2, half_z * 2.5),
+                );
+                if let Some(id) = scene.spawn_with_mesh(crown, MeshId::PYRAMID) {
+                    scene.set_material(id, MaterialId::DEFAULT);
+                    entity_ids.push(id);
+                }
+            }
+            // Angular boulders use the existing low-poly pyramid mesh.
+            1 => {
+                let height = 1.0 + half_x * 0.65;
+                let rock = Transform3::new(
+                    Vec3::new(x, ground + height * 0.5, z),
+                    Vec3::new(yaw * 0.7, yaw, 0.12),
+                    Vec3::new(half_x * 2.0, height, half_z * 2.0),
+                );
+                if let Some(id) = scene.spawn_with_mesh(rock, MeshId::PYRAMID) {
+                    scene.set_material(id, MaterialId::DEFAULT);
+                    entity_ids.push(id);
+                }
+            }
+            // Low shrubs fill the gaps without adding expensive geometry.
+            _ => {
+                let shrub = Transform3::new(
+                    Vec3::new(x, ground + 0.32, z),
+                    Vec3::new(0.0, yaw, 0.0),
+                    Vec3::new(half_x * 1.7, 0.64, half_z * 1.7),
+                );
+                if let Some(id) = scene.spawn_with_mesh(shrub, MeshId::CUBE) {
+                    scene.set_material(id, MaterialId::DEFAULT);
+                    entity_ids.push(id);
+                }
+            }
         }
     }
 }
