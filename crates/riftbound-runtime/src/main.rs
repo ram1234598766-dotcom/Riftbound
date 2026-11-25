@@ -60,6 +60,77 @@ fn vehicle_surface_label(surface: VehicleSurface) -> &'static str {
     }
 }
 
+fn vehicle_dust_scale(speed: f32, surface: VehicleSurface, pulse: f32) -> f32 {
+    if !speed.is_finite()
+        || !pulse.is_finite()
+        || speed.abs() < 1.0
+        || matches!(surface, VehicleSurface::Asphalt | VehicleSurface::Snow)
+    {
+        return 0.0;
+    }
+    let speed_factor = (speed.abs() / 18.0).clamp(0.0, 1.0);
+    let pulse_factor = (0.65 + 0.35 * pulse.sin()).clamp(0.0, 1.0);
+    (0.08 + speed_factor * 0.22) * pulse_factor
+}
+
+fn build_vehicle_dust_particles(scene: &mut Scene) -> Vec<EntityId> {
+    let mut particles = Vec::with_capacity(4);
+    for _ in 0..4 {
+        let transform = Transform3::new(
+            Vec3::new(0.0, -100.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        );
+        if let Some(entity) = scene.spawn_with_mesh(transform, MeshId::ENV_SHRUB) {
+            particles.push(entity);
+        }
+    }
+    particles
+}
+
+fn vehicle_dust_transforms(
+    entities: &[EntityId],
+    position: Vec3,
+    heading: f32,
+    speed: f32,
+    surface: VehicleSurface,
+    time: f32,
+) -> Vec<(EntityId, Transform3)> {
+    let mut transforms = Vec::with_capacity(entities.len());
+    let cosine = heading.cos();
+    let sine = heading.sin();
+    for (index, entity) in entities.iter().enumerate() {
+        let phase = time * 7.0 + index as f32 * 1.7;
+        let scale = vehicle_dust_scale(speed, surface, phase);
+        if scale <= 0.0 {
+            transforms.push((
+                *entity,
+                Transform3::new(
+                    Vec3::new(position.x, -100.0, position.z),
+                    Vec3::new(0.0, 0.0, 0.0),
+                    Vec3::new(0.0, 0.0, 0.0),
+                ),
+            ));
+            continue;
+        }
+        let side = if index % 2 == 0 { -0.62 } else { 0.62 };
+        let rear = 1.45 + (index / 2) as f32 * 0.35;
+        let world_x = position.x + cosine * side + sine * rear;
+        let world_z = position.z - sine * side + cosine * rear;
+        let ground = world_terrain_sample(world_x, world_z).height;
+        let drift = (phase * 0.7).sin() * 0.12;
+        transforms.push((
+            *entity,
+            Transform3::new(
+                Vec3::new(world_x + drift, ground + 0.10 + scale * 0.25, world_z),
+                Vec3::new(phase * 0.12, heading, phase * 0.08),
+                Vec3::new(scale * 0.9, scale * 0.55, scale * 0.9),
+            ),
+        ));
+    }
+    transforms
+}
+
 const MAX_SIMULATION_STEP: f32 = 1.0 / 30.0;
 
 fn clear_held_controls_on_focus_loss(input: &mut InputState) {
@@ -101,6 +172,7 @@ struct RiftboundApp {
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_wheel_rotation: f32,
     vehicle_wheel_steering: f32,
+    vehicle_dust_entities: Vec<EntityId>,
     vehicle_state: VehicleState,
     vehicle_surface_tracker: VehicleSurfaceTracker,
     vehicle_upgrades: VehicleUpgrades,
@@ -267,6 +339,7 @@ impl ApplicationHandler for RiftboundApp {
                 scene.set_material(player, MaterialId::RIFT);
                 let player_parts = build_player_character(&mut scene, player);
                 let (vehicle, vehicle_wheels) = build_vehicle(&mut scene);
+                let vehicle_dust_entities = build_vehicle_dust_particles(&mut scene);
                 let vehicle_state = VehicleState {
                     position: Vec3::new(0.0, 0.58, -1.2),
                     ..VehicleState::default()
@@ -346,6 +419,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.player_parts = Some(player_parts);
                 self.vehicle = Some(vehicle);
                 self.vehicle_wheels = Some(vehicle_wheels);
+                self.vehicle_dust_entities = vehicle_dust_entities;
                 self.vehicle_state = vehicle_state;
                 self.vehicle_surface_tracker =
                     VehicleSurfaceTracker::new(world_terrain_vehicle_surface(
@@ -370,7 +444,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
                 self.loot_entities = loot_entities;
-                self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
+                self.animated_transforms = Vec::with_capacity(16 + self.pickup_entities.len());
                 self.extraction = Some(extraction);
                 self.beacon_entity = Some(beacon_entity);
                 self.checkpoint_entity = Some(checkpoint_entity);
@@ -416,6 +490,7 @@ impl ApplicationHandler for RiftboundApp {
         self.world_streamer = None;
         self.world_slot_map = None;
         self.world_obstacle_entities.clear();
+        self.vehicle_dust_entities.clear();
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
         self.loot_entities.clear();
@@ -900,9 +975,25 @@ impl ApplicationHandler for RiftboundApp {
                                     ));
                                 }
                             }
+                            self.animated_transforms.extend(vehicle_dust_transforms(
+                                &self.vehicle_dust_entities,
+                                self.vehicle_state.position,
+                                self.vehicle_state.heading,
+                                self.vehicle_state.speed,
+                                self.vehicle_surface_tracker.current(),
+                                self.animation_time,
+                            ));
                         }
                     }
                     if !self.driving {
+                        self.animated_transforms.extend(vehicle_dust_transforms(
+                            &self.vehicle_dust_entities,
+                            self.vehicle_state.position,
+                            self.vehicle_state.heading,
+                            0.0,
+                            self.vehicle_surface_tracker.current(),
+                            self.animation_time,
+                        ));
                         // Return the front wheels to center after the player exits the vehicle.
                         self.vehicle_wheel_steering = smooth_wheel_steering(
                             self.vehicle_wheel_steering,
@@ -2359,6 +2450,34 @@ fn spawn_world_obstacle_props(
 #[allow(clippy::items_after_test_module)]
 mod world_prop_tests {
     use super::*;
+
+    #[test]
+    fn vehicle_dust_is_limited_to_moving_loose_terrain() {
+        assert_eq!(vehicle_dust_scale(12.0, VehicleSurface::Asphalt, 0.5), 0.0);
+        assert_eq!(vehicle_dust_scale(12.0, VehicleSurface::Snow, 0.5), 0.0);
+        assert_eq!(vehicle_dust_scale(0.2, VehicleSurface::Gravel, 0.5), 0.0);
+        for surface in [VehicleSurface::Gravel, VehicleSurface::Mud, VehicleSurface::Sand] {
+            let scale = vehicle_dust_scale(12.0, surface, 0.5);
+            assert!(scale > 0.0 && scale <= 0.30);
+        }
+    }
+
+    #[test]
+    fn vehicle_dust_pool_is_bounded_and_hidden_when_inactive() {
+        let mut scene = Scene::new();
+        let entities = build_vehicle_dust_particles(&mut scene);
+        assert_eq!(entities.len(), 4);
+        let transforms = vehicle_dust_transforms(
+            &entities,
+            Vec3::new(3.0, 1.0, 4.0),
+            0.0,
+            0.0,
+            VehicleSurface::Gravel,
+            0.0,
+        );
+        assert_eq!(transforms.len(), 4);
+        assert!(transforms.iter().all(|(_, transform)| transform.scale == Vec3::new(0.0, 0.0, 0.0)));
+    }
 
     #[test]
     fn terrain_streaming_follows_vehicle_while_driving_and_player_on_foot() {
