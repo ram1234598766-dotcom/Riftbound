@@ -527,8 +527,7 @@ fn append_vehicle_wheel_arch(
     }
 
     let row = u16::from(segments + 1) * 2;
-    for side in 0..2 {
-        let side_base = base + u16::from(side) * row;
+    for side_base in [base, base + row] {
         for segment in 0..segments {
             let start = side_base + segment * 2;
             indices.extend_from_slice(&[
