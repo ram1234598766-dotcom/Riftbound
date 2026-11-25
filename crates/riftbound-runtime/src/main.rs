@@ -11,10 +11,10 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleSurfaceTracker,
-    VehicleUpgrades,
-    WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample,
-    world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
+    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
+    VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
+    world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+    world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -715,13 +715,14 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            self.vehicle_surface_tracker.update(world_terrain_vehicle_surface(
-                                self.vehicle_state.position.x,
-                                self.vehicle_state.position.z,
-                                self.vehicle_state.heading,
-                                0.78,
-                                1.32,
-                            )),
+                            self.vehicle_surface_tracker
+                                .update(world_terrain_vehicle_surface(
+                                    self.vehicle_state.position.x,
+                                    self.vehicle_state.position.z,
+                                    self.vehicle_state.heading,
+                                    0.78,
+                                    1.32,
+                                )),
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
