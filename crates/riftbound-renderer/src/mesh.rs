@@ -1601,6 +1601,28 @@ mod tests {
     }
 
     #[test]
+    fn world_chunk_vertex_colors_include_slope_lighting() {
+        for side in [5, 9] {
+            let (vertices, _) = world_terrain_chunk_data(11, 0, side).expect("sand-region chunk");
+            let middle = side / 2;
+            let vertex = vertices[middle * side + middle];
+            let world_x = 11.0 * 64.0;
+            let world_z = 0.0;
+            let sample = world_terrain_sample(world_x, world_z);
+            let base = terrain_color_at(sample.surface, world_x, world_z);
+            let light = terrain_light_factor(world_x, world_z);
+            let elevation_tint = sample.height.max(0.0) * 0.012;
+            for channel in 0..3 {
+                let expected = (base[channel] * light + elevation_tint).min(1.0);
+                assert!(
+                    (vertex.color[channel] - expected).abs() < 1.0e-5,
+                    "side {side} channel {channel} did not include terrain lighting"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn detailed_chunk_edges_collapse_midpoints_for_distant_lod_seams() {
         let (vertices, _) = world_terrain_chunk_data(3, -4, 9).expect("detailed chunk");
         let side = 9;
