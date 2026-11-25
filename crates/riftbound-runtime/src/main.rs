@@ -13,7 +13,7 @@ use riftbound_core::{
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
-    world_road_sample, world_terrain_sample,
+    world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -813,59 +813,63 @@ impl ApplicationHandler for RiftboundApp {
                             self.vehicle_state.position.y = suspension_pose.average_ground_height
                                 + suspension_config.rest_length
                                 - suspension_pose.average_compression;
-                            let average_ground = world_terrain_sample(
+                            if let Some(ground_heights) = world_terrain_vehicle_ground_heights(
                                 self.vehicle_state.position.x,
                                 self.vehicle_state.position.z,
-                            )
-                            .height;
-                        let _ = self.vehicle_recovery.record_safe_state(
-                            self.vehicle_state,
-                            average_ground,
-                            2.5,
-                        );
-                        let vehicle_transform = Transform3::new(
-                            self.vehicle_state.position,
-                            Vec3::new(
-                                suspension_pose.pitch,
                                 self.vehicle_state.heading,
-                                suspension_pose.roll,
-                            ),
-                            Vec3::new(1.0, 1.0, 1.0),
-                        );
-                        if let Some(vehicle) = self.vehicle {
-                            self.animated_transforms.push((vehicle, vehicle_transform));
-                        }
-                        if let Some(wheels) = self.vehicle_wheels {
-                            self.vehicle_wheel_rotation = (self.vehicle_wheel_rotation
-                                + wheel_rotation_delta(self.vehicle_state.speed, vehicle_delta, 0.34))
-                                .rem_euclid(std::f32::consts::TAU);
-                            let wheel_spin = self.vehicle_wheel_rotation;
-                            self.vehicle_wheel_steering = smooth_wheel_steering(
-                                self.vehicle_wheel_steering,
-                                steering * 0.35,
-                                vehicle_delta,
-                            );
-                            let wheel_steering = self.vehicle_wheel_steering;
-                            let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
-                            for (index, wheel) in wheels.iter().enumerate() {
-                                let front = index < 2;
-                                let steer = if front { wheel_steering } else { 0.0 };
-                                let local_y = wheel_local_vertical_offset(
-                                    suspension_pose.wheel_compressions[index],
-                                    suspension_config.rest_length,
-                                    0.34,
+                                suspension_config.track_width * 0.5,
+                                suspension_config.wheelbase * 0.5,
+                            ) {
+                                let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
+                                let _ = self.vehicle_recovery.record_safe_state(
+                                    self.vehicle_state,
+                                    average_ground,
+                                    2.5,
                                 );
-                                let (local_x, local_z) = wheel_offsets[index];
-                                self.animated_transforms.push((
-                                    *wheel,
-                                    Transform3::new(
-                                        Vec3::new(local_x, local_y, local_z),
-                                        Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
-                                        Vec3::new(0.34, 0.68, 0.68),
-                                    ),
-                                ));
                             }
-                        }
+                            let vehicle_transform = Transform3::new(
+                                self.vehicle_state.position,
+                                Vec3::new(
+                                    suspension_pose.pitch,
+                                    self.vehicle_state.heading,
+                                    suspension_pose.roll,
+                                ),
+                                Vec3::new(1.0, 1.0, 1.0),
+                            );
+                            if let Some(vehicle) = self.vehicle {
+                                self.animated_transforms.push((vehicle, vehicle_transform));
+                            }
+                            if let Some(wheels) = self.vehicle_wheels {
+                                self.vehicle_wheel_rotation = (self.vehicle_wheel_rotation
+                                    + wheel_rotation_delta(self.vehicle_state.speed, vehicle_delta, 0.34))
+                                    .rem_euclid(std::f32::consts::TAU);
+                                let wheel_spin = self.vehicle_wheel_rotation;
+                                self.vehicle_wheel_steering = smooth_wheel_steering(
+                                    self.vehicle_wheel_steering,
+                                    steering * 0.35,
+                                    vehicle_delta,
+                                );
+                                let wheel_steering = self.vehicle_wheel_steering;
+                                let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
+                                for (index, wheel) in wheels.iter().enumerate() {
+                                    let front = index < 2;
+                                    let steer = if front { wheel_steering } else { 0.0 };
+                                    let local_y = wheel_local_vertical_offset(
+                                        suspension_pose.wheel_compressions[index],
+                                        suspension_config.rest_length,
+                                        0.34,
+                                    );
+                                    let (local_x, local_z) = wheel_offsets[index];
+                                    self.animated_transforms.push((
+                                        *wheel,
+                                        Transform3::new(
+                                            Vec3::new(local_x, local_y, local_z),
+                                            Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
+                                            Vec3::new(0.34, 0.68, 0.68),
+                                        ),
+                                    ));
+                                }
+                            }
                     }
                     }
                     if !self.driving {
