@@ -174,7 +174,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle_suspension = vehicle_suspension;
                 self.vehicle_recovery = vehicle_recovery;
                 self.driving = false;
-                self.collision = Some(arena_collision_world());
+                self.collision = Some(world_collision_world());
                 self.pickups = pickups;
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
@@ -1435,10 +1435,11 @@ fn build_crystal_markers(scene: &mut Scene) {
     }
 }
 
-/// Height of the native arena's procedural ground, in world-space Y units.
-/// Keep this formula aligned with the renderer's terrain vertex generator.
-fn arena_collision_world() -> CollisionWorld {
-    let mut world = CollisionWorld::new(Aabb2::new(-9.5, 9.5, -9.5, 9.5));
+/// Broad world bounds for the current streamed-world collision prototype.
+/// The starter obstacles remain as temporary blockout props until chunk-based
+/// obstacle data is introduced; the arena-sized outer boundary is removed.
+fn world_collision_world() -> CollisionWorld {
+    let mut world = CollisionWorld::new(Aabb2::new(-1_000_000.0, 1_000_000.0, -1_000_000.0, 1_000_000.0));
     world.add_obstacle(Aabb2::new(-2.75, -1.25, -1.75, -0.25));
     world.add_obstacle(Aabb2::new(1.75, 3.25, 0.75, 2.25));
     world.add_obstacle(Aabb2::new(-1.0, 1.0, 3.25, 4.75));
