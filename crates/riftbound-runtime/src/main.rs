@@ -88,19 +88,20 @@ fn build_vehicle_dust_particles(scene: &mut Scene) -> Vec<EntityId> {
     particles
 }
 
-fn vehicle_dust_transforms(
+fn append_vehicle_dust_transforms(
     entities: &[EntityId],
     position: Vec3,
     heading: f32,
     speed: f32,
     surface: VehicleSurface,
     time: f32,
-) -> Vec<(EntityId, Transform3)> {
-    let mut transforms = Vec::with_capacity(entities.len());
+    transforms: &mut Vec<(EntityId, Transform3)>,
+) {
     let cosine = heading.cos();
     let sine = heading.sin();
     for (index, entity) in entities.iter().enumerate() {
-        let phase = time * 7.0 + index as f32 * 1.7;
+        let index_phase = f32::from(u8::try_from(index).unwrap_or(0));
+        let phase = time * 7.0 + index_phase * 1.7;
         let scale = vehicle_dust_scale(speed, surface, phase);
         if scale <= 0.0 {
             transforms.push((
@@ -114,7 +115,8 @@ fn vehicle_dust_transforms(
             continue;
         }
         let side = if index % 2 == 0 { -0.62 } else { 0.62 };
-        let rear = 1.45 + (index / 2) as f32 * 0.35;
+        let rear_index = f32::from(u8::try_from(index / 2).unwrap_or(0));
+        let rear = 1.45 + rear_index * 0.35;
         let world_x = position.x + cosine * side + sine * rear;
         let world_z = position.z - sine * side + cosine * rear;
         let ground = world_terrain_sample(world_x, world_z).height;
@@ -128,7 +130,6 @@ fn vehicle_dust_transforms(
             ),
         ));
     }
-    transforms
 }
 
 const MAX_SIMULATION_STEP: f32 = 1.0 / 30.0;
@@ -975,25 +976,27 @@ impl ApplicationHandler for RiftboundApp {
                                     ));
                                 }
                             }
-                            self.animated_transforms.extend(vehicle_dust_transforms(
+                            append_vehicle_dust_transforms(
                                 &self.vehicle_dust_entities,
                                 self.vehicle_state.position,
                                 self.vehicle_state.heading,
                                 self.vehicle_state.speed,
                                 self.vehicle_surface_tracker.current(),
                                 self.animation_time,
-                            ));
+                                &mut self.animated_transforms,
+                            );
                         }
                     }
                     if !self.driving {
-                        self.animated_transforms.extend(vehicle_dust_transforms(
+                        append_vehicle_dust_transforms(
                             &self.vehicle_dust_entities,
                             self.vehicle_state.position,
                             self.vehicle_state.heading,
                             0.0,
                             self.vehicle_surface_tracker.current(),
                             self.animation_time,
-                        ));
+                            &mut self.animated_transforms,
+                        );
                         // Return the front wheels to center after the player exits the vehicle.
                         self.vehicle_wheel_steering = smooth_wheel_steering(
                             self.vehicle_wheel_steering,
@@ -2467,13 +2470,15 @@ mod world_prop_tests {
         let mut scene = Scene::new();
         let entities = build_vehicle_dust_particles(&mut scene);
         assert_eq!(entities.len(), 4);
-        let transforms = vehicle_dust_transforms(
+        let mut transforms = Vec::with_capacity(4);
+        append_vehicle_dust_transforms(
             &entities,
             Vec3::new(3.0, 1.0, 4.0),
             0.0,
             0.0,
             VehicleSurface::Gravel,
             0.0,
+            &mut transforms,
         );
         assert_eq!(transforms.len(), 4);
         assert!(transforms.iter().all(|(_, transform)| transform.scale == Vec3::new(0.0, 0.0, 0.0)));
