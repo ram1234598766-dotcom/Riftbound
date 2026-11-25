@@ -1460,11 +1460,8 @@ impl ApplicationHandler for RiftboundApp {
                         .scene()
                         .get(player)
                         .map_or(self.camera_target, |transform| transform.translation);
-                    let world_focus = world_stream_focus(
-                        self.driving,
-                        self.vehicle_state.position,
-                        player_focus,
-                    );
+                    let world_focus =
+                        world_stream_focus(self.driving, self.vehicle_state.position, player_focus);
                     if let (Some(streamer), Some(slot_map)) =
                         (self.world_streamer.as_mut(), self.world_slot_map.as_mut())
                     {
