@@ -1205,6 +1205,36 @@ mod tests {
     }
 
     #[test]
+    fn northbound_bridge_has_guardrails_and_support_piers_at_both_lods() {
+        for side in [5, 9] {
+            let (vertices, indices) =
+                world_terrain_chunk_data(1, -1, side).expect("bridge chunk");
+            let lower_rail_count = vertices
+                .iter()
+                .filter(|vertex| vertex.color == [0.42, 0.45, 0.48])
+                .count();
+            let upper_rail_count = vertices
+                .iter()
+                .filter(|vertex| vertex.color == [0.58, 0.61, 0.64])
+                .count();
+            let pier_count = vertices
+                .iter()
+                .filter(|vertex| vertex.color == [0.38, 0.4, 0.43])
+                .count();
+            assert_eq!(lower_rail_count, 20);
+            assert_eq!(upper_rail_count, 20);
+            assert_eq!(pier_count, 16);
+            assert!(valid_index_data(vertices.len(), &indices));
+
+            let bridge_deck = world_terrain_sample(80.0, -72.0).height;
+            assert!(vertices.iter().any(|vertex| {
+                (vertex.position[1] - (bridge_deck + 1.1)).abs() < 1.0e-4
+                    && vertex.color == [0.58, 0.61, 0.64]
+            }));
+        }
+    }
+
+    #[test]
     fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
