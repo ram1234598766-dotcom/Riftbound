@@ -21,6 +21,8 @@ pub struct HudData {
     pub equipment: String,
     /// Optional vehicle speed and terrain readout while driving.
     pub vehicle_info: Option<String>,
+    /// Blended vehicle tyre grip, as a percentage.
+    pub vehicle_grip: Option<u8>,
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
@@ -161,9 +163,22 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     }
     if let Some(vehicle_info) = &data.vehicle_info {
         let panel_y = if width < 680.0 { 350.0 } else { 194.0 };
-        rect(out, 22.0, panel_y, 250.0, 38.0, panel, width, height);
-        rect(out, 22.0, panel_y, 3.0, 38.0, [1.0, 0.62, 0.28, 1.0], width, height);
-        text(out, vehicle_info, 38.0, panel_y + 13.0, 1.5, white, width, height);
+        rect(out, 22.0, panel_y, 270.0, 54.0, panel, width, height);
+        rect(out, 22.0, panel_y, 3.0, 54.0, [1.0, 0.62, 0.28, 1.0], width, height);
+        text(out, vehicle_info, 38.0, panel_y + 10.0, 1.5, white, width, height);
+        if let Some(grip) = data.vehicle_grip {
+            let ratio = f32::from(grip.min(100)) / 100.0;
+            let grip_color = if ratio < 0.45 {
+                [1.0, 0.36, 0.24, 1.0]
+            } else if ratio < 0.72 {
+                [1.0, 0.72, 0.28, 1.0]
+            } else {
+                [0.25, 0.88, 1.0, 1.0]
+            };
+            text(out, &format!("TYRE GRIP {grip}%"), 38.0, panel_y + 30.0, 1.25, grip_color, width, height);
+            rect(out, 170.0, panel_y + 34.0, 102.0, 5.0, muted, width, height);
+            rect(out, 170.0, panel_y + 34.0, 102.0 * ratio, 5.0, grip_color, width, height);
+        }
     }
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
