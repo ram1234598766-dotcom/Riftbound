@@ -1692,8 +1692,8 @@ mod tests {
         for (detailed_row, distant_row) in [(0, 0), (2, 1), (4, 2), (6, 3), (8, 4)] {
             let detailed_vertex = detailed.0[detailed_row * 9 + 8];
             let distant_vertex = distant.0[distant_row * 5];
-            let detailed_world_x = detailed_vertex.position[0] + 32.0;
-            let distant_world_x = distant_vertex.position[0] + 64.0 - 32.0;
+            let detailed_world_x = detailed_vertex.position[0];
+            let distant_world_x = distant_vertex.position[0] + 64.0;
             assert!((detailed_world_x - 32.0).abs() < 1.0e-4);
             assert!((distant_world_x - 32.0).abs() < 1.0e-4);
             assert_eq!(detailed_vertex.position[1], distant_vertex.position[1]);
