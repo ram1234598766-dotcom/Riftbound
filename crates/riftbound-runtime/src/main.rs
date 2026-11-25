@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld,
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
-    ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
+    Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, PlayerProgression, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
     terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
@@ -64,6 +64,7 @@ struct RiftboundApp {
     support_enemies: Vec<(EntityId, EntityId, EnemyBrain, f32)>,
     player_health: PlayerHealth,
     progression: PlayerProgression,
+    inventory: Inventory,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -802,6 +803,14 @@ impl ApplicationHandler for RiftboundApp {
                             );
                             let collected_count = collected.len();
                             if collected_count > 0 {
+                                let shard_overflow = self
+                                    .inventory
+                                    .add(ItemKind::RiftShard, collected_count as u16);
+                                if shard_overflow > 0 {
+                                    log::warn!(
+                                        "Inventory full: {shard_overflow} rift shard(s) could not be stored"
+                                    );
+                                }
                                 let awarded_xp = (collected_count as u64) * 25;
                                 let levels_gained = self.progression.award_xp(awarded_xp);
                                 log::info!(
