@@ -398,9 +398,148 @@ impl WorldChunkStreamer {
     }
 }
 
+
+/// One CPU-generated terrain vertex in absolute world coordinates.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WorldTerrainVertex {
+    /// Absolute world-space position (X, elevation, Z).
+    pub position: [f32; 3],
+    /// Smooth, world-space terrain normal shared by neighbouring chunks.
+    pub normal: [f32; 3],
+    /// Surface material sampled at this vertex.
+    pub surface: crate::VehicleSurface,
+}
+
+/// CPU mesh payload for one streamed terrain chunk.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WorldTerrainMeshData {
+    /// Number of vertices along each grid edge.
+    pub resolution: usize,
+    /// Row-major terrain vertices.
+    pub vertices: Vec<WorldTerrainVertex>,
+    /// Triangle-list indices with consistent upward winding.
+    pub indices: Vec<u32>,
+}
+
+/// Builds a deterministic terrain grid for a chunk request.
+///
+/// Vertex positions are sampled in absolute coordinates. Normals use a fixed
+/// world-space finite-difference interval, so shared chunk-edge vertices produce
+/// identical results regardless of which chunk generated them.
+#[must_use]
+pub fn build_world_chunk_mesh(request: WorldChunkRequest) -> Option<WorldTerrainMeshData> {
+    const NORMAL_STEP: f32 = 1.0;
+    let resolution = match request.lod {
+        WorldChunkLod::Detailed => 9,
+        WorldChunkLod::Distant => 5,
+    };
+    let spacing = WORLD_CHUNK_SIZE / (resolution - 1) as f32;
+    let origin_x = request.coord.x as f32 * WORLD_CHUNK_SIZE;
+    let origin_z = request.coord.z as f32 * WORLD_CHUNK_SIZE;
+    let mut vertices = Vec::with_capacity(resolution * resolution);
+
+    for row in 0..resolution {
+        for column in 0..resolution {
+            let x = origin_x + column as f32 * spacing;
+            let z = origin_z + row as f32 * spacing;
+            let center = crate::world_terrain_sample(x, z);
+            let left = crate::world_terrain_sample(x - NORMAL_STEP, z).height;
+            let right = crate::world_terrain_sample(x + NORMAL_STEP, z).height;
+            let north = crate::world_terrain_sample(x, z - NORMAL_STEP).height;
+            let south = crate::world_terrain_sample(x, z + NORMAL_STEP).height;
+            let dx = (right - left) / (2.0 * NORMAL_STEP);
+            let dz = (south - north) / (2.0 * NORMAL_STEP);
+            let length = (dx * dx + 1.0 + dz * dz).sqrt();
+            if !center.height.is_finite() || !length.is_finite() || length <= f32::EPSILON {
+                return None;
+            }
+            vertices.push(WorldTerrainVertex {
+                position: [x, center.height, z],
+                normal: [-dx / length, 1.0 / length, -dz / length],
+                surface: center.surface,
+            });
+        }
+    }
+
+    let mut indices = Vec::with_capacity((resolution - 1) * (resolution - 1) * 6);
+    for row in 0..(resolution - 1) {
+        for column in 0..(resolution - 1) {
+            let top_left = u32::try_from(row * resolution + column).ok()?;
+            let top_right = top_left + 1;
+            let bottom_left = top_left + u32::try_from(resolution).ok()?;
+            let bottom_right = bottom_left + 1;
+            indices.extend_from_slice(&[
+                top_left, bottom_left, top_right,
+                top_right, bottom_left, bottom_right,
+            ]);
+        }
+    }
+
+    Some(WorldTerrainMeshData { resolution, vertices, indices })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn generated_chunk_mesh_has_expected_bounded_grid_and_indices() {
+        let request = WorldChunkRequest {
+            coord: WorldChunkCoord { x: 0, z: 0 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 0,
+        };
+        let mesh = build_world_chunk_mesh(request).expect("valid terrain mesh");
+        assert_eq!(mesh.resolution, 9);
+        assert_eq!(mesh.vertices.len(), 81);
+        assert_eq!(mesh.indices.len(), 8 * 8 * 6);
+        assert!(mesh.vertices.iter().all(|vertex| {
+            vertex.position.iter().all(|value| value.is_finite())
+                && vertex.normal.iter().all(|value| value.is_finite())
+                && (vertex.normal[0].powi(2) + vertex.normal[1].powi(2) + vertex.normal[2].powi(2) - 1.0).abs() < 1.0e-4
+                && vertex.normal[1] > 0.0
+        }));
+    }
+
+    #[test]
+    fn adjacent_chunk_edges_match_positions_heights_and_normals() {
+        let left = build_world_chunk_mesh(WorldChunkRequest {
+            coord: WorldChunkCoord { x: 2, z: -3 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 0,
+        }).expect("left chunk");
+        let right = build_world_chunk_mesh(WorldChunkRequest {
+            coord: WorldChunkCoord { x: 3, z: -3 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 1,
+        }).expect("right chunk");
+        for row in 0..left.resolution {
+            let a = left.vertices[row * left.resolution + left.resolution - 1];
+            let b = right.vertices[row * right.resolution];
+            assert_eq!(a.position, b.position);
+            assert_eq!(a.normal, b.normal);
+        }
+    }
+
+    #[test]
+    fn distant_and_detailed_chunks_share_aligned_boundary_samples() {
+        let detailed = build_world_chunk_mesh(WorldChunkRequest {
+            coord: WorldChunkCoord { x: 0, z: 0 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 0,
+        }).expect("detailed chunk");
+        let distant = build_world_chunk_mesh(WorldChunkRequest {
+            coord: WorldChunkCoord { x: 1, z: 0 },
+            lod: WorldChunkLod::Distant,
+            distance_squared: 1,
+        }).expect("distant chunk");
+        for row in 0..distant.resolution {
+            let a = detailed.vertices[(row * 2) * detailed.resolution + 8];
+            let b = distant.vertices[row * distant.resolution];
+            assert_eq!(a.position, b.position);
+            assert_eq!(a.normal, b.normal);
+        }
+    }
+
 
     #[test]
     fn standard_window_is_bounded_and_uses_two_detail_tiers() {
