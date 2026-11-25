@@ -66,6 +66,7 @@ struct RiftboundApp {
     progression: PlayerProgression,
     inventory: Inventory,
     equipment: Equipment,
+    inventory_open: bool,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -201,7 +202,9 @@ impl ApplicationHandler for RiftboundApp {
                 self.inventory = Inventory::default();
                 self.inventory.add(ItemKind::ExplorerVest, 1);
                 self.inventory.add(ItemKind::TrailBoots, 1);
+                self.inventory.add(ItemKind::Medkit, 2);
                 self.equipment = Equipment::default();
+                self.inventory_open = false;
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
                 self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
@@ -312,8 +315,24 @@ impl ApplicationHandler for RiftboundApp {
                             log::info!("Exited vehicle prototype");
                         }
                     }
+                    if event.state == ElementState::Pressed && key == KeyCode::KeyI {
+                        self.inventory_open = !self.inventory_open;
+                    }
                     if event.state == ElementState::Pressed {
                         match key {
+                            KeyCode::Digit5 => {
+                                if self.inventory.count(ItemKind::Medkit) > 0 {
+                                    let restored = self.player_health.heal(35);
+                                    if restored > 0 {
+                                        self.inventory.remove(ItemKind::Medkit, 1);
+                                        log::info!("Medkit used: restored {restored} health");
+                                    } else {
+                                        log::info!("Health is already full; medkit was not consumed");
+                                    }
+                                } else {
+                                    log::info!("No medkits available");
+                                }
+                            }
                             KeyCode::Digit1 => {
                                 if self.inventory.equip_from_inventory(
                                     &mut self.equipment,
@@ -1040,6 +1059,27 @@ impl ApplicationHandler for RiftboundApp {
                                 prompt,
                                 health: self.player_health.current(),
                                 max_health: self.player_health.maximum(),
+                                inventory: self.inventory_open.then(|| {
+                                    format!(
+                                        "SHARDS {} SALV {} MED {}",
+                                        self.inventory.count(ItemKind::RiftShard),
+                                        self.inventory.count(ItemKind::Salvage),
+                                        self.inventory.count(ItemKind::Medkit),
+                                    )
+                                }),
+                                equipment: format!(
+                                    "BODY {} FEET {}",
+                                    if self.equipment.item(EquipmentSlot::Body).is_some() {
+                                        "VEST"
+                                    } else {
+                                        "NONE"
+                                    },
+                                    if self.equipment.item(EquipmentSlot::Feet).is_some() {
+                                        "BOOTS"
+                                    } else {
+                                        "NONE"
+                                    },
+                                ),
                             });
                         }
                         Ok(false) => {
