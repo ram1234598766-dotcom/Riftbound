@@ -467,6 +467,69 @@ fn world_terrain_chunk_data(
                 ]);
             }
         }
+
+        // Dash spacing is fixed in world units, not tied to terrain LOD, so
+        // markings line up when adjacent chunks use different mesh densities.
+        const DASH_COUNT: usize = 8;
+        const DASH_LENGTH: f32 = 4.0;
+        const DASH_STEP: f32 = 8.0;
+        const LINE_HALF_WIDTH: f32 = 0.12;
+        for dash in 0..DASH_COUNT {
+            let start_z = -32.0 + f32::from(u8::try_from(dash).ok()?) * DASH_STEP;
+            let end_z = start_z + DASH_LENGTH;
+            let start_world_z = origin_z + start_z;
+            let end_world_z = origin_z + end_z;
+            let start_road = world_road_sample(origin_x, start_world_z);
+            let end_road = world_road_sample(origin_x, end_world_z);
+            let start_height =
+                world_terrain_sample(start_road.center_x, start_world_z).height + 0.24;
+            let end_height =
+                world_terrain_sample(end_road.center_x, end_world_z).height + 0.24;
+            let line_start = u16::try_from(vertices.len()).ok()?;
+            let line_color = [0.95, 0.78, 0.28];
+            vertices.extend_from_slice(&[
+                MeshVertex {
+                    position: [
+                        start_road.center_x - LINE_HALF_WIDTH - origin_x,
+                        start_height,
+                        start_z,
+                    ],
+                    color: line_color,
+                },
+                MeshVertex {
+                    position: [
+                        start_road.center_x + LINE_HALF_WIDTH - origin_x,
+                        start_height,
+                        start_z,
+                    ],
+                    color: line_color,
+                },
+                MeshVertex {
+                    position: [
+                        end_road.center_x - LINE_HALF_WIDTH - origin_x,
+                        end_height,
+                        end_z,
+                    ],
+                    color: line_color,
+                },
+                MeshVertex {
+                    position: [
+                        end_road.center_x + LINE_HALF_WIDTH - origin_x,
+                        end_height,
+                        end_z,
+                    ],
+                    color: line_color,
+                },
+            ]);
+            indices.extend_from_slice(&[
+                line_start,
+                line_start + 2,
+                line_start + 1,
+                line_start + 1,
+                line_start + 2,
+                line_start + 3,
+            ]);
+        }
     }
 
     // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
@@ -667,10 +730,10 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4);
-        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4);
-        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6);
-        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6);
+        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4);
+        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4);
+        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6);
+        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6);
         assert!(valid_index_data(detailed.0.len(), &detailed.1));
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
@@ -723,10 +786,30 @@ mod tests {
     }
 
     #[test]
+    fn road_centre_markings_have_lod_independent_world_spacing() {
+        for side in [5, 9] {
+            let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("road chunk");
+            let base_vertices = side * side + 4 * (side - 1) * 4;
+            let ribbon_vertices = side * 4;
+            let marking_start = base_vertices + ribbon_vertices;
+            let markings = &vertices[marking_start..marking_start + 8 * 4];
+            assert_eq!(markings.len(), 32);
+            for dash in 0..8 {
+                let segment = &markings[dash * 4..dash * 4 + 4];
+                assert!((segment[1].position[0] - segment[0].position[0] - 0.24).abs() < 1.0e-4);
+                assert!((segment[3].position[0] - segment[2].position[0] - 0.24).abs() < 1.0e-4);
+                assert!((segment[2].position[2] - segment[0].position[2] - 4.0).abs() < 1.0e-4);
+                assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
+            }
+            assert!(valid_index_data(vertices.len(), &indices));
+        }
+    }
+
+    #[test]
     fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
-        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4);
+        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4);
         assert_eq!(distant_chunk.0.len(), 81 + 4 * 8 * 4);
         assert_eq!(distant_chunk.1.len(), 384 + 4 * 8 * 6);
     }
