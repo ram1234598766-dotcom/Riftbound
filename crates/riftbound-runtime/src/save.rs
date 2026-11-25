@@ -20,9 +20,13 @@ pub struct SavedProfile {
 
 impl Default for SavedProfile {
     fn default() -> Self {
+        let mut inventory = Inventory::default();
+        inventory.add(ItemKind::ExplorerVest, 1);
+        inventory.add(ItemKind::TrailBoots, 1);
+        inventory.add(ItemKind::Medkit, 2);
         Self {
             upgrades: VehicleUpgrades::default(),
-            inventory: Inventory::default(),
+            inventory,
             equipment: Equipment::default(),
             progression: PlayerProgression::default(),
         }
