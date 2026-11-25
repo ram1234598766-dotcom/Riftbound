@@ -1501,15 +1501,41 @@ fn world_obstacle_footprints(chunks: &[WorldChunkRequest]) -> Vec<Aabb2> {
             let center_x = origin_x + side * (13.0 + (selector % 9) as f32);
             let center_z = origin_z + 10.0 + ((selector >> 8) % 40) as f32;
             let half_size = 0.65 + ((selector >> 16) % 8) as f32 * 0.12;
-            if selector % 5 != 0 {
+
+            // Keep generated props out of the primary road and both branch roads.
+            // The extra margin accounts for the visible tree crown, not just its trunk.
+            let main_road = world_road_sample(center_x, center_z);
+            let on_eastbound_spur = (0.0..=160.0).contains(&center_x)
+                && center_z.abs() <= 11.0;
+            let on_northbound_branch = (-132.0..=2.0).contains(&center_z)
+                && (center_x - 80.0).abs() <= 11.0;
+            let road_clearance = main_road.lateral_distance.abs()
+                > main_road.half_width + 3.0;
+            if selector % 5 != 0
+                && road_clearance
+                && !on_eastbound_spur
+                && !on_northbound_branch
+            {
                 obstacles.push(Aabb2::new(
-                    center_x - half_size, center_x + half_size,
-                    center_z - half_size, center_z + half_size,
+                    center_x - half_size,
+                    center_x + half_size,
+                    center_z - half_size,
+                    center_z + half_size,
                 ));
             }
         }
     }
     obstacles
+}
+
+/// Derives visual variation from world position so chunk enumeration order cannot change props.
+fn world_prop_variant(x: f32, z: f32) -> (u32, f32) {
+    let mut hash = x.to_bits().rotate_left(7) ^ z.to_bits().rotate_right(5);
+    hash ^= hash >> 16;
+    hash = hash.wrapping_mul(0x7FEB_352D);
+    hash ^= hash >> 15;
+    let yaw = (hash % 701) as f32 * 0.001 - 0.35;
+    (hash % 3, yaw)
 }
 
 /// Keeps visible blockout props and collision footprints aligned to active chunks.
@@ -1527,15 +1553,15 @@ fn spawn_world_obstacle_props(
     for id in entity_ids.drain(..) {
         scene.despawn(id);
     }
-    for (index, footprint) in world_obstacle_footprints(chunks).into_iter().enumerate() {
+    for footprint in world_obstacle_footprints(chunks) {
         let x = f32::midpoint(footprint.min_x, footprint.max_x);
         let z = f32::midpoint(footprint.min_z, footprint.max_z);
         let half_x = (footprint.max_x - footprint.min_x) * 0.5;
         let half_z = (footprint.max_z - footprint.min_z) * 0.5;
         let ground = world_terrain_sample(x, z).height;
-        let yaw = ((index % 7) as f32 - 3.0) * 0.11;
+        let (variant, yaw) = world_prop_variant(x, z);
 
-        match index % 3 {
+        match variant {
             // A two-part tree silhouette: narrow trunk and broad faceted crown.
             0 => {
                 let trunk = Transform3::new(
@@ -1635,6 +1661,44 @@ mod world_prop_tests {
                 && footprint.min_z < footprint.max_z
         }));
         assert!(first.len() <= chunks.len() * 2);
+    }
+
+    #[test]
+    fn prop_variants_and_yaw_are_independent_of_chunk_order() {
+        let first = world_prop_variant(17.5, -42.0);
+        let second = world_prop_variant(-91.0, 128.0);
+        assert_eq!(first, world_prop_variant(17.5, -42.0));
+        assert_eq!(second, world_prop_variant(-91.0, 128.0));
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn obstacle_footprints_keep_clear_of_all_road_corridors() {
+        let chunks = [
+            WorldChunkRequest {
+                coord: riftbound_core::WorldChunkCoord { x: 0, z: 0 },
+                lod: riftbound_core::WorldChunkLod::Detailed,
+                distance_squared: 0,
+            },
+            WorldChunkRequest {
+                coord: riftbound_core::WorldChunkCoord { x: 1, z: -1 },
+                lod: riftbound_core::WorldChunkLod::Detailed,
+                distance_squared: 1,
+            },
+            WorldChunkRequest {
+                coord: riftbound_core::WorldChunkCoord { x: 1, z: -2 },
+                lod: riftbound_core::WorldChunkLod::Detailed,
+                distance_squared: 4,
+            },
+        ];
+        for footprint in world_obstacle_footprints(&chunks) {
+            let x = f32::midpoint(footprint.min_x, footprint.max_x);
+            let z = f32::midpoint(footprint.min_z, footprint.max_z);
+            let road = world_road_sample(x, z);
+            assert!(road.lateral_distance.abs() > road.half_width + 3.0);
+            assert!(!((0.0..=160.0).contains(&x) && z.abs() <= 11.0));
+            assert!(!((-132.0..=2.0).contains(&z) && (x - 80.0).abs() <= 11.0));
+        }
     }
 }
 
