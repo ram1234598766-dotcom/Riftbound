@@ -634,7 +634,7 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
     }
 }
 
-/// Adds stable, low-amplitude surface variation without texture memory or per-frame work.
+/// Adds stable surface variation and blends biome colours across broad boundary zones.
 fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32; 3] {
     let x = world_x.round() as i32 as u32;
     let z = world_z.round() as i32 as u32;
@@ -643,12 +643,46 @@ fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32
     hash = hash.wrapping_mul(0x7FEB_352D);
     hash ^= hash >> 15;
     let variation = ((hash & 0xFFFF) as f32 / 65_535.0 - 0.5) * 0.035;
-    let base = terrain_surface_color(surface);
+
+    // Gameplay surfaces remain discrete for vehicle handling; only their rendered
+    // colours blend over 96 world units to avoid hard visual biome borders.
+    let gravel = terrain_surface_color(VehicleSurface::Gravel);
+    let base = match surface {
+        VehicleSurface::Sand => blend_terrain_color(
+            gravel,
+            terrain_surface_color(VehicleSurface::Sand),
+            smooth_terrain_blend((world_x - 650.0) / 96.0),
+        ),
+        VehicleSurface::Mud => blend_terrain_color(
+            gravel,
+            terrain_surface_color(VehicleSurface::Mud),
+            smooth_terrain_blend((-world_x - 650.0) / 96.0),
+        ),
+        VehicleSurface::Snow => blend_terrain_color(
+            gravel,
+            terrain_surface_color(VehicleSurface::Snow),
+            smooth_terrain_blend((-world_z - 650.0) / 96.0),
+        ),
+        _ => terrain_surface_color(surface),
+    };
     [
         (base[0] + variation).clamp(0.0, 1.0),
         (base[1] + variation * 0.72).clamp(0.0, 1.0),
         (base[2] + variation * 0.42).clamp(0.0, 1.0),
     ]
+}
+
+fn blend_terrain_color(start: [f32; 3], end: [f32; 3], amount: f32) -> [f32; 3] {
+    [
+        start[0] + (end[0] - start[0]) * amount,
+        start[1] + (end[1] - start[1]) * amount,
+        start[2] + (end[2] - start[2]) * amount,
+    ]
+}
+
+fn smooth_terrain_blend(value: f32) -> f32 {
+    let value = value.clamp(0.0, 1.0);
+    value * value * (3.0 - 2.0 * value)
 }
 
 fn terrain_chunk_data(
@@ -1819,6 +1853,39 @@ mod vehicle_mesh_tests {
         assert_eq!(first, repeated);
         assert_ne!(first, nearby);
         assert!(first.iter().all(|channel| (0.0..=1.0).contains(channel)));
+    }
+
+    #[test]
+    fn biome_colour_blends_are_smooth_and_reach_their_target_palette() {
+        for (surface, boundary_x, boundary_z, direction) in [
+            (VehicleSurface::Sand, 650.0, 120.0, 0.0),
+            (VehicleSurface::Mud, -650.0, 120.0, 1.0),
+            (VehicleSurface::Snow, 120.0, -650.0, 2.0),
+        ] {
+            let near = if direction == 0.0 {
+                terrain_color_at(surface, boundary_x + 1.0, boundary_z)
+            } else if direction == 1.0 {
+                terrain_color_at(surface, boundary_x - 1.0, boundary_z)
+            } else {
+                terrain_color_at(surface, boundary_x, boundary_z - 1.0)
+            };
+            let far = if direction == 0.0 {
+                terrain_color_at(surface, boundary_x + 160.0, boundary_z)
+            } else if direction == 1.0 {
+                terrain_color_at(surface, boundary_x - 160.0, boundary_z)
+            } else {
+                terrain_color_at(surface, boundary_x, boundary_z - 160.0)
+            };
+            let target = terrain_surface_color(surface);
+            assert!(near.iter().all(|channel| (0.0..=1.0).contains(channel)));
+            assert!(far.iter().zip(target).all(|(actual, expected)| {
+                (actual - expected).abs() < 0.025
+            }));
+        }
+
+        let before = terrain_color_at(VehicleSurface::Sand, 650.0, 120.0);
+        let after = terrain_color_at(VehicleSurface::Sand, 651.0, 120.0);
+        assert!(before.iter().zip(after).all(|(a, b)| (a - b).abs() < 0.04));
     }
 
     #[test]
