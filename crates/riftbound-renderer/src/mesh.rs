@@ -584,6 +584,49 @@ fn world_terrain_chunk_data(
                     ]);
                 }
             }
+
+            // Keep the spur's centre dashes aligned in absolute world space.
+            // Each chunk emits only the complete dash segments it owns.
+            const SPUR_DASH_LENGTH: f32 = 4.0;
+            const SPUR_DASH_STEP: f32 = 8.0;
+            const SPUR_LINE_HALF_WIDTH: f32 = 0.12;
+            for dash in 0..20 {
+                let start_x = f32::from(u8::try_from(dash).ok()?) * SPUR_DASH_STEP;
+                let end_x = start_x + SPUR_DASH_LENGTH;
+                if start_x < spur_min_x || end_x > spur_max_x {
+                    continue;
+                }
+                let start_height = world_terrain_sample(start_x, 0.0).height + 0.27;
+                let end_height = world_terrain_sample(end_x, 0.0).height + 0.27;
+                let line_start = u16::try_from(vertices.len()).ok()?;
+                let line_color = [0.95, 0.78, 0.28];
+                vertices.extend_from_slice(&[
+                    MeshVertex {
+                        position: [start_x - origin_x, start_height, -SPUR_LINE_HALF_WIDTH],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [start_x - origin_x, start_height, SPUR_LINE_HALF_WIDTH],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [end_x - origin_x, end_height, -SPUR_LINE_HALF_WIDTH],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [end_x - origin_x, end_height, SPUR_LINE_HALF_WIDTH],
+                        color: line_color,
+                    },
+                ]);
+                indices.extend_from_slice(&[
+                    line_start,
+                    line_start + 2,
+                    line_start + 1,
+                    line_start + 1,
+                    line_start + 2,
+                    line_start + 3,
+                ]);
+            }
         }
     }
 
@@ -785,10 +828,10 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
-        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4 + 5 * 4);
-        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6);
-        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6 + 4 * 3 * 6);
+        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4 + 4 * 4);
+        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4 + 5 * 4 + 4 * 4);
+        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6);
+        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6);
         assert!(valid_index_data(detailed.0.len(), &detailed.1));
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
@@ -902,8 +945,8 @@ mod tests {
         assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
         // This X-neighbour owns the eastbound spur, not the primary road ribbon
         // or its centre markings. Its remaining extra vertices are the terrain skirts.
-        assert_eq!(distant_chunk.0.len(), 81 + 9 * 4 + 4 * 8 * 4);
-        assert_eq!(distant_chunk.1.len(), 384 + 8 * 3 * 6 + 4 * 8 * 6);
+        assert_eq!(distant_chunk.0.len(), 81 + 9 * 4 + 8 * 4 + 4 * 8 * 4);
+        assert_eq!(distant_chunk.1.len(), 384 + 8 * 3 * 6 + 8 * 6 + 4 * 8 * 6);
     }
 
     #[test]
