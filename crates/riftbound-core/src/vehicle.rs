@@ -977,6 +977,20 @@ impl SuspensionState {
                 - self.average_ground_velocity * config.damping;
             self.average_ground_velocity += body_follow_acceleration * step_dt;
             self.average_ground_height += self.average_ground_velocity * step_dt;
+            // Front and rear anti-roll coupling transfers some spring response
+            // across each axle, resisting excessive body lean on side slopes.
+            let front_anti_roll = (self.compression[0] - self.compression[1])
+                * config.spring_strength
+                * 0.12;
+            let rear_anti_roll = (self.compression[2] - self.compression[3])
+                * config.spring_strength
+                * 0.12;
+            let anti_roll_accelerations = [
+                -front_anti_roll,
+                front_anti_roll,
+                -rear_anti_roll,
+                rear_anti_roll,
+            ];
             for (index, target) in target_compressions.iter().copied().enumerate() {
                 // Corners crossing a ridge or rut receive a small extra damping
                 // bias proportional to their deviation from the four-wheel mean.
@@ -1005,7 +1019,8 @@ impl SuspensionState {
                     * compression_progress;
                 let acceleration = (target - self.compression[index]) * config.spring_strength
                     - self.compression_velocity[index] * rebound_damping
-                    + bump_stop_acceleration;
+                    + bump_stop_acceleration
+                    + anti_roll_accelerations[index];
                 self.compression_velocity[index] += acceleration * step_dt;
                 self.compression[index] = (self.compression[index]
                     + self.compression_velocity[index] * step_dt)
@@ -1918,6 +1933,25 @@ mod tests {
 
         assert!(recovered_pose.roll.abs() < ridge_pose.roll.abs());
         assert!(recovered_pose.roll.abs() < 0.001);
+    }
+
+    #[test]
+    fn suspension_anti_roll_couples_left_and_right_wheel_response() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        let side_slope = [0.3, 0.0, 0.3, 0.0];
+
+        for _ in 0..120 {
+            suspension.update(side_slope, 0.58, config, 1.0 / 60.0);
+        }
+
+        let pose = suspension.pose(config);
+        let front_gap = (pose.wheel_compressions[0] - pose.wheel_compressions[1]).abs();
+        let rear_gap = (pose.wheel_compressions[2] - pose.wheel_compressions[3]).abs();
+        let target_gap = (0.3_f32).min(config.max_travel);
+        assert!(front_gap < target_gap);
+        assert!(rear_gap < target_gap);
+        assert!(pose.roll.is_finite());
     }
 
     #[test]
