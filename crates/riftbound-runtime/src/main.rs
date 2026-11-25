@@ -713,7 +713,6 @@ impl ApplicationHandler for RiftboundApp {
                         } else {
                             0.0
                         };
-                        let vehicle_previous_position = self.vehicle_state.position;
                         let sampled_surface = world_terrain_vehicle_surface(
                             self.vehicle_state.position.x,
                             self.vehicle_state.position.z,
