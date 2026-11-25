@@ -1912,3 +1912,86 @@ mod tests {
         assert!((before_retarget.2 - after_retarget.2).abs() < 0.0001);
     }
 }
+
+
+#[cfg(test)]
+mod wheel_traction_tests {
+    use super::*;
+
+    #[test]
+    fn wheel_contact_grip_is_blended_independently_per_corner() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let contacts = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Snow,
+            VehicleSurface::Gravel,
+            VehicleSurface::Mud,
+        ];
+
+        tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        let initial = tracker.wheel_traction();
+        assert_eq!(initial, [1.0; 4]);
+
+        for _ in 0..19 {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        }
+        let settled = tracker.wheel_traction();
+
+        assert!((settled[0] - VehicleSurface::Asphalt.traction()).abs() < f32::EPSILON);
+        assert!((settled[1] - VehicleSurface::Snow.traction()).abs() < f32::EPSILON);
+        assert!((settled[2] - VehicleSurface::Gravel.traction()).abs() < f32::EPSILON);
+        assert!((settled[3] - VehicleSurface::Mud.traction()).abs() < f32::EPSILON);
+        assert!(settled[0] > settled[2]);
+        assert!(settled[2] > settled[3]);
+        assert!(settled[3] > settled[1]);
+    }
+
+    #[test]
+    fn four_wheel_handling_rejects_invalid_corner_grip_atomically() {
+        let mut vehicle = VehicleState {
+            position: Vec3::new(0.0, 0.0, 0.0),
+            heading: 0.0,
+            speed: 4.0,
+        };
+        let before = vehicle;
+        vehicle.update_with_four_wheel_surface_response(
+            VehicleInput {
+                throttle: 1.0,
+                brake: 0.0,
+                steering: 0.5,
+            },
+            (0.8, 1.0, 1.0),
+            [1.0, 0.8, f32::NAN, 0.6],
+            VehicleConfig::default(),
+            1.0 / 60.0,
+        );
+        assert_eq!(vehicle, before);
+    }
+
+    #[test]
+    fn four_wheel_handling_uses_corner_average_for_longitudinal_grip() {
+        let mut mixed = VehicleState::default();
+        let mut uniform = VehicleState::default();
+        let input = VehicleInput {
+            throttle: 1.0,
+            brake: 0.0,
+            steering: 0.0,
+        };
+        let config = VehicleConfig::default();
+        mixed.update_with_four_wheel_surface_response(
+            input,
+            (1.0, 1.0, 0.8),
+            [1.0, 0.6, 0.8, 0.8],
+            config,
+            1.0 / 60.0,
+        );
+        uniform.update_with_four_wheel_surface_response(
+            input,
+            (0.8, 1.0, 0.8),
+            [0.8; 4],
+            config,
+            1.0 / 60.0,
+        );
+        assert!((mixed.speed - uniform.speed).abs() < f32::EPSILON);
+    }
+}
