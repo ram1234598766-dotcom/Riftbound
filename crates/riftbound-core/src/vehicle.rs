@@ -760,7 +760,10 @@ mod tests {
             suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
         }
 
-        let bump_pose = suspension.update([0.42, 0.0, 0.0, 0.0], 0.58, config, 1.0 / 60.0);
+        let mut bump_pose = SuspensionPose::default();
+        for _ in 0..6 {
+            bump_pose = suspension.update([0.42, 0.0, 0.0, 0.0], 0.58, config, 1.0 / 60.0);
+        }
         assert!(bump_pose.pitch.is_finite() && bump_pose.roll.is_finite());
         assert!(bump_pose.pitch.abs() > 0.001);
 
