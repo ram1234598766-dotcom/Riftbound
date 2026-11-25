@@ -810,13 +810,14 @@ impl ApplicationHandler for RiftboundApp {
                         }
                         if let Some(wheels) = self.vehicle_wheels {
                             let wheel_spin = self.vehicle_state.speed * delta * 1.7;
+                            let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
                             for (index, wheel) in wheels.iter().enumerate() {
                                 let front = index < 2;
                                 let steer = if front { steering * 0.35 } else { 0.0 };
                                 let local_y =
                                     ground_heights[index] + 0.34 - self.vehicle_state.position.y;
                                 let (local_x, local_z) =
-                                    vehicle_wheel_local_offsets(suspension_config)[index];
+                                    wheel_offsets[index];
                                 self.animated_transforms.push((
                                     *wheel,
                                     Transform3::new(
