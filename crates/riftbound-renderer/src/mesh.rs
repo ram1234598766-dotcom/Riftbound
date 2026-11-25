@@ -695,7 +695,7 @@ mod tests {
     fn world_chunk_road_ribbon_is_raised_continuous_and_inside_chunk_edges() {
         for side in [5, 9] {
             let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("world chunk");
-            let road_start = if side == 9 { 81 + 4 * 8 * 4 } else { 25 + 4 * 4 * 4 };
+            let road_start = if side == 9 { 81 } else { 25 };
             let road_vertices = &vertices[road_start..road_start + side * 4];
             assert_eq!(road_vertices.len(), side * 4);
             assert!(road_vertices.iter().all(|vertex| {
