@@ -1748,21 +1748,27 @@ fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
 
 fn build_vehicle(scene: &mut Scene) -> (EntityId, [EntityId; 4]) {
     let body = scene
-        .spawn(Transform3::new(
-            Vec3::new(0.0, 0.62, -1.2),
-            Vec3::default(),
-            Vec3::new(1.75, 0.55, 3.25),
-        ))
+        .spawn_with_mesh(
+            Transform3::new(
+                Vec3::new(0.0, 0.62, -1.2),
+                Vec3::default(),
+                Vec3::new(1.0, 1.0, 1.0),
+            ),
+            MeshId::VEHICLE_BODY,
+        )
         .expect("vehicle body entity ID space available");
     scene.set_material(body, MaterialId::RIFT);
     let mut wheels = Vec::with_capacity(4);
     for (x, z) in [(-0.95, -0.95), (0.95, -0.95), (-0.95, 0.95), (0.95, 0.95)] {
         let wheel = scene
-            .spawn(Transform3::new(
-                Vec3::new(x, -0.30, z),
-                Vec3::new(0.0, 0.0, std::f32::consts::FRAC_PI_2),
-                Vec3::new(0.34, 0.68, 0.68),
-            ))
+            .spawn_with_mesh(
+                Transform3::new(
+                    Vec3::new(x, -0.30, z),
+                    Vec3::new(0.0, 0.0, std::f32::consts::FRAC_PI_2),
+                    Vec3::new(0.34, 0.68, 0.68),
+                ),
+                MeshId::VEHICLE_WHEEL,
+            )
             .expect("vehicle wheel entity ID space available");
         scene.set_material(wheel, MaterialId::AMBER);
         assert!(scene.set_parent(wheel, Some(body)));
