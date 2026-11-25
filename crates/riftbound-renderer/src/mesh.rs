@@ -664,8 +664,18 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
 
 /// Returns a soft directional-light factor from the shared world height field.
 fn terrain_light_factor(world_x: f32, world_z: f32) -> f32 {
+    let center_height = world_terrain_sample(world_x, world_z).height;
+    terrain_light_factor_with_center(world_x, world_z, center_height)
+}
+
+/// Computes directional lighting while reusing the vertex's already sampled height.
+/// This saves one terrain-field evaluation for every generated terrain vertex.
+fn terrain_light_factor_with_center(world_x: f32, world_z: f32, center_height: f32) -> f32 {
     const SAMPLE_STEP: f32 = 2.0;
     const LIGHT: [f32; 3] = [-0.42426407, 0.84852815, -0.31622776];
+    if !center_height.is_finite() {
+        return 0.82;
+    }
     let left = world_terrain_sample(world_x - SAMPLE_STEP, world_z).height;
     let right = world_terrain_sample(world_x + SAMPLE_STEP, world_z).height;
     let back = world_terrain_sample(world_x, world_z - SAMPLE_STEP).height;
@@ -828,7 +838,7 @@ fn world_terrain_chunk_data(
             let world_x = origin_x + local_x;
             let world_z = origin_z + local_z;
             let base = terrain_color_at(sample.surface, world_x, world_z);
-            let light = terrain_light_factor(world_x, world_z);
+            let light = terrain_light_factor_with_center(world_x, world_z, sample.height);
             let elevation_tint = sample.height.max(0.0) * 0.012;
             vertices.push(MeshVertex {
                 position: [local_x, sample.height, local_z],
