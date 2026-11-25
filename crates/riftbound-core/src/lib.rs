@@ -48,6 +48,6 @@ pub use world_streaming::{
     WorldChunkLod, WorldChunkRequest, WorldChunkSlot, WorldChunkSlotMap, WorldChunkStreamer,
 };
 pub use world_terrain::{
-    WorldTerrainSample, world_terrain_sample, world_terrain_vehicle_ground_heights,
-    world_terrain_vehicle_surface,
+    WorldRoadSample, WorldTerrainSample, world_road_sample, world_terrain_sample,
+    world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
 };
