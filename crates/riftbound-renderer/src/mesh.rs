@@ -700,13 +700,11 @@ fn terrain_light_factor_with_center(world_x: f32, world_z: f32, center_height: f
 
 /// Adds stable surface variation and blends biome colours across broad boundary zones.
 fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32; 3] {
-    let x = world_x.round() as i32 as u32;
-    let z = world_z.round() as i32 as u32;
-    let mut hash = x.wrapping_mul(0x9E37_79B9) ^ z.wrapping_mul(0x85EB_CA6B);
-    hash ^= hash >> 16;
-    hash = hash.wrapping_mul(0x7FEB_352D);
-    hash ^= hash >> 15;
-    let variation = ((hash & 0xFFFF) as f32 / 65_535.0 - 0.5) * 0.035;
+    // Two inexpensive, deterministic value-noise scales create broad natural
+    // variation without allocating textures or introducing chunk-edge seams.
+    let broad = terrain_detail_noise(world_x, world_z, 18.0);
+    let fine = terrain_detail_noise(world_x, world_z, 4.5);
+    let variation = ((broad - 0.5) * 0.042 + (fine - 0.5) * 0.018);
 
     // Gameplay surfaces remain discrete for vehicle handling; only their rendered
     // colours blend over 96 world units to avoid hard visual biome borders.
@@ -734,6 +732,46 @@ fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32
         (base[1] + variation * 0.72).clamp(0.0, 1.0),
         (base[2] + variation * 0.42).clamp(0.0, 1.0),
     ]
+}
+
+fn terrain_lattice_noise(x: i32, z: i32) -> f32 {
+    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9)
+        ^ (z as u32).wrapping_mul(0x85EB_CA6B);
+    hash ^= hash >> 16;
+    hash = hash.wrapping_mul(0x7FEB_352D);
+    hash ^= hash >> 15;
+    (hash & 0xFFFF) as f32 / 65_535.0
+}
+
+/// Smooth, allocation-free value noise in absolute world coordinates.
+fn terrain_detail_noise(world_x: f32, world_z: f32, scale: f32) -> f32 {
+    if !world_x.is_finite() || !world_z.is_finite() || !scale.is_finite() || scale <= 0.0 {
+        return 0.5;
+    }
+    let grid_x = world_x / scale;
+    let grid_z = world_z / scale;
+    let cell_x = grid_x.floor();
+    let cell_z = grid_z.floor();
+    if cell_x < i32::MIN as f32 || cell_x >= i32::MAX as f32
+        || cell_z < i32::MIN as f32 || cell_z >= i32::MAX as f32
+    {
+        return 0.5;
+    }
+    let x = cell_x as i32;
+    let z = cell_z as i32;
+    let tx = smooth_terrain_blend(grid_x - cell_x);
+    let tz = smooth_terrain_blend(grid_z - cell_z);
+    let near = blend_terrain_color(
+        [terrain_lattice_noise(x, z); 3],
+        [terrain_lattice_noise(x + 1, z); 3],
+        tx,
+    )[0];
+    let far = blend_terrain_color(
+        [terrain_lattice_noise(x, z + 1); 3],
+        [terrain_lattice_noise(x + 1, z + 1); 3],
+        tx,
+    )[0];
+    near + (far - near) * tz
 }
 
 fn blend_terrain_color(start: [f32; 3], end: [f32; 3], amount: f32) -> [f32; 3] {
@@ -1597,6 +1635,18 @@ mod tests {
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
+    }
+
+    #[test]
+    fn terrain_detail_noise_is_smooth_deterministic_and_bounded() {
+        for (x, z) in [(0.0, 0.0), (-700.0, 120.0), (700.0, -650.0)] {
+            let first = terrain_detail_noise(x, z, 18.0);
+            assert_eq!(first, terrain_detail_noise(x, z, 18.0));
+            assert!((0.0..=1.0).contains(&first));
+            let nearby = terrain_detail_noise(x + 0.01, z + 0.01, 18.0);
+            assert!((first - nearby).abs() < 0.01);
+        }
+        assert_eq!(terrain_detail_noise(f32::NAN, 0.0, 18.0), 0.5);
     }
 
     #[test]
