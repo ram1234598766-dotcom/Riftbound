@@ -1056,8 +1056,12 @@ impl SuspensionState {
             // unloads smoothly. The bounded factor avoids runaway tyre forces.
             let dynamic_load = (1.0 + self.compression_velocity[index] * 0.08)
                 .clamp(0.75, 1.25);
-            let contact = (self.compression[index] / (config.max_travel * 0.25))
+            let contact_fraction = (self.compression[index] / (config.max_travel * 0.25))
                 .clamp(0.0, 1.0);
+            // Smoothstep avoids a sharp grip ramp as a wheel first reconnects
+            // with the ground, while retaining full load at the contact threshold.
+            let contact = contact_fraction * contact_fraction
+                * (3.0 - 2.0 * contact_fraction);
             (relative_load * dynamic_load * contact).clamp(0.0, 1.25)
         })
     }
@@ -1361,6 +1365,26 @@ mod tests {
         suspension.compression_velocity = [100.0, 100.0, 0.0, 0.0];
         let bounded = suspension.wheel_load_factors(config);
         assert!(bounded.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
+    }
+
+    #[test]
+    fn suspension_contact_grip_ramps_smoothly_from_zero_load() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState {
+            ground_reference_initialized: true,
+            ..SuspensionState::default()
+        };
+        suspension.compression = [config.max_travel * 0.25 * 0.25; 4];
+        let light_contact = suspension.wheel_load_factors(config)[0];
+        suspension.compression = [config.max_travel * 0.25 * 0.5; 4];
+        let partial_contact = suspension.wheel_load_factors(config)[0];
+        suspension.compression = [config.max_travel * 0.25; 4];
+        let full_contact = suspension.wheel_load_factors(config)[0];
+
+        assert!(light_contact > 0.0 && light_contact < 0.2);
+        assert!(partial_contact > light_contact);
+        assert!((partial_contact - 0.5).abs() < 0.0001);
+        assert!((full_contact - 1.0).abs() < 0.0001);
     }
 
     #[test]
