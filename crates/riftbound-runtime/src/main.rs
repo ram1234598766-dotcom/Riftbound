@@ -50,7 +50,7 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
     }
 }
 
-const MAX_VEHICLE_STEP: f32 = 1.0 / 30.0;
+const MAX_SIMULATION_STEP: f32 = 1.0 / 30.0;
 
 fn clear_held_controls_on_focus_loss(input: &mut InputState) {
     input.clear();
@@ -58,7 +58,7 @@ fn clear_held_controls_on_focus_loss(input: &mut InputState) {
 
 fn bounded_simulation_delta(delta: f32) -> f32 {
     if delta.is_finite() {
-        delta.clamp(0.0, MAX_VEHICLE_STEP)
+        delta.clamp(0.0, MAX_SIMULATION_STEP)
     } else {
         0.0
     }
@@ -2458,7 +2458,7 @@ mod world_prop_tests {
     #[test]
     fn simulation_delta_is_bounded_and_rejects_invalid_values() {
         assert_eq!(bounded_simulation_delta(0.0), 0.0);
-        assert_eq!(bounded_simulation_delta(1.0), MAX_VEHICLE_STEP);
+        assert_eq!(bounded_simulation_delta(1.0), MAX_SIMULATION_STEP);
         assert_eq!(bounded_simulation_delta(-1.0), 0.0);
         assert_eq!(bounded_simulation_delta(f32::NAN), 0.0);
         assert_eq!(bounded_simulation_delta(f32::INFINITY), 0.0);
