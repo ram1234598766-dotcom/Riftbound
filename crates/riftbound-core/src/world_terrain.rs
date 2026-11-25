@@ -186,10 +186,9 @@ pub fn world_terrain_vehicle_ground_heights(
         return None;
     }
 
-    let contacts = vehicle_contact_positions(world_x, world_z, heading, half_track, half_wheelbase)?;
-    Some(contacts.map(|(contact_x, contact_z)| {
-        world_terrain_sample(contact_x, contact_z).height
-    }))
+    let contacts =
+        vehicle_contact_positions(world_x, world_z, heading, half_track, half_wheelbase)?;
+    Some(contacts.map(|(contact_x, contact_z)| world_terrain_sample(contact_x, contact_z).height))
 }
 
 /// Returns the terrain surface under each tyre in suspension corner order.
@@ -327,8 +326,7 @@ fn corridor_blend(lateral_distance: f32, half_width: f32, shoulder_width: f32) -
     if lateral_distance <= half_width {
         1.0
     } else {
-        let shoulder_progress =
-            ((lateral_distance - half_width) / shoulder_width).clamp(0.0, 1.0);
+        let shoulder_progress = ((lateral_distance - half_width) / shoulder_width).clamp(0.0, 1.0);
         1.0 - smoothstep(shoulder_progress)
     }
 }
@@ -387,9 +385,9 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        WorldTerrainSample, value_noise, world_road_sample, world_terrain_sample,
-        world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
-        world_terrain_vehicle_surfaces, vehicle_contact_positions,
+        WorldTerrainSample, value_noise, vehicle_contact_positions, world_road_sample,
+        world_terrain_sample, world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
+        world_terrain_vehicle_surfaces,
     };
     use crate::VehicleSurface;
 
@@ -641,8 +639,10 @@ mod tests {
             240.0,
         )
         .height;
-        let natural_shoulder =
-            procedural_ground_height(road.center_x + road.half_width + road.shoulder_width * 0.5, 240.0);
+        let natural_shoulder = procedural_ground_height(
+            road.center_x + road.half_width + road.shoulder_width * 0.5,
+            240.0,
+        );
         assert!((shoulder - center).abs() <= (natural_shoulder - center).abs());
     }
 
@@ -671,10 +671,9 @@ mod tests {
         let surfaces = world_terrain_vehicle_surfaces(
             position.0, position.1, position.2, position.3, position.4,
         );
-        let direct = vehicle_contact_positions(
-            position.0, position.1, position.2, position.3, position.4,
-        )
-        .expect("same validated contacts");
+        let direct =
+            vehicle_contact_positions(position.0, position.1, position.2, position.3, position.4)
+                .expect("same validated contacts");
         for index in 0..4 {
             let sample = world_terrain_sample(direct[index].0, direct[index].1);
             assert_eq!(heights[index], sample.height);
