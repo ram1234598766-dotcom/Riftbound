@@ -66,8 +66,6 @@ impl VehicleSurface {
     fn speed_factor(self) -> f32 {
         self.speed_multiplier()
     }
-
-
 }
 
 /// Tunable, unit-agnostic vehicle handling values.
