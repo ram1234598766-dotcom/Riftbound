@@ -435,6 +435,23 @@ mod tests {
     }
 
     #[test]
+    fn negative_world_positions_use_floor_based_chunk_coordinates() {
+        let mut streamer = WorldChunkStreamer::standard();
+
+        assert!(streamer.update_focus(-0.01, -64.0));
+        assert_eq!(
+            streamer.focus_chunk(),
+            Some(WorldChunkCoord { x: -1, z: -1 })
+        );
+
+        assert!(streamer.update_focus(-64.01, -64.01));
+        assert_eq!(
+            streamer.focus_chunk(),
+            Some(WorldChunkCoord { x: -2, z: -2 })
+        );
+    }
+
+    #[test]
     fn invalid_focus_does_not_destroy_previous_window() {
         let mut streamer = WorldChunkStreamer::standard();
         assert!(streamer.update_focus(0.0, 0.0));
