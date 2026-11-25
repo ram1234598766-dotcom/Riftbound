@@ -2448,6 +2448,17 @@ mod world_prop_tests {
     }
 
     #[test]
+    fn exited_vehicle_front_wheels_return_to_center_smoothly() {
+        let mut steering = 0.35;
+        for _ in 0..60 {
+            steering = smooth_wheel_steering(steering, 0.0, 1.0 / 60.0);
+        }
+
+        assert!(steering.abs() < 0.001);
+        assert!(steering.is_finite());
+    }
+
+    #[test]
     fn wheel_rotation_accumulates_forward_and_reverse_travel() {
         let forward = wheel_rotation_delta(8.0, 0.25, 0.5);
         let reverse = wheel_rotation_delta(-8.0, 0.25, 0.5);
