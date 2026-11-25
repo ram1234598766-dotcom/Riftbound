@@ -121,6 +121,20 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-environment-shrub-mesh")
     }
 
+    /// Creates a joined low-poly vehicle body with cabin, bumpers and lights.
+    #[must_use]
+    pub fn vehicle_body(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = vehicle_body_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-vehicle-body-mesh")
+    }
+
+    /// Creates a faceted tire with a contrasting inset hub.
+    #[must_use]
+    pub fn vehicle_wheel(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = vehicle_wheel_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-vehicle-wheel-mesh")
+    }
+
     /// Creates a faceted octahedral crystal mesh with alternating cyan facets.
     #[must_use]
     pub fn crystal(device: &wgpu::Device) -> Option<Self> {
@@ -408,6 +422,88 @@ fn environment_shrub_data() -> (Vec<MeshVertex>, Vec<u16>) {
         [0.0, 0.18, -0.28],
         [0.56, 0.48, 0.22],
     );
+    (vertices, indices)
+}
+
+
+fn vehicle_body_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let mut vertices = Vec::with_capacity(144);
+    let mut indices = Vec::with_capacity(216);
+    let parts = [
+        // Reinforced lower chassis.
+        ([1.82, 0.42, 3.35], [0.0, -0.02, 0.0], [0.055, 0.16, 0.24]),
+        // Long front hood and rear deck.
+        ([1.72, 0.34, 1.08], [0.0, 0.34, -1.05], [0.07, 0.30, 0.42]),
+        ([1.62, 0.30, 0.72], [0.0, 0.30, 1.20], [0.06, 0.24, 0.34]),
+        // Raised cabin and roof.
+        ([1.38, 0.76, 1.48], [0.0, 0.70, 0.22], [0.10, 0.38, 0.50]),
+        ([1.28, 0.12, 1.02], [0.0, 1.13, 0.20], [0.16, 0.46, 0.56]),
+        // Front and rear bumpers.
+        ([1.92, 0.18, 0.20], [0.0, -0.10, -1.70], [0.32, 0.36, 0.40]),
+        ([1.92, 0.18, 0.20], [0.0, -0.10, 1.70], [0.32, 0.36, 0.40]),
+        // Front lamps and rear signal clusters.
+        ([0.34, 0.16, 0.08], [-0.58, 0.22, -1.61], [0.95, 0.82, 0.52]),
+        ([0.34, 0.16, 0.08], [0.58, 0.22, -1.61], [0.95, 0.82, 0.52]),
+        ([0.26, 0.13, 0.08], [-0.60, 0.20, 1.61], [0.82, 0.12, 0.10]),
+        ([0.26, 0.13, 0.08], [0.60, 0.20, 1.61], [0.82, 0.12, 0.10]),
+    ];
+    for (scale, offset, color) in parts {
+        append_environment_part(
+            &mut vertices,
+            &mut indices,
+            cube_data(),
+            scale,
+            offset,
+            color,
+        );
+    }
+    (vertices, indices)
+}
+
+fn append_wheel_ring(
+    vertices: &mut Vec<MeshVertex>,
+    indices: &mut Vec<u16>,
+    radius: f32,
+    half_width: f32,
+    color: [f32; 3],
+    segments: u16,
+) {
+    let base = u16::try_from(vertices.len()).expect("wheel mesh vertex offset fits u16");
+    for side in 0..2 {
+        let y = if side == 0 { -half_width } else { half_width };
+        for segment in 0..segments {
+            let angle = std::f32::consts::TAU * f32::from(segment) / f32::from(segments);
+            vertices.push(MeshVertex {
+                position: [radius * angle.cos(), y, radius * angle.sin()],
+                color,
+            });
+        }
+    }
+    for segment in 0..segments {
+        let next = (segment + 1) % segments;
+        let a = base + segment;
+        let b = base + next;
+        let c = base + segments + next;
+        let d = base + segments + segment;
+        indices.extend_from_slice(&[a, b, c, a, c, d]);
+        indices.extend_from_slice(&[base + segments * 2, d, c]);
+        indices.extend_from_slice(&[base + segments * 2 + 1, b, a]);
+    }
+    vertices.push(MeshVertex {
+        position: [0.0, -half_width, 0.0],
+        color,
+    });
+    vertices.push(MeshVertex {
+        position: [0.0, half_width, 0.0],
+        color,
+    });
+}
+
+fn vehicle_wheel_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let mut vertices = Vec::with_capacity(44);
+    let mut indices = Vec::with_capacity(120);
+    append_wheel_ring(&mut vertices, &mut indices, 0.5, 0.24, [0.035, 0.045, 0.055], 12);
+    append_wheel_ring(&mut vertices, &mut indices, 0.27, 0.255, [0.58, 0.62, 0.66], 12);
     (vertices, indices)
 }
 
@@ -1536,5 +1632,34 @@ mod environment_mesh_tests {
         let shrub = environment_shrub_data();
         assert_ne!(tree.0.len(), boulder.0.len());
         assert_ne!(boulder.0.len(), shrub.0.len());
+    }
+}
+
+
+#[cfg(test)]
+mod vehicle_mesh_tests {
+    use super::*;
+
+    #[test]
+    fn vehicle_meshes_have_valid_finite_geometry() {
+        for (vertices, indices) in [vehicle_body_data(), vehicle_wheel_data()] {
+            assert!(!vertices.is_empty());
+            assert!(valid_index_data(vertices.len(), &indices));
+            assert!(vertices.iter().all(|vertex| {
+                vertex
+                    .position
+                    .iter()
+                    .chain(vertex.color.iter())
+                    .all(|value| value.is_finite())
+            }));
+        }
+    }
+
+    #[test]
+    fn vehicle_body_and_wheel_have_distinct_geometry() {
+        let body = vehicle_body_data();
+        let wheel = vehicle_wheel_data();
+        assert!(body.0.len() > wheel.0.len());
+        assert!(body.1.len() > wheel.1.len());
     }
 }
