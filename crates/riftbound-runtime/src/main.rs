@@ -176,7 +176,9 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle_recovery = vehicle_recovery;
                 self.driving = false;
                 let mut collision = world_collision_world();
-                sync_world_collision(&mut collision, world_streamer.active_chunks());
+                if let Some(streamer) = self.world_streamer.as_ref() {
+                    sync_world_collision(&mut collision, streamer.active_chunks());
+                }
                 self.collision = Some(collision);
                 self.pickups = pickups;
                 self.mission = MissionProgress::new(self.pickups.total());
@@ -1452,13 +1454,14 @@ fn world_collision_world() -> CollisionWorld {
 }
 
 /// Rebuilds collision footprints from the same bounded chunk window as terrain streaming.
+#[allow(clippy::cast_precision_loss)] // Chunk indices and generated offsets are tightly bounded.
 fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
     let mut obstacles = Vec::with_capacity(chunks.len() * 2);
     for request in chunks {
         let chunk_x = request.coord.x;
         let chunk_z = request.coord.z;
-        let mut hash = (chunk_x as u32).wrapping_mul(0x9E37_79B9)
-            ^ (chunk_z as u32).wrapping_mul(0x85EB_CA6B);
+        let mut hash = chunk_x.cast_unsigned().wrapping_mul(0x9E37_79B9)
+            ^ chunk_z.cast_unsigned().wrapping_mul(0x85EB_CA6B);
         hash ^= hash >> 16;
         hash = hash.wrapping_mul(0x7FEB_352D);
         hash ^= hash >> 15;
