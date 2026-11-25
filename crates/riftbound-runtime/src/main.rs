@@ -12,7 +12,7 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleAudioState,
+    VehicleAudioMix, VehicleAudioState,
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
     world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
@@ -842,7 +842,11 @@ impl ApplicationHandler for RiftboundApp {
                     simulation_delta,
                 );
                 if let Some(output) = self.vehicle_audio_output.as_ref() {
-                    output.set_mix(audio_mix);
+                    output.set_mix(if self.driving {
+                        audio_mix
+                    } else {
+                        VehicleAudioMix::default()
+                    });
                 }
                 self.animation_time += delta.min(0.1);
                 self.player_health.update(simulation_delta);
