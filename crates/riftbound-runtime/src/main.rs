@@ -1,5 +1,7 @@
 //! Native window lifecycle and application entry point for Riftbound.
 
+mod save;
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -88,6 +90,7 @@ impl ApplicationHandler for RiftboundApp {
                 log::error!("Could not start LAN server thread: {error}");
             }
         }
+        self.vehicle_upgrades = save::load_vehicle_upgrades();
         if self.renderer.is_some() {
             return;
         }
@@ -293,7 +296,12 @@ impl ApplicationHandler for RiftboundApp {
             return;
         }
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                    log::warn!("Could not save vehicle upgrades: {error}");
+                }
+                event_loop.exit();
+            }
             WindowEvent::Resized(size) => {
                 if let Some(renderer) = self.renderer.as_mut() {
                     renderer.resize(size.width, size.height);
@@ -347,6 +355,9 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyU => {
                                 if self.vehicle_upgrades.purchase_engine_upgrade(&mut self.inventory) {
                                     log::info!("Engine upgraded to tier {}", self.vehicle_upgrades.engine_level());
+                                    if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                                        log::warn!("Could not save vehicle upgrades: {error}");
+                                    }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
                                     log::info!("Engine upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
                                 } else {
@@ -356,6 +367,9 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyH => {
                                 if self.vehicle_upgrades.purchase_handling_upgrade(&mut self.inventory) {
                                     log::info!("Handling and tires upgraded to tier {}", self.vehicle_upgrades.handling_level());
+                                    if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                                        log::warn!("Could not save vehicle upgrades: {error}");
+                                    }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_handling_cost() {
                                     log::info!("Handling upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
                                 } else {
