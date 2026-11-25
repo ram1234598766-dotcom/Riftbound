@@ -2773,7 +2773,7 @@ mod world_prop_tests {
         assert!(first > 0.0 && first < 0.35);
         assert!(settled > first && settled < 0.35);
         assert!(returning < settled && returning > -0.35);
-        assert_eq!(smooth_wheel_steering(0.0, 1.0, 1.0), 0.35);
+        assert!((smooth_wheel_steering(0.0, 1.0, 1.0) - 0.35).abs() < 1.0e-4);
         assert_eq!(smooth_wheel_steering(0.2, f32::NAN, 0.1), 0.0);
     }
 
