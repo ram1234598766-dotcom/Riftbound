@@ -20,6 +20,14 @@ impl PlayerProgression {
         Self { total_xp: 0, level: 1 }
     }
 
+    /// Restores progression from a saved lifetime XP total.
+    #[must_use]
+    pub fn from_total_xp(total_xp: u64) -> Self {
+        let mut progression = Self::new();
+        progression.award_xp(total_xp);
+        progression
+    }
+
     /// Adds experience and returns the number of levels gained.
     pub fn award_xp(&mut self, amount: u64) -> u32 {
         let previous_level = self.level;
