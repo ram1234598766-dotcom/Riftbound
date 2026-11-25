@@ -228,6 +228,8 @@ impl Renderer {
                 prompt: None,
                 health: 100,
                 max_health: 100,
+                inventory: None,
+                equipment: String::new(),
             },
             meshes,
             mesh_batches,
