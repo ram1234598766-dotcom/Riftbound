@@ -1535,9 +1535,9 @@ mod tests {
             for side in [5, 9] {
                 let (vertices, _) =
                     world_terrain_chunk_data(chunk_x, chunk_z, side).expect("biome chunk");
-                let grid_count = side * side;
                 let skirt_vertices_per_edge = (side - 1) * 4;
-                let mut skirt_offset = grid_count;
+                let skirt_vertex_count = 4 * skirt_vertices_per_edge;
+                let mut skirt_offset = vertices.len() - skirt_vertex_count;
 
                 let edges = [
                     (0..side).collect::<Vec<_>>(),
