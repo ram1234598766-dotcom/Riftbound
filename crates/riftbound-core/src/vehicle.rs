@@ -684,6 +684,39 @@ mod tests {
         );
     }
     #[test]
+    fn wheel_contact_response_averages_all_four_tyre_surfaces() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let contacts = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Asphalt,
+            VehicleSurface::Snow,
+            VehicleSurface::Snow,
+        ];
+        for _ in 0..72 {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        }
+        let (traction, speed, resistance) = tracker.response();
+        let expected_traction = (VehicleSurface::Asphalt.traction()
+            + VehicleSurface::Asphalt.traction()
+            + VehicleSurface::Snow.traction()
+            + VehicleSurface::Snow.traction())
+            * 0.25;
+        let expected_speed = (VehicleSurface::Asphalt.speed_multiplier()
+            + VehicleSurface::Asphalt.speed_multiplier()
+            + VehicleSurface::Snow.speed_multiplier()
+            + VehicleSurface::Snow.speed_multiplier())
+            * 0.25;
+        let expected_resistance = (VehicleSurface::Asphalt.rolling_resistance()
+            + VehicleSurface::Asphalt.rolling_resistance()
+            + VehicleSurface::Snow.rolling_resistance()
+            + VehicleSurface::Snow.rolling_resistance())
+            * 0.25;
+        assert!((traction - expected_traction).abs() < 0.01);
+        assert!((speed - expected_speed).abs() < 0.01);
+        assert!((resistance - expected_resistance).abs() < 0.01);
+    }
+
+    #[test]
     fn terrain_surface_profiles_expose_distinct_driving_characteristics() {
         assert_eq!(VehicleSurface::Asphalt.traction(), 1.0);
         assert!(VehicleSurface::Asphalt.traction() > VehicleSurface::Gravel.traction());
