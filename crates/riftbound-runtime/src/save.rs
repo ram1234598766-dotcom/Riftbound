@@ -111,7 +111,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
         values.get("player_y"),
         values.get("player_z"),
     ) {
-        (None, None, None) | (Some("-"), Some("-"), Some("-")) => None,
+        (None, None, None) | (Some(&"-"), Some(&"-"), Some(&"-")) => None,
         (Some(x), Some(y), Some(z)) => {
             let position = Vec3::new(
                 x.parse::<f32>().ok()?,
