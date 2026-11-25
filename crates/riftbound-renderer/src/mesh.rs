@@ -829,6 +829,35 @@ fn world_terrain_chunk_data(
         }
     }
 
+    // A 9x9 detailed edge meets a 5x5 distant edge at every second
+    // vertex. Collapse each intervening detailed edge height onto the line
+    // between those shared coarse samples. This makes the two boundary
+    // polylines geometrically identical, avoiding T-junction cracks without
+    // requiring the streamer to rebuild neighbours when their LOD changes.
+    if side == 9 {
+        for index in (1..side - 1).step_by(2) {
+            for edge_index in [
+                index,
+                index * side,
+                index * side + side - 1,
+                (side - 1) * side + index,
+            ] {
+                let (before, after) = if edge_index < side {
+                    (edge_index - 1, edge_index + 1)
+                } else if edge_index % side == 0 {
+                    (edge_index - side, edge_index + side)
+                } else if edge_index % side == side - 1 {
+                    (edge_index - side, edge_index + side)
+                } else {
+                    (edge_index - side, edge_index + side)
+                };
+                let height = (vertices.get(before)?.position[1]
+                    + vertices.get(after)?.position[1]) * 0.5;
+                vertices.get_mut(edge_index)?.position[1] = height;
+            }
+        }
+    }
+
     // Add the road ribbon only to chunks that fully contain its corridor.
     // This avoids drawing duplicate, translated copies in every streamed X column.
     let road_is_inside_chunk = (0..side).all(|z| {
@@ -1527,6 +1556,32 @@ mod tests {
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
+    }
+
+    #[test]
+    fn detailed_chunk_edges_collapse_midpoints_for_distant_lod_seams() {
+        let (vertices, _) = world_terrain_chunk_data(3, -4, 9).expect("detailed chunk");
+        let side = 9;
+        for index in (1..side - 1).step_by(2) {
+            let edge_indices = [
+                index,
+                index * side,
+                index * side + side - 1,
+                (side - 1) * side + index,
+            ];
+            for edge_index in edge_indices {
+                let (before, after) = if edge_index < side {
+                    (edge_index - 1, edge_index + 1)
+                } else {
+                    (edge_index - side, edge_index + side)
+                };
+                let expected = (vertices[before].position[1] + vertices[after].position[1]) * 0.5;
+                assert!(
+                    (vertices[edge_index].position[1] - expected).abs() < 1.0e-5,
+                    "edge midpoint {edge_index} does not lie on the coarse edge"
+                );
+            }
+        }
     }
 
     #[test]
