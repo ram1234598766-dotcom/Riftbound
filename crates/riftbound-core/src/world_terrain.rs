@@ -86,10 +86,7 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
         };
     }
 
-    let broad = value_noise(world_x * 0.004, world_z * 0.004);
-    let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
-    let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
-    let ground_height = broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0;
+    let ground_height = procedural_ground_height(world_x, world_z);
 
     let road = world_road_sample(world_x, world_z);
     // A short eastbound spur branches from the primary road at the origin.
@@ -115,7 +112,16 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     // This avoids a vertical height discontinuity where the bridge meets terrain.
     let bridge_distance_to_edge = (world_x - 72.0).min(88.0 - world_x);
     let bridge_side_blend = smoothstep((bridge_distance_to_edge / 2.0).clamp(0.0, 1.0));
-    let height = ground_height
+    let road_blend = if road.lateral_distance <= road.half_width {
+        1.0
+    } else {
+        let shoulder_progress =
+            ((road.lateral_distance - road.half_width) / road.shoulder_width).clamp(0.0, 1.0);
+        1.0 - smoothstep(shoulder_progress)
+    };
+    let road_bed_height = procedural_ground_height(road.center_x, world_z);
+    let road_adjusted_height = lerp(ground_height, road_bed_height, road_blend);
+    let height = road_adjusted_height
         + if bridge_corridor {
             4.0 * bridge_blend * bridge_side_blend
         } else {
@@ -294,6 +300,13 @@ const fn surface_index(surface: VehicleSurface) -> usize {
         VehicleSurface::Snow => 4,
         VehicleSurface::Rock => 5,
     }
+}
+
+fn procedural_ground_height(world_x: f32, world_z: f32) -> f32 {
+    let broad = value_noise(world_x * 0.004, world_z * 0.004);
+    let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
+    let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
+    broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0
 }
 
 // Input coordinates are bounded by world_terrain_sample before reaching this helper.
@@ -581,6 +594,25 @@ mod tests {
             world_terrain_vehicle_surface(0.0, 0.0, 0.0, 0.8, f32::INFINITY),
             VehicleSurface::Rock
         );
+    }
+
+    #[test]
+    fn winding_road_surface_blends_into_terrain_without_height_steps() {
+        let road = world_road_sample(0.0, 240.0);
+        let center = world_terrain_sample(road.center_x, 240.0).height;
+        let inside_left = world_terrain_sample(road.center_x - 3.0, 240.0).height;
+        let inside_right = world_terrain_sample(road.center_x + 3.0, 240.0).height;
+        assert!((inside_left - center).abs() < 1.0e-5);
+        assert!((inside_right - center).abs() < 1.0e-5);
+
+        let shoulder = world_terrain_sample(
+            road.center_x + road.half_width + road.shoulder_width * 0.5,
+            240.0,
+        )
+        .height;
+        let natural_shoulder =
+            procedural_ground_height(road.center_x + road.half_width + road.shoulder_width * 0.5, 240.0);
+        assert!((shoulder - center).abs() <= (natural_shoulder - center).abs());
     }
 
     #[test]
