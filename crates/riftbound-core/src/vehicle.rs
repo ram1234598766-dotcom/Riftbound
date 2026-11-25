@@ -19,6 +19,65 @@ pub enum VehicleSurface {
     Rock,
 }
 
+/// Filters brief surface-sampling changes so a vehicle does not flicker between
+/// terrain profiles when its wheel contacts straddle a biome boundary.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VehicleSurfaceTracker {
+    current: VehicleSurface,
+    candidate: Option<VehicleSurface>,
+    candidate_frames: u8,
+}
+
+impl Default for VehicleSurfaceTracker {
+    fn default() -> Self {
+        Self::new(VehicleSurface::Asphalt)
+    }
+}
+
+impl VehicleSurfaceTracker {
+    /// Number of consecutive fixed updates required before accepting a new surface.
+    pub const CONFIRMATION_FRAMES: u8 = 4;
+
+    /// Creates a tracker using the surface at the vehicle's current location.
+    #[must_use]
+    pub const fn new(initial: VehicleSurface) -> Self {
+        Self {
+            current: initial,
+            candidate: None,
+            candidate_frames: 0,
+        }
+    }
+
+    /// Returns the stable surface, accepting changes after repeated matching samples.
+    pub fn update(&mut self, sampled: VehicleSurface) -> VehicleSurface {
+        if sampled == self.current {
+            self.candidate = None;
+            self.candidate_frames = 0;
+            return self.current;
+        }
+
+        if self.candidate == Some(sampled) {
+            self.candidate_frames = self.candidate_frames.saturating_add(1);
+        } else {
+            self.candidate = Some(sampled);
+            self.candidate_frames = 1;
+        }
+
+        if self.candidate_frames >= Self::CONFIRMATION_FRAMES {
+            self.current = sampled;
+            self.candidate = None;
+            self.candidate_frames = 0;
+        }
+        self.current
+    }
+
+    /// Returns the currently accepted terrain surface.
+    #[must_use]
+    pub const fn current(self) -> VehicleSurface {
+        self.current
+    }
+}
+
 impl VehicleSurface {
     /// Returns the normalized tire-grip multiplier used for acceleration and steering.
     #[must_use]
@@ -480,6 +539,20 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vehicle_surface_tracker_filters_single_frame_boundary_noise() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Asphalt), VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Gravel);
+        assert_eq!(tracker.current(), VehicleSurface::Gravel);
+        assert_eq!(tracker.update(VehicleSurface::Asphalt), VehicleSurface::Gravel);
+        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Gravel);
+    }
 
     #[test]
     fn terrain_surface_profiles_expose_distinct_driving_characteristics() {
