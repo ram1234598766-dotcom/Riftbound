@@ -15,6 +15,7 @@ use riftbound_core::{
     VehicleAudioMix, VehicleAudioState, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
     VehicleSurface, VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest,
     terrain_height, world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+    world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -1117,9 +1118,7 @@ impl ApplicationHandler for RiftboundApp {
                         // Return the front wheels to center after the player exits the vehicle.
                         self.vehicle_wheel_steering =
                             smooth_wheel_steering(self.vehicle_wheel_steering, 0.0, delta);
-                        if let (Some(renderer), Some(wheels)) =
-                            (self.renderer.as_ref(), self.vehicle_wheels)
-                        {
+                        if let Some(wheels) = self.vehicle_wheels {
                             for wheel in wheels.iter().take(2) {
                                 if let Some(mut transform) = renderer.scene().get(*wheel).copied() {
                                     transform.rotation_radians.y = self.vehicle_wheel_steering;
