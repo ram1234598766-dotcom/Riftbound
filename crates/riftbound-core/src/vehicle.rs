@@ -1121,7 +1121,7 @@ impl SuspensionState {
 
     /// Returns the current visual chassis response without advancing simulation.
     #[must_use]
-    pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
+    pub fn pose(&self, _config: SuspensionConfig) -> SuspensionPose {
         let front_velocity =
             f32::midpoint(self.compression_velocity[0], self.compression_velocity[1]);
         let rear_velocity =
