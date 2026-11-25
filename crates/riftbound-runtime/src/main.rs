@@ -119,7 +119,7 @@ fn build_vehicle_dust_particles(scene: &mut Scene) -> Vec<EntityId> {
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 0.0),
         );
-        if let Some(entity) = scene.spawn_with_mesh(transform, MeshId::ENV_SHRUB) {
+        if let Some(entity) = scene.spawn_with_mesh(transform, MeshId::VEHICLE_PARTICLE) {
             particles.push(entity);
         }
     }
