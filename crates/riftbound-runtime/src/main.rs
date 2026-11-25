@@ -509,7 +509,10 @@ impl ApplicationHandler for RiftboundApp {
                                         "Handling and tires upgraded to tier {}",
                                         self.vehicle_upgrades.handling_level()
                                     );
-                                    if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
+                                    if let Err(error) = save::save_profile_to_slot(
+                                        self.save_slot,
+                                        &self.saved_profile(),
+                                    ) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) =
