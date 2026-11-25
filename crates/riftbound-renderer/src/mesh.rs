@@ -789,17 +789,25 @@ mod tests {
     fn road_centre_markings_have_lod_independent_world_spacing() {
         for side in [5, 9] {
             let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("road chunk");
-            let base_vertices = side * side + 4 * (side - 1) * 4;
+            let base_vertices = side * side;
             let ribbon_vertices = side * 4;
             let marking_start = base_vertices + ribbon_vertices;
             let markings = &vertices[marking_start..marking_start + 8 * 4];
             assert_eq!(markings.len(), 32);
             for dash in 0..8 {
                 let segment = &markings[dash * 4..dash * 4 + 4];
-                assert!((segment[1].position[0] - segment[0].position[0] - 0.24).abs() < 1.0e-4);
-                assert!((segment[3].position[0] - segment[2].position[0] - 0.24).abs() < 1.0e-4);
+                assert!(
+                    (segment[1].position[0] - segment[0].position[0] - 0.24).abs() < 1.0e-4
+                );
+                assert!(
+                    (segment[3].position[0] - segment[2].position[0] - 0.24).abs() < 1.0e-4
+                );
                 assert!((segment[2].position[2] - segment[0].position[2] - 4.0).abs() < 1.0e-4);
-                assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
+                assert!(
+                    segment
+                        .iter()
+                        .all(|vertex| vertex.color == [0.95, 0.78, 0.28])
+                );
             }
             assert!(valid_index_data(vertices.len(), &indices));
         }
