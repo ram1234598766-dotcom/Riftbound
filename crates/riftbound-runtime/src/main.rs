@@ -318,6 +318,14 @@ impl ApplicationHandler for RiftboundApp {
                 if event.state == ElementState::Pressed
                     && event.physical_key == PhysicalKey::Code(KeyCode::Escape)
                 {
+                    if let Err(error) = save::save_profile(&save::SavedProfile {
+                        upgrades: self.vehicle_upgrades,
+                        inventory: self.inventory.clone(),
+                        equipment: self.equipment,
+                        progression: self.progression,
+                    }) {
+                        log::warn!("Could not save player profile: {error}");
+                    }
                     event_loop.exit();
                     return;
                 }
