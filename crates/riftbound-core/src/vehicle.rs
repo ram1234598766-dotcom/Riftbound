@@ -853,6 +853,10 @@ impl Default for SuspensionConfig {
 pub struct SuspensionPose {
     /// Per-wheel spring compression in front-left, front-right, rear-left, rear-right order.
     pub wheel_compressions: [f32; 4],
+    /// Per-wheel spring compression velocity in world units per second.
+    pub wheel_compression_velocities: [f32; 4],
+    /// Peak normalized compression speed, useful for bump and landing feedback.
+    pub impact_intensity: f32,
     /// Mean spring compression across all wheels.
     pub average_compression: f32,
     /// Damped average terrain height followed by the sprung chassis.
@@ -984,8 +988,15 @@ impl SuspensionState {
         let rear = f32::midpoint(self.compression[2], self.compression[3]);
         let left = f32::midpoint(self.compression[0], self.compression[2]);
         let right = f32::midpoint(self.compression[1], self.compression[3]);
+        let peak_compression_speed = self
+            .compression_velocity
+            .iter()
+            .map(|velocity| velocity.abs())
+            .fold(0.0_f32, f32::max);
         SuspensionPose {
             wheel_compressions: self.compression,
+            wheel_compression_velocities: self.compression_velocity,
+            impact_intensity: (peak_compression_speed / 4.0).clamp(0.0, 1.0),
             average_compression: self.compression.iter().sum::<f32>() * 0.25,
             average_ground_height: if self.ground_reference_initialized {
                 self.average_ground_height
@@ -1173,6 +1184,22 @@ mod tests {
         assert!((pose_30.average_ground_height - pose_60.average_ground_height).abs() < 0.0001);
         assert!((pose_30.pitch - pose_60.pitch).abs() < 0.0001);
         assert!((pose_30.roll - pose_60.roll).abs() < 0.0001);
+    }
+
+    #[test]
+    fn suspension_pose_reports_bounded_bump_intensity_from_corner_velocity() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        let smooth_pose = suspension.pose(config);
+        assert_eq!(smooth_pose.impact_intensity, 0.0);
+        suspension.update([0.35, 0.0, 0.0, 0.0], 0.58, config, 1.0 / 60.0);
+        let bump_pose = suspension.pose(config);
+        assert!(bump_pose.impact_intensity > 0.0);
+        assert!(bump_pose.impact_intensity <= 1.0);
+        assert!(bump_pose.wheel_compression_velocities[0] > 0.0);
+        assert!(bump_pose.wheel_compression_velocities[0]
+            > bump_pose.wheel_compression_velocities[1]);
     }
 
     #[test]
