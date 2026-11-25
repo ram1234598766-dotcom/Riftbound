@@ -54,4 +54,5 @@ pub use world_streaming::{
 pub use world_terrain::{
     WorldRoadSample, WorldTerrainSample, world_road_sample, world_terrain_sample,
     world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
+    world_terrain_vehicle_surfaces,
 };
