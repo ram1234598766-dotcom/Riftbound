@@ -230,6 +230,7 @@ impl Renderer {
                 max_health: 100,
                 inventory: None,
                 equipment: String::new(),
+                vehicle_info: None,
             },
             meshes,
             mesh_batches,
