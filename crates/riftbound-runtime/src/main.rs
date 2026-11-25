@@ -26,6 +26,17 @@ use winit::{
 };
 
 const PLAYER_RADIUS: f32 = 0.19;
+
+fn vehicle_wheel_local_offsets(config: SuspensionConfig) -> [(f32, f32); 4] {
+    let half_track = config.track_width * 0.5;
+    let half_wheelbase = config.wheelbase * 0.5;
+    [
+        (-half_track, -half_wheelbase),
+        (half_track, -half_wheelbase),
+        (-half_track, half_wheelbase),
+        (half_track, half_wheelbase),
+    ]
+}
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -804,16 +815,8 @@ impl ApplicationHandler for RiftboundApp {
                                 let steer = if front { steering * 0.35 } else { 0.0 };
                                 let local_y =
                                     ground_heights[index] + 0.34 - self.vehicle_state.position.y;
-                                let local_x = if index % 2 == 0 {
-                                    -suspension_config.track_width * 0.5
-                                } else {
-                                    suspension_config.track_width * 0.5
-                                };
-                                let local_z = if front {
-                                    -suspension_config.wheelbase * 0.5
-                                } else {
-                                    suspension_config.wheelbase * 0.5
-                                };
+                                let (local_x, local_z) =
+                                    vehicle_wheel_local_offsets(suspension_config)[index];
                                 self.animated_transforms.push((
                                     *wheel,
                                     Transform3::new(
@@ -2343,6 +2346,24 @@ mod world_prop_tests {
         assert_eq!(
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
+        );
+    }
+
+    #[test]
+    fn vehicle_wheel_offsets_follow_suspension_dimensions_and_corner_order() {
+        let config = SuspensionConfig {
+            track_width: 2.4,
+            wheelbase: 3.6,
+            ..SuspensionConfig::default()
+        };
+        assert_eq!(
+            vehicle_wheel_local_offsets(config),
+            [
+                (-1.2, -1.8),
+                (1.2, -1.8),
+                (-1.2, 1.8),
+                (1.2, 1.8),
+            ]
         );
     }
 
