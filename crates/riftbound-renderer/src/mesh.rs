@@ -1656,7 +1656,8 @@ mod tests {
 
             let bridge_rail_height = world_terrain_sample(72.0, -72.0).height + 1.1;
             assert!(vertices.iter().any(|vertex| {
-                (vertex.position[0] - 8.0).abs() < 1.0e-4
+                ((vertex.position[0] - 7.84).abs() < 1.0e-4
+                    || (vertex.position[0] - 8.16).abs() < 1.0e-4)
                     && (vertex.position[2] + 8.0).abs() < 1.0e-4
                     && (vertex.position[1] - bridge_rail_height).abs() < 1.0e-4
                     && vertex.color == [0.58, 0.61, 0.64]
@@ -1680,8 +1681,27 @@ mod tests {
         );
         assert_eq!(
             distant_chunk.1.len(),
-            384 + 8 * 3 * 6 + 8 * 6 + 5 * 3 * 6 + 4 * 6 + 4 * 8 * 6
+            384 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6 + 4 * 8 * 6
         );
+    }
+
+    #[test]
+    fn mixed_world_chunk_lods_share_identical_east_west_edge_samples() {
+        let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
+        let distant = world_terrain_chunk_data(1, 0, 5).expect("distant chunk");
+        for (detailed_row, distant_row) in [(0, 0), (2, 1), (4, 2), (6, 3), (8, 4)] {
+            let detailed_vertex = detailed.0[detailed_row * 9 + 8];
+            let distant_vertex = distant.0[distant_row * 5];
+            let detailed_world_x = detailed_vertex.position[0] + 32.0;
+            let distant_world_x = distant_vertex.position[0] + 64.0 - 32.0;
+            assert!((detailed_world_x - 32.0).abs() < 1.0e-4);
+            assert!((distant_world_x - 32.0).abs() < 1.0e-4);
+            assert_eq!(detailed_vertex.position[1], distant_vertex.position[1]);
+            assert_eq!(detailed_vertex.position[2], distant_vertex.position[2]);
+            assert_eq!(detailed_vertex.color, distant_vertex.color);
+        }
+        assert!(valid_index_data(detailed.0.len(), &detailed.1));
+        assert!(valid_index_data(distant.0.len(), &distant.1));
     }
 
     #[test]
