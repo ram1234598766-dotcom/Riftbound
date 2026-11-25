@@ -141,7 +141,10 @@ impl VehicleSurfaceTracker {
         contacts: [VehicleSurface; 4],
     ) -> VehicleSurface {
         self.update(dominant_surface);
-        self.side_blend_frames = self.side_blend_frames.saturating_add(1).min(Self::TRANSITION_FRAMES);
+        self.side_blend_frames = self
+            .side_blend_frames
+            .saturating_add(1)
+            .min(Self::TRANSITION_FRAMES);
         let side_target = [
             (contacts[0].traction() + contacts[2].traction()) * 0.5,
             (contacts[1].traction() + contacts[3].traction()) * 0.5,
@@ -153,7 +156,11 @@ impl VehicleSurfaceTracker {
             self.side_blend_frames = 0;
         }
         let target = [
-            contacts.iter().map(|surface| surface.traction()).sum::<f32>() * 0.25,
+            contacts
+                .iter()
+                .map(|surface| surface.traction())
+                .sum::<f32>()
+                * 0.25,
             contacts
                 .iter()
                 .map(|surface| surface.speed_multiplier())
@@ -421,7 +428,14 @@ impl VehicleState {
         delta_seconds: f32,
     ) {
         self.update_with_wheel_surface_response(
-            input, traction, speed_multiplier, rolling_resistance, traction, traction, config, delta_seconds,
+            input,
+            traction,
+            speed_multiplier,
+            rolling_resistance,
+            traction,
+            traction,
+            config,
+            delta_seconds,
         );
     }
 
@@ -793,12 +807,30 @@ mod tests {
         };
         let mut uneven = balanced;
         balanced.update_with_wheel_surface_response(
-            VehicleInput { brake: 0.8, ..VehicleInput::default() },
-            0.69, 1.0, 1.5, 0.69, 0.69, config, 0.05,
+            VehicleInput {
+                brake: 0.8,
+                ..VehicleInput::default()
+            },
+            0.69,
+            1.0,
+            1.5,
+            0.69,
+            0.69,
+            config,
+            0.05,
         );
         uneven.update_with_wheel_surface_response(
-            VehicleInput { brake: 0.8, ..VehicleInput::default() },
-            0.69, 1.0, 1.5, 0.38, 1.0, config, 0.05,
+            VehicleInput {
+                brake: 0.8,
+                ..VehicleInput::default()
+            },
+            0.69,
+            1.0,
+            1.5,
+            0.38,
+            1.0,
+            config,
+            0.05,
         );
         assert!(uneven.heading > balanced.heading);
     }
