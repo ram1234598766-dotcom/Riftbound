@@ -701,6 +701,37 @@ mod tests {
     }
 
     #[test]
+    fn every_terrain_surface_enforces_its_own_forward_speed_limit() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            throttle: 1.0,
+            ..VehicleInput::default()
+        };
+        let surfaces = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Mud,
+            VehicleSurface::Sand,
+            VehicleSurface::Snow,
+            VehicleSurface::Rock,
+        ];
+        let mut speeds = Vec::with_capacity(surfaces.len());
+
+        for surface in surfaces {
+            let mut vehicle = VehicleState::default();
+            for _ in 0..600 {
+                vehicle.update(input, surface, config, 0.05);
+            }
+            let surface_limit = config.max_forward_speed * surface.speed_multiplier();
+            assert!(vehicle.speed > 0.0);
+            assert!(vehicle.speed <= surface_limit + 0.001);
+            speeds.push(vehicle.speed);
+        }
+
+        assert!(speeds.windows(2).all(|pair| pair[0] > pair[1]));
+    }
+
+    #[test]
     fn invalid_delta_and_non_finite_input_are_ignored() {
         let mut vehicle = VehicleState::default();
         vehicle.update(
