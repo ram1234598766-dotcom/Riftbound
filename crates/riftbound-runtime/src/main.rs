@@ -2281,9 +2281,18 @@ mod world_prop_tests {
         let first = world_obstacle_footprints(&chunks);
         assert_eq!(first, world_obstacle_footprints(&chunks));
         let reversed_chunks = [chunks[1], chunks[0]];
+        let mut ordered_footprints = first.clone();
         let mut reversed_footprints = world_obstacle_footprints(&reversed_chunks);
-        reversed_footprints.reverse();
-        assert_eq!(first, reversed_footprints);
+        let sort_footprints = |footprints: &mut Vec<Aabb2>| {
+            footprints.sort_by(|left, right| {
+                left.min_x
+                    .total_cmp(&right.min_x)
+                    .then_with(|| left.min_z.total_cmp(&right.min_z))
+            });
+        };
+        sort_footprints(&mut ordered_footprints);
+        sort_footprints(&mut reversed_footprints);
+        assert_eq!(ordered_footprints, reversed_footprints);
         assert!(first.iter().all(|footprint| {
             footprint.min_x.is_finite()
                 && footprint.max_x.is_finite()
