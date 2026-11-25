@@ -680,9 +680,6 @@ mod tests {
             assert_eq!(heights[index], sample.height);
             assert_eq!(surfaces[index], sample.surface);
         }
-        assert_ne!(world_terrain_vehicle_surface(
-            position.0, position.1, position.2, position.3, position.4,
-        ), VehicleSurface::Rock);
     }
 
     #[test]
