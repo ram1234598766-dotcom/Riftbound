@@ -467,6 +467,21 @@ mod tests {
     }
 
     #[test]
+    fn slot_lookup_returns_stable_slot_and_none_for_evicted_coordinates() {
+        let mut streamer = WorldChunkStreamer::standard();
+        let mut slots = WorldChunkSlotMap::for_config(WorldChunkConfig::default());
+        assert!(streamer.update_focus(0.0, 0.0));
+        assert!(slots.apply_changes(streamer.changes()));
+        let origin = WorldChunkCoord { x: 0, z: 0 };
+        let original = slots.slot_for(origin).expect("origin chunk is assigned");
+
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
+        assert!(slots.apply_changes(streamer.changes()));
+        assert_eq!(slots.slot_for(origin).expect("origin remains active").slot_index, original.slot_index);
+        assert!(slots.slot_for(WorldChunkCoord { x: -2, z: 0 }).is_none());
+    }
+
+    #[test]
     fn slot_map_reuses_evicted_slots_and_preserves_unchanged_chunk_slots() {
         let mut streamer = WorldChunkStreamer::standard();
         let mut slots = WorldChunkSlotMap::for_config(WorldChunkConfig::default());
