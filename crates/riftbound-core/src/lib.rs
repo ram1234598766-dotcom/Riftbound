@@ -11,6 +11,7 @@ mod enemy;
 mod entity;
 mod health;
 mod input;
+mod inventory;
 mod math;
 mod mission;
 mod objective;
@@ -33,6 +34,7 @@ pub use enemy::{EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyE
 pub use entity::{EntityArena, EntityId};
 pub use health::PlayerHealth;
 pub use input::{Button, InputState};
+pub use inventory::{Equipment, EquipmentSlot, Inventory, ItemKind, ItemStack};
 pub use math::{Vec2, Vec3};
 pub use mission::{MissionPhase, MissionProgress};
 pub use objective::{ObjectiveKind, ObjectiveProgress};
