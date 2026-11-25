@@ -667,6 +667,7 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
 }
 
 /// Returns a soft directional-light factor from the shared world height field.
+#[cfg(test)]
 fn terrain_light_factor(world_x: f32, world_z: f32) -> f32 {
     let center_height = world_terrain_sample(world_x, world_z).height;
     terrain_light_factor_with_center(world_x, world_z, center_height)
