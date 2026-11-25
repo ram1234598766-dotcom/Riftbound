@@ -412,48 +412,57 @@ impl VehicleState {
     ) -> Option<SuspensionPose> {
         let half_track = suspension_config.track_width * 0.5;
         let half_wheelbase = suspension_config.wheelbase * 0.5;
-        let ground_heights = world_terrain_vehicle_ground_heights(
+        world_terrain_vehicle_ground_heights(
             self.position.x,
             self.position.z,
             self.heading,
             half_track,
             half_wheelbase,
         )?;
+
+        // Work on copies so an invalid destination sample cannot partially advance
+        // the vehicle, suspension, or blended surface tracker.
+        let mut next_vehicle = *self;
+        let mut next_suspension = *suspension;
+        let mut next_surface_tracker = *surface_tracker;
         let wheel_surfaces = world_terrain_vehicle_surfaces(
-            self.position.x,
-            self.position.z,
-            self.heading,
+            next_vehicle.position.x,
+            next_vehicle.position.z,
+            next_vehicle.heading,
             half_track,
             half_wheelbase,
         );
         let dominant_surface = world_terrain_vehicle_surface(
-            self.position.x,
-            self.position.z,
-            self.heading,
+            next_vehicle.position.x,
+            next_vehicle.position.z,
+            next_vehicle.heading,
             half_track,
             half_wheelbase,
         );
-        surface_tracker.update_wheel_contacts(dominant_surface, wheel_surfaces);
-        self.update_with_wheel_surface_response(
+        next_surface_tracker.update_wheel_contacts(dominant_surface, wheel_surfaces);
+        next_vehicle.update_with_wheel_surface_response(
             input,
-            surface_tracker.response(),
-            surface_tracker.side_traction(),
+            next_surface_tracker.response(),
+            next_surface_tracker.side_traction(),
             config,
             delta_seconds,
         );
         let updated_heights = world_terrain_vehicle_ground_heights(
-            self.position.x,
-            self.position.z,
-            self.heading,
+            next_vehicle.position.x,
+            next_vehicle.position.z,
+            next_vehicle.heading,
             half_track,
             half_wheelbase,
         )?;
-        let pose = suspension.update(
+        let pose = next_suspension.update(
             updated_heights,
-            self.position.y,
+            next_vehicle.position.y,
             suspension_config,
             delta_seconds,
         );
+        *self = next_vehicle;
+        *suspension = next_suspension;
+        *surface_tracker = next_surface_tracker;
         Some(pose)
     }
 
