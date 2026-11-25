@@ -712,9 +712,9 @@ impl VehicleState {
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
         let grip = traction;
-        // Keep propulsion and braking tied to actual tyre load, but retain
-        // modest steering authority when all four wheels are off the ground.
-        let steering_grip = grip.max(0.05);
+        // Blend from modest airborne control to full tyre-supported steering
+        // continuously as wheel load returns during landing.
+        let steering_grip = 0.05 + grip * 0.95;
         let grip_imbalance = right_traction - left_traction;
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
@@ -1140,6 +1140,35 @@ mod tests {
         assert!(vehicle.speed > 0.0);
         assert!(vehicle.heading > heading_before);
         assert!(vehicle.heading < 0.05);
+    }
+
+    #[test]
+    fn steering_authority_increases_smoothly_as_wheel_load_returns() {
+        let steering_response = |grip: f32| {
+            let mut vehicle = VehicleState {
+                speed: 8.0,
+                ..VehicleState::default()
+            };
+            vehicle.update_with_wheel_surface_response(
+                VehicleInput {
+                    throttle: 0.0,
+                    brake: 0.0,
+                    steering: 1.0,
+                },
+                (grip, 1.0, 0.0),
+                (grip, grip),
+                VehicleConfig::default(),
+                1.0 / 60.0,
+            );
+            vehicle.heading
+        };
+
+        let airborne = steering_response(0.0);
+        let partial_contact = steering_response(0.5);
+        let grounded = steering_response(1.0);
+        assert!(airborne > 0.0);
+        assert!(partial_contact > airborne);
+        assert!(grounded > partial_contact);
     }
 
     #[test]
