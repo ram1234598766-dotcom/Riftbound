@@ -1,6 +1,6 @@
 //! Deterministic lightweight ground-vehicle handling for the open-world driving RPG.
 
-use crate::Vec3;
+use crate::{Inventory, ItemKind, Vec3};
 
 /// Surface response used by the vehicle simulation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,6 +81,61 @@ impl Default for VehicleConfig {
             steering_rate: 1.8,
             drag: 0.16,
         }
+    }
+}
+
+
+/** Persistent engine tuning purchased with recovered salvage. */
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct VehicleUpgrades {
+    engine_level: u8,
+}
+
+impl VehicleUpgrades {
+    /// Maximum engine tuning tier.
+    pub const MAX_ENGINE_LEVEL: u8 = 3;
+    /// Salvage required for each successive engine tier.
+    pub const ENGINE_UPGRADE_COSTS: [u16; 3] = [3, 5, 8];
+
+    /// Current engine tuning tier.
+    #[must_use]
+    pub const fn engine_level(self) -> u8 {
+        self.engine_level
+    }
+
+    /// Salvage required for the next engine tier, or None at maximum level.
+    #[must_use]
+    pub const fn next_engine_cost(self) -> Option<u16> {
+        if self.engine_level >= Self::MAX_ENGINE_LEVEL {
+            None
+        } else {
+            Some(Self::ENGINE_UPGRADE_COSTS[self.engine_level as usize])
+        }
+    }
+
+    /// Purchases the next engine tier without changing inventory on failure.
+    pub fn purchase_engine_upgrade(&mut self, inventory: &mut Inventory) -> bool {
+        let Some(cost) = self.next_engine_cost() else {
+            return false;
+        };
+        if inventory.count(ItemKind::Salvage) < u32::from(cost) {
+            return false;
+        }
+        let removed = inventory.remove(ItemKind::Salvage, cost);
+        if removed != cost {
+            return false;
+        }
+        self.engine_level += 1;
+        true
+    }
+
+    /// Applies the installed engine tiers to a base handling configuration.
+    #[must_use]
+    pub fn apply_to(self, mut config: VehicleConfig) -> VehicleConfig {
+        let level = self.engine_level.min(Self::MAX_ENGINE_LEVEL);
+        config.acceleration += f32::from(level) * 2.0;
+        config.max_forward_speed += f32::from(level) * 2.5;
+        config
     }
 }
 
@@ -359,6 +414,29 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn engine_upgrades_spend_salvage_and_improve_handling_with_a_level_cap() {
+        let mut inventory = Inventory::default();
+        let mut upgrades = VehicleUpgrades::default();
+        assert!(!upgrades.purchase_engine_upgrade(&mut inventory));
+        assert_eq!(upgrades.engine_level(), 0);
+        inventory.add(ItemKind::Salvage, 16);
+        assert!(upgrades.purchase_engine_upgrade(&mut inventory));
+        assert_eq!(inventory.count(ItemKind::Salvage), 13);
+        assert_eq!(upgrades.engine_level(), 1);
+        let tuned = upgrades.apply_to(VehicleConfig::default());
+        assert_eq!(tuned.acceleration, 12.0);
+        assert_eq!(tuned.max_forward_speed, 26.5);
+        assert!(upgrades.purchase_engine_upgrade(&mut inventory));
+        assert_eq!(inventory.count(ItemKind::Salvage), 8);
+        assert!(upgrades.purchase_engine_upgrade(&mut inventory));
+        assert_eq!(inventory.count(ItemKind::Salvage), 0);
+        assert_eq!(upgrades.engine_level(), VehicleUpgrades::MAX_ENGINE_LEVEL);
+        assert_eq!(upgrades.next_engine_cost(), None);
+        assert!(!upgrades.purchase_engine_upgrade(&mut inventory));
+    }
+
     #[test]
     fn vehicle_recovery_restores_last_safe_state_and_resets_speed() {
         let initial = VehicleState {
