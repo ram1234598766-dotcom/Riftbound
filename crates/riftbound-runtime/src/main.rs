@@ -426,6 +426,9 @@ impl ApplicationHandler for RiftboundApp {
                                     if restored > 0 {
                                         self.inventory.remove(ItemKind::Medkit, 1);
                                         log::info!("Medkit used: restored {restored} health");
+                                        if let Err(error) = save::save_profile(&self.saved_profile()) {
+                                            log::warn!("Could not save medkit use: {error}");
+                                        }
                                     } else {
                                         log::info!("Health is already full; medkit was not consumed");
                                     }
@@ -1088,7 +1091,9 @@ impl ApplicationHandler for RiftboundApp {
                                 log::info!(
                                     "Checkpoint activated; falling will return the player here"
                                 );
-                                if let Err(error) = save::save_profile(&self.saved_profile()) {
+                                let mut profile = self.saved_profile();
+                                profile.player_position = Some(checkpoint.position());
+                                if let Err(error) = save::save_profile(&profile) {
                                     log::warn!("Could not save activated checkpoint: {error}");
                                 }
                             }
