@@ -1188,4 +1188,36 @@ mod tests {
         assert!(heading_changes.iter().all(|heading| *heading < 0.0));
         assert!(heading_changes.windows(2).all(|pair| pair[0] < pair[1]));
     }
+
+    #[test]
+    fn blended_terrain_response_produces_intermediate_acceleration() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            throttle: 1.0,
+            ..VehicleInput::default()
+        };
+        let mut asphalt = VehicleState::default();
+        let mut snow = VehicleState::default();
+        let mut transition = VehicleState::default();
+
+        asphalt.update(input, VehicleSurface::Asphalt, config, 0.1);
+        snow.update(input, VehicleSurface::Snow, config, 0.1);
+        transition.update_with_surface_response(
+            input,
+            f32::midpoint(VehicleSurface::Asphalt.traction(), VehicleSurface::Snow.traction()),
+            f32::midpoint(
+                VehicleSurface::Asphalt.speed_multiplier(),
+                VehicleSurface::Snow.speed_multiplier(),
+            ),
+            f32::midpoint(
+                VehicleSurface::Asphalt.rolling_resistance(),
+                VehicleSurface::Snow.rolling_resistance(),
+            ),
+            config,
+            0.1,
+        );
+
+        assert!(transition.speed > snow.speed);
+        assert!(transition.speed < asphalt.speed);
+    }
 }
