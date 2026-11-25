@@ -11,8 +11,9 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades, WORLD_CHUNK_SIZE,
-    WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample, world_terrain_vehicle_surface,
+    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades,
+    WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample,
+    world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
