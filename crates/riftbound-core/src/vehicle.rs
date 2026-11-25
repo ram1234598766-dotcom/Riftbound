@@ -776,6 +776,34 @@ mod tests {
     }
 
     #[test]
+    fn suspension_rolls_over_a_one_sided_terrain_ridge_and_recovers() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+
+        for _ in 0..30 {
+            suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        }
+
+        let mut ridge_pose = SuspensionPose::default();
+        for _ in 0..12 {
+            ridge_pose =
+                suspension.update([0.32, 0.0, 0.32, 0.0], 0.58, config, 1.0 / 60.0);
+        }
+
+        assert!(ridge_pose.roll.abs() > 0.001);
+        assert!(ridge_pose.pitch.abs() < 0.001);
+        assert!(ridge_pose.roll.is_finite());
+
+        let mut recovered_pose = ridge_pose;
+        for _ in 0..360 {
+            recovered_pose = suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        }
+
+        assert!(recovered_pose.roll.abs() < ridge_pose.roll.abs());
+        assert!(recovered_pose.roll.abs() < 0.001);
+    }
+
+    #[test]
     fn suspension_pose_tracks_combined_terrain_pitch_and_roll() {
         let config = SuspensionConfig::default();
         let mut suspension = SuspensionState::default();
