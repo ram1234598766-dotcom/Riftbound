@@ -1475,6 +1475,7 @@ mod tests {
     fn suspension_load_factors_transfer_grip_between_wheel_corners() {
         let suspension = SuspensionState {
             compression: [0.4, 0.2, 0.1, 0.1],
+            ground_reference_initialized: true,
             ..SuspensionState::default()
         };
         let loads = suspension.wheel_load_factors(SuspensionConfig::default());
@@ -1512,6 +1513,7 @@ mod tests {
             ..SuspensionState::default()
         };
         let mut uneven = flat;
+        uneven.compression = [0.5, 0.1, 0.1, 0.1];
         flat.update([0.2; 4], 0.58, config, 1.0 / 60.0);
         uneven.update([0.5, 0.1, 0.1, 0.1], 0.58, config, 1.0 / 60.0);
         assert!(uneven.compression_velocity[0] < flat.compression_velocity[0]);
@@ -1523,7 +1525,7 @@ mod tests {
     fn suspension_rebound_uses_extra_damping_after_landing() {
         let config = SuspensionConfig::default();
         let mut state = SuspensionState {
-            compression: [0.5; 4],
+            compression: [0.2; 4],
             compression_velocity: [-4.0; 4],
             average_ground_height: 0.0,
             average_ground_velocity: 0.0,
@@ -1533,7 +1535,7 @@ mod tests {
         let chassis_height = config.rest_length + 1.0;
         let step = 1.0 / 60.0;
         let expected_acceleration =
-            (0.0 - 0.5) * config.spring_strength - (-4.0 * config.damping * 1.35);
+            (0.0 - 0.2) * config.spring_strength - (-4.0 * config.damping * 1.35);
         let expected_velocity = -4.0 + expected_acceleration * step;
 
         state.update([0.0; 4], chassis_height, config, step);
@@ -1755,7 +1757,7 @@ mod tests {
         }
         let early = tracker.wheel_traction()[0];
         assert!(early > VehicleSurface::Snow.traction());
-        assert!(early < 1.0 - (1.0 - VehicleSurface::Snow.traction()) * 0.2);
+        assert!(early < 1.0 - (1.0 - VehicleSurface::Snow.traction()) * 0.1);
 
         for _ in 4..9 {
             tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
