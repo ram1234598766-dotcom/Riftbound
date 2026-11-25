@@ -65,6 +65,8 @@ struct RiftboundApp {
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
+    world_streamer: Option<riftbound_core::WorldChunkStreamer>,
+    world_slot_map: Option<riftbound_core::WorldChunkSlotMap>,
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -148,12 +150,22 @@ impl ApplicationHandler for RiftboundApp {
                     event_loop.exit();
                     return;
                 }
+                let mut world_streamer = riftbound_core::WorldChunkStreamer::standard();
+                let mut world_slot_map = riftbound_core::WorldChunkSlotMap::for_config(
+                    riftbound_core::WorldChunkConfig::default(),
+                );
+                let _ = world_streamer.update_focus(player_transform.translation.x, player_transform.translation.z);
+                if !renderer.sync_world_terrain(world_streamer.changes(), &mut world_slot_map) {
+                    log::error!("Initial world terrain chunk synchronization failed");
+                }
                 renderer.follow_camera(player_transform.translation);
                 self.camera_target = player_transform.translation;
                 log::info!("Riftbound arena, player, and collision world initialized");
                 window.request_redraw();
                 self.window = Some(window);
                 self.renderer = Some(renderer);
+                self.world_streamer = Some(world_streamer);
+                self.world_slot_map = Some(world_slot_map);
                 self.player = Some(player);
                 self.player_parts = Some(player_parts);
                 self.vehicle = Some(vehicle);
