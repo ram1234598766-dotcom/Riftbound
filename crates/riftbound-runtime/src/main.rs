@@ -944,6 +944,20 @@ impl ApplicationHandler for RiftboundApp {
                             return;
                         }
                     }
+                    let world_focus = if self.driving {
+                        self.vehicle_state.position
+                    } else {
+                        renderer.scene().get(player).map_or(self.camera_target, |transform| transform.translation)
+                    };
+                    if let (Some(streamer), Some(slot_map)) =
+                        (self.world_streamer.as_mut(), self.world_slot_map.as_mut())
+                    {
+                        if streamer.update_focus(world_focus.x, world_focus.z)
+                            && !renderer.sync_world_terrain(streamer.changes(), slot_map)
+                        {
+                            log::error!("World terrain chunk synchronization failed");
+                        }
+                    }
                     renderer.render();
                 }
                 self.input.begin_frame();
