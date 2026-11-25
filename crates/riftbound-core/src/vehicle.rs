@@ -784,14 +784,18 @@ mod tests {
             suspension.update([100.0, -100.0, 100.0, -100.0], 0.58, config, 1.0 / 60.0);
         }
 
-        assert!(suspension
-            .compression
-            .iter()
-            .all(|compression| *compression >= 0.0 && *compression <= config.max_travel));
-        assert!(suspension
-            .compression_velocity
-            .iter()
-            .all(|velocity| velocity.is_finite()));
+        assert!(
+            suspension
+                .compression
+                .iter()
+                .all(|compression| *compression >= 0.0 && *compression <= config.max_travel)
+        );
+        assert!(
+            suspension
+                .compression_velocity
+                .iter()
+                .all(|velocity| velocity.is_finite())
+        );
         let pose = suspension.pose(config);
         assert!(pose.average_compression.is_finite());
         assert!(pose.pitch.is_finite() && pose.roll.is_finite());
