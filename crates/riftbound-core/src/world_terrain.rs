@@ -467,7 +467,13 @@ mod tests {
     #[test]
     fn world_vehicle_surface_ties_favor_the_center_surface() {
         assert_eq!(
-            world_terrain_vehicle_surface(6.0, 0.0, 0.0, 0.78, 1.32),
+            world_terrain_vehicle_surface(
+                world_road_sample(0.0, 20.0).center_x + 6.0,
+                20.0,
+                0.0,
+                0.78,
+                1.32
+            ),
             VehicleSurface::Gravel
         );
     }
