@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld,
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
-    ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
+    Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, PlayerProgression, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
     terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
@@ -65,6 +65,7 @@ struct RiftboundApp {
     player_health: PlayerHealth,
     progression: PlayerProgression,
     inventory: Inventory,
+    equipment: Equipment,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -197,6 +198,10 @@ impl ApplicationHandler for RiftboundApp {
                 }
                 self.collision = Some(collision);
                 self.pickups = pickups;
+                self.inventory = Inventory::default();
+                self.inventory.add(ItemKind::ExplorerVest, 1);
+                self.inventory.add(ItemKind::TrailBoots, 1);
+                self.equipment = Equipment::default();
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
                 self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
@@ -307,6 +312,47 @@ impl ApplicationHandler for RiftboundApp {
                             log::info!("Exited vehicle prototype");
                         }
                     }
+                    if event.state == ElementState::Pressed {
+                        match key {
+                            KeyCode::Digit1 => {
+                                if self.inventory.equip_from_inventory(
+                                    &mut self.equipment,
+                                    ItemKind::ExplorerVest,
+                                ) {
+                                    log::info!("Explorer Vest equipped: incoming damage reduced by 8");
+                                } else {
+                                    log::info!("No Explorer Vest available in inventory");
+                                }
+                            }
+                            KeyCode::Digit2 => {
+                                if self.inventory.equip_from_inventory(
+                                    &mut self.equipment,
+                                    ItemKind::TrailBoots,
+                                ) {
+                                    log::info!("Trail Boots equipped: traversal speed increased by 8%");
+                                } else {
+                                    log::info!("No Trail Boots available in inventory");
+                                }
+                            }
+                            KeyCode::Digit3 => {
+                                if self.inventory.unequip_to_inventory(
+                                    &mut self.equipment,
+                                    EquipmentSlot::Body,
+                                ) {
+                                    log::info!("Body equipment returned to inventory");
+                                }
+                            }
+                            KeyCode::Digit4 => {
+                                if self.inventory.unequip_to_inventory(
+                                    &mut self.equipment,
+                                    EquipmentSlot::Feet,
+                                ) {
+                                    log::info!("Foot equipment returned to inventory");
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                     if let Some(button) = movement_button(key) {
                         self.input
                             .set_button(button, event.state == ElementState::Pressed);
@@ -332,6 +378,8 @@ impl ApplicationHandler for RiftboundApp {
                     };
                     let previous_position = transform.translation;
                     if !self.driving {
+                        self.controller
+                            .set_movement_bonus(self.equipment.movement_bonus());
                         self.controller.update_camera_relative(
                             &mut transform,
                             &self.input,
@@ -668,7 +716,10 @@ impl ApplicationHandler for RiftboundApp {
                                 let pulse_distance =
                                     distance_squared(transform.translation, enemy_position);
                                 if pulse_distance <= 2.2 * 2.2
-                                    && self.player_health.apply_damage(25, 1.0)
+                                    && self.player_health.apply_damage(
+                                        25_u8.saturating_sub(self.equipment.armor_bonus()).max(1),
+                                        1.0,
+                                    )
                                 {
                                     log::info!("Sentinel pulse hit the player");
                                     if !self.player_health.is_alive() {
@@ -747,7 +798,10 @@ impl ApplicationHandler for RiftboundApp {
                         if event == Some(EnemyEvent::PulseReleased) {
                             *pulse_timer = 0.28;
                             if distance_squared(transform.translation, enemy_position) <= 2.2 * 2.2
-                                && self.player_health.apply_damage(15, 1.0)
+                                && self.player_health.apply_damage(
+                                    15_u8.saturating_sub(self.equipment.armor_bonus()).max(1),
+                                    1.0,
+                                )
                             {
                                 log::info!("An arena enemy pulse hit the player");
                                 if !self.player_health.is_alive() {
