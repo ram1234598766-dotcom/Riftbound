@@ -1,10 +1,16 @@
 //! Player experience and level progression for RPG rewards.
 
 /// Deterministic, allocation-free player progression state.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PlayerProgression {
     total_xp: u64,
     level: u32,
+}
+
+impl Default for PlayerProgression {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PlayerProgression {
