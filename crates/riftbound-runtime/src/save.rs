@@ -234,11 +234,6 @@ pub fn load_profile_from_slot(slot: SaveSlot) -> SavedProfile {
         .unwrap_or_default()
 }
 
-/// Loads the default campaign slot.
-pub fn load_profile() -> SavedProfile {
-    load_profile_from_slot(SaveSlot::One)
-}
-
 /// Atomically replaces one slot after writing a temporary file.
 pub fn save_profile_to_slot(slot: SaveSlot, profile: &SavedProfile) -> io::Result<()> {
     let path = save_path(slot)?;
