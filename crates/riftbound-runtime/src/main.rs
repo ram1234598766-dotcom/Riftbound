@@ -50,6 +50,16 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
     }
 }
 
+const MAX_VEHICLE_STEP: f32 = 1.0 / 30.0;
+
+fn bounded_vehicle_delta(delta: f32) -> f32 {
+    if delta.is_finite() {
+        delta.clamp(0.0, MAX_VEHICLE_STEP)
+    } else {
+        0.0
+    }
+}
+
 fn smooth_wheel_steering(current: f32, target: f32, delta: f32) -> f32 {
     if !current.is_finite() || !target.is_finite() || !delta.is_finite() {
         return 0.0;
@@ -722,6 +732,8 @@ impl ApplicationHandler for RiftboundApp {
                     self.animated_transforms.clear();
                     self.animated_transforms.push((player, transform));
                     if self.driving {
+                        // Keep vehicle simulation stable after a stalled or backgrounded frame.
+                        let vehicle_delta = bounded_vehicle_delta(delta);
                         let throttle = if self.input.is_held(Button::MoveForward) {
                             1.0
                         } else if self.input.is_held(Button::MoveBackward) {
@@ -770,7 +782,7 @@ impl ApplicationHandler for RiftboundApp {
                             (traction, speed_multiplier, rolling_resistance),
                             (left_traction, right_traction),
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
-                            delta,
+                            vehicle_delta,
                         );
                         if let Some(collision) = self.collision.as_ref() {
                             let movement = Vec3::new(
@@ -822,7 +834,7 @@ impl ApplicationHandler for RiftboundApp {
                             ground_heights,
                             self.vehicle_state.position.y,
                             suspension_config,
-                            delta,
+                            vehicle_delta,
                         );
                         let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
                         self.vehicle_state.position.y = suspension_pose.average_ground_height
@@ -847,13 +859,13 @@ impl ApplicationHandler for RiftboundApp {
                         }
                         if let Some(wheels) = self.vehicle_wheels {
                             self.vehicle_wheel_rotation = (self.vehicle_wheel_rotation
-                                + wheel_rotation_delta(self.vehicle_state.speed, delta, 0.34))
+                                + wheel_rotation_delta(self.vehicle_state.speed, vehicle_delta, 0.34))
                                 .rem_euclid(std::f32::consts::TAU);
                             let wheel_spin = self.vehicle_wheel_rotation;
                             self.vehicle_wheel_steering = smooth_wheel_steering(
                                 self.vehicle_wheel_steering,
                                 steering * 0.35,
-                                delta,
+                                vehicle_delta,
                             );
                             let wheel_steering = self.vehicle_wheel_steering;
                             let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
@@ -2416,6 +2428,15 @@ mod world_prop_tests {
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
         );
+    }
+
+    #[test]
+    fn vehicle_delta_is_bounded_and_rejects_invalid_values() {
+        assert_eq!(bounded_vehicle_delta(0.0), 0.0);
+        assert_eq!(bounded_vehicle_delta(1.0), MAX_VEHICLE_STEP);
+        assert_eq!(bounded_vehicle_delta(-1.0), 0.0);
+        assert_eq!(bounded_vehicle_delta(f32::NAN), 0.0);
+        assert_eq!(bounded_vehicle_delta(f32::INFINITY), 0.0);
     }
 
     #[test]
