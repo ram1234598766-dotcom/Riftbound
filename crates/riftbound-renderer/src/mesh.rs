@@ -1471,8 +1471,9 @@ mod tests {
                     .all(|value| value.is_finite())
             }));
         }
-        let base_vertex_count = 25;
-        assert!(distant.0[base_vertex_count..].chunks_exact(4).all(|skirt| {
+        let skirt_vertex_count = 4 * (5 - 1) * 4;
+        let skirt_start = distant.0.len() - skirt_vertex_count;
+        assert!(distant.0[skirt_start..].chunks_exact(4).all(|skirt| {
             (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs() < 1.0e-4
                 && (skirt[2].position[1] - skirt[3].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
                     < 1.0e-4
@@ -1653,9 +1654,11 @@ mod tests {
             assert_eq!(pier_count, 16);
             assert!(valid_index_data(vertices.len(), &indices));
 
-            let bridge_deck = world_terrain_sample(80.0, -72.0).height;
+            let bridge_rail_height = world_terrain_sample(72.0, -72.0).height + 1.1;
             assert!(vertices.iter().any(|vertex| {
-                (vertex.position[1] - (bridge_deck + 1.1)).abs() < 1.0e-4
+                (vertex.position[0] - 8.0).abs() < 1.0e-4
+                    && (vertex.position[2] + 8.0).abs() < 1.0e-4
+                    && (vertex.position[1] - bridge_rail_height).abs() < 1.0e-4
                     && vertex.color == [0.58, 0.61, 0.64]
             }));
         }
@@ -1665,7 +1668,10 @@ mod tests {
     fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
-        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
+        assert_eq!(
+            road_chunk.0.len(),
+            81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4 + 4 * 4
+        );
         // The neighbouring chunk owns the eastbound spur and northbound branch,
         // but not the primary winding road ribbon.
         assert_eq!(
