@@ -905,6 +905,8 @@ pub struct SuspensionState {
     compression_velocity: [f32; 4],
     average_ground_height: f32,
     average_ground_velocity: f32,
+    terrain_pitch: f32,
+    terrain_roll: f32,
     ground_reference_initialized: bool,
 }
 
@@ -945,9 +947,17 @@ impl SuspensionState {
         let substeps = (dt / (1.0 / 60.0)).ceil() as u32;
         let step_dt = dt / substeps as f32;
         let target_ground_height = wheel_ground_heights.iter().sum::<f32>() * 0.25;
+        let front_ground = f32::midpoint(wheel_ground_heights[0], wheel_ground_heights[1]);
+        let rear_ground = f32::midpoint(wheel_ground_heights[2], wheel_ground_heights[3]);
+        let left_ground = f32::midpoint(wheel_ground_heights[0], wheel_ground_heights[2]);
+        let right_ground = f32::midpoint(wheel_ground_heights[1], wheel_ground_heights[3]);
+        let target_terrain_pitch = ((front_ground - rear_ground) / config.wheelbase).atan();
+        let target_terrain_roll = ((left_ground - right_ground) / config.track_width).atan();
         if !self.ground_reference_initialized {
             self.average_ground_height = target_ground_height;
             self.average_ground_velocity = 0.0;
+            self.terrain_pitch = target_terrain_pitch;
+            self.terrain_roll = target_terrain_roll;
             self.ground_reference_initialized = true;
         }
         let target_compressions = wheel_ground_heights.map(|height| {
@@ -956,6 +966,11 @@ impl SuspensionState {
         let average_target_compression =
             target_compressions.iter().sum::<f32>() * 0.25;
         for _ in 0..substeps {
+            // Follow sustained terrain gradients smoothly; transient wheel impacts
+            // remain represented separately by differential spring velocity.
+            let slope_blend = 1.0 - (-8.0 * step_dt).exp();
+            self.terrain_pitch += (target_terrain_pitch - self.terrain_pitch) * slope_blend;
+            self.terrain_roll += (target_terrain_roll - self.terrain_roll) * slope_blend;
             let body_follow_strength = config.spring_strength * 0.35;
             let body_follow_acceleration = (target_ground_height - self.average_ground_height)
                 * body_follow_strength
@@ -1049,6 +1064,12 @@ impl SuspensionState {
 
         self.average_ground_height = wheel_ground_heights.iter().sum::<f32>() * 0.25;
         self.average_ground_velocity = 0.0;
+        let front_ground = f32::midpoint(wheel_ground_heights[0], wheel_ground_heights[1]);
+        let rear_ground = f32::midpoint(wheel_ground_heights[2], wheel_ground_heights[3]);
+        let left_ground = f32::midpoint(wheel_ground_heights[0], wheel_ground_heights[2]);
+        let right_ground = f32::midpoint(wheel_ground_heights[1], wheel_ground_heights[3]);
+        self.terrain_pitch = ((front_ground - rear_ground) / config.wheelbase).atan();
+        self.terrain_roll = ((left_ground - right_ground) / config.track_width).atan();
         self.ground_reference_initialized = true;
         for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
             self.compression[index] = (ground_height + config.rest_length - chassis_height)
@@ -1102,12 +1123,8 @@ impl SuspensionState {
             } else {
                 0.0
             },
-            pitch: (((front - rear) / config.wheelbase.max(f32::EPSILON)).atan()
-                + dynamic_pitch)
-                .clamp(-0.35, 0.35),
-            roll: (((left - right) / config.track_width.max(f32::EPSILON)).atan()
-                + dynamic_roll)
-                .clamp(-0.35, 0.35),
+            pitch: (self.terrain_pitch + dynamic_pitch).clamp(-0.35, 0.35),
+            roll: (self.terrain_roll + dynamic_roll).clamp(-0.35, 0.35),
         }
     }
 }
@@ -1901,6 +1918,23 @@ mod tests {
 
         assert!(recovered_pose.roll.abs() < ridge_pose.roll.abs());
         assert!(recovered_pose.roll.abs() < 0.001);
+    }
+
+    #[test]
+    fn suspension_pose_tracks_sustained_slope_independently_of_impact_velocity() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        let slope = [0.3, 0.3, 0.0, 0.0];
+
+        for _ in 0..240 {
+            suspension.update(slope, 0.58, config, 1.0 / 60.0);
+        }
+
+        let pose = suspension.pose(config);
+        let expected_pitch = (0.3_f32 / config.wheelbase).atan();
+        assert!((pose.pitch - expected_pitch).abs() < 0.002);
+        assert!(pose.roll.abs() < 0.002);
+        assert!(pose.pitch.is_finite() && pose.roll.is_finite());
     }
 
     #[test]
