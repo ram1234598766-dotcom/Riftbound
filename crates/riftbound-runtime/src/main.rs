@@ -1456,14 +1456,15 @@ impl ApplicationHandler for RiftboundApp {
                             return;
                         }
                     }
-                    let world_focus = if self.driving {
-                        self.vehicle_state.position
-                    } else {
-                        renderer
-                            .scene()
-                            .get(player)
-                            .map_or(self.camera_target, |transform| transform.translation)
-                    };
+                    let player_focus = renderer
+                        .scene()
+                        .get(player)
+                        .map_or(self.camera_target, |transform| transform.translation);
+                    let world_focus = world_stream_focus(
+                        self.driving,
+                        self.vehicle_state.position,
+                        player_focus,
+                    );
                     if let (Some(streamer), Some(slot_map)) =
                         (self.world_streamer.as_mut(), self.world_slot_map.as_mut())
                     {
@@ -2153,6 +2154,15 @@ fn world_prop_variant_for_surface(surface: VehicleSurface, variant: u32) -> u32 
 }
 
 /// Keeps visible blockout props and collision footprints aligned to active chunks.
+/// Selects the active terrain-streaming focus from the currently controlled actor.
+fn world_stream_focus(driving: bool, vehicle_position: Vec3, player_position: Vec3) -> Vec3 {
+    if driving {
+        vehicle_position
+    } else {
+        player_position
+    }
+}
+
 fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
     let obstacles = world_obstacle_footprints(chunks);
     world.replace_obstacles(&obstacles);
@@ -2223,6 +2233,15 @@ fn spawn_world_obstacle_props(
 #[allow(clippy::items_after_test_module)]
 mod world_prop_tests {
     use super::*;
+
+    #[test]
+    fn terrain_streaming_follows_vehicle_while_driving_and_player_on_foot() {
+        let player = Vec3::new(12.0, 1.0, 24.0);
+        let vehicle = Vec3::new(160.0, 0.8, -96.0);
+
+        assert_eq!(world_stream_focus(true, vehicle, player), vehicle);
+        assert_eq!(world_stream_focus(false, vehicle, player), player);
+    }
 
     #[test]
     fn distant_chunks_use_half_the_detailed_prop_budget() {
