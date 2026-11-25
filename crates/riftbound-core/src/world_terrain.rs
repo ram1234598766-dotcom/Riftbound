@@ -345,6 +345,30 @@ mod tests {
     }
 
     #[test]
+    fn northbound_bridge_elevation_has_smooth_approaches() {
+        let ground_height = |world_x: f32, world_z: f32| {
+            let broad = value_noise(world_x * 0.004, world_z * 0.004);
+            let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
+            let ridge =
+                1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
+            broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0
+        };
+
+        for world_z in [-88.0, -56.0] {
+            let sample = world_terrain_sample(80.0, world_z);
+            assert!((sample.height - ground_height(80.0, world_z)).abs() < 1.0e-4);
+        }
+        let bridge_deck = world_terrain_sample(80.0, -72.0);
+        assert!((bridge_deck.height - ground_height(80.0, -72.0) - 4.0).abs() < 1.0e-4);
+        let approach = world_terrain_sample(80.0, -84.0);
+        assert!((approach.height - ground_height(80.0, -84.0) - 2.0).abs() < 1.0e-4);
+        assert_eq!(
+            world_terrain_sample(96.0, -72.0).height,
+            ground_height(96.0, -72.0)
+        );
+    }
+
+    #[test]
     fn northbound_branch_has_asphalt_and_gravel_shoulders() {
         for world_z in [-16.0, -64.0, -120.0, -128.0] {
             assert_eq!(
