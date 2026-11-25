@@ -1259,4 +1259,47 @@ mod tests {
         assert!(transition.speed > snow.speed);
         assert!(transition.speed < asphalt.speed);
     }
+
+    #[test]
+    fn terrain_tracker_blends_response_after_confirmed_surface_change() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        for _ in 0..VehicleSurfaceTracker::CONFIRMATION_FRAMES {
+            tracker.update(VehicleSurface::Snow);
+        }
+
+        let start = tracker.response();
+        assert!((start.0 - VehicleSurface::Asphalt.traction()).abs() < 0.0001);
+        assert_eq!(tracker.current(), VehicleSurface::Snow);
+
+        let mut previous = start.0;
+        for _ in 0..VehicleSurfaceTracker::TRANSITION_FRAMES {
+            tracker.update(VehicleSurface::Snow);
+            let response = tracker.response();
+            assert!(response.0 <= previous);
+            assert!(response.0 >= VehicleSurface::Snow.traction());
+            previous = response.0;
+        }
+
+        assert!((tracker.response().0 - VehicleSurface::Snow.traction()).abs() < 0.0001);
+    }
+
+    #[test]
+    fn terrain_tracker_retargets_from_current_blended_response() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        for _ in 0..VehicleSurfaceTracker::CONFIRMATION_FRAMES {
+            tracker.update(VehicleSurface::Snow);
+        }
+        for _ in 0..6 {
+            tracker.update(VehicleSurface::Snow);
+        }
+        let before_retarget = tracker.response();
+
+        for _ in 0..VehicleSurfaceTracker::CONFIRMATION_FRAMES {
+            tracker.update(VehicleSurface::Mud);
+        }
+        let after_retarget = tracker.response();
+        assert!((before_retarget.0 - after_retarget.0).abs() < 0.0001);
+        assert!((before_retarget.1 - after_retarget.1).abs() < 0.0001);
+        assert!((before_retarget.2 - after_retarget.2).abs() < 0.0001);
+    }
 }
