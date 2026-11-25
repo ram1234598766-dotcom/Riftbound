@@ -53,7 +53,7 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
 const MAX_VEHICLE_STEP: f32 = 1.0 / 30.0;
 
 fn clear_held_controls_on_focus_loss(input: &mut InputState) {
-    *input = InputState::default();
+    input.clear();
 }
 
 fn bounded_simulation_delta(delta: f32) -> f32 {
