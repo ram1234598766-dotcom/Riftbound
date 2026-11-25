@@ -312,8 +312,10 @@ impl ApplicationHandler for RiftboundApp {
                     upgrades: self.vehicle_upgrades,
                     inventory: self.inventory.clone(),
                     equipment: self.equipment,
-progression: self.progression,
-                checkpoint_active: self.checkpoint_progress.is_some_and(CheckpointProgress::has_active_checkpoint),
+                    progression: self.progression,
+                    checkpoint_active: self.checkpoint_progress.is_some_and(
+                        CheckpointProgress::has_active_checkpoint,
+                    ),
                 }) {
                     log::warn!("Could not save vehicle upgrades: {error}");
                 }
@@ -335,8 +337,10 @@ progression: self.progression,
                         upgrades: self.vehicle_upgrades,
                         inventory: self.inventory.clone(),
                         equipment: self.equipment,
-progression: self.progression,
-                    checkpoint_active: self.checkpoint_progress.is_some_and(CheckpointProgress::has_active_checkpoint),
+                        progression: self.progression,
+                        checkpoint_active: self.checkpoint_progress.is_some_and(
+                            CheckpointProgress::has_active_checkpoint,
+                        ),
                     }) {
                         log::warn!("Could not save player profile: {error}");
                     }
@@ -385,8 +389,10 @@ progression: self.progression,
                     upgrades: self.vehicle_upgrades,
                     inventory: self.inventory.clone(),
                     equipment: self.equipment,
-progression: self.progression,
-                checkpoint_active: self.checkpoint_progress.is_some_and(CheckpointProgress::has_active_checkpoint),
+                    progression: self.progression,
+                    checkpoint_active: self.checkpoint_progress.is_some_and(
+                        CheckpointProgress::has_active_checkpoint,
+                    ),
                 }) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
@@ -403,8 +409,10 @@ progression: self.progression,
                     upgrades: self.vehicle_upgrades,
                     inventory: self.inventory.clone(),
                     equipment: self.equipment,
-progression: self.progression,
-                checkpoint_active: self.checkpoint_progress.is_some_and(CheckpointProgress::has_active_checkpoint),
+                    progression: self.progression,
+                    checkpoint_active: self.checkpoint_progress.is_some_and(
+                        CheckpointProgress::has_active_checkpoint,
+                    ),
                 }) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
