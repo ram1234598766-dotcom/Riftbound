@@ -569,7 +569,9 @@ impl Renderer {
         let mut removed_count = 0;
         for coord in changes.removed() {
             if let Some(slot) = slot_map.slot_for(*coord) {
-                if removed_count == removed_slots.len() {
+                if removed_count == removed_slots.len()
+                    || slot.slot_index >= self.world_terrain_slots.len()
+                {
                     return false;
                 }
                 removed_slots[removed_count] = slot.slot_index;
