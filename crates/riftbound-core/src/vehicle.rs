@@ -26,6 +26,8 @@ pub struct VehicleSurfaceTracker {
     current: VehicleSurface,
     candidate: Option<VehicleSurface>,
     candidate_frames: u8,
+    blend_from: [f32; 3],
+    blend_frames: u8,
 }
 
 impl Default for VehicleSurfaceTracker {
@@ -45,11 +47,37 @@ impl VehicleSurfaceTracker {
             current: initial,
             candidate: None,
             candidate_frames: 0,
+            blend_from: [
+                initial.traction(),
+                initial.speed_multiplier(),
+                initial.rolling_resistance(),
+            ],
+            blend_frames: Self::TRANSITION_FRAMES,
         }
+    }
+
+    /// Number of fixed updates used to blend accepted terrain changes.
+    pub const TRANSITION_FRAMES: u8 = 18;
+
+    /// Returns blended traction, speed multiplier, and rolling resistance.
+    #[must_use]
+    pub fn response(self) -> (f32, f32, f32) {
+        let target = [
+            self.current.traction(),
+            self.current.speed_multiplier(),
+            self.current.rolling_resistance(),
+        ];
+        let amount = f32::from(self.blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        (
+            self.blend_from[0] + (target[0] - self.blend_from[0]) * amount,
+            self.blend_from[1] + (target[1] - self.blend_from[1]) * amount,
+            self.blend_from[2] + (target[2] - self.blend_from[2]) * amount,
+        )
     }
 
     /// Returns the stable surface, accepting changes after repeated matching samples.
     pub fn update(&mut self, sampled: VehicleSurface) -> VehicleSurface {
+        self.blend_frames = self.blend_frames.saturating_add(1).min(Self::TRANSITION_FRAMES);
         if sampled == self.current {
             self.candidate = None;
             self.candidate_frames = 0;
@@ -64,6 +92,11 @@ impl VehicleSurfaceTracker {
         }
 
         if self.candidate_frames >= Self::CONFIRMATION_FRAMES {
+            self.blend_from = {
+                let (traction, speed, resistance) = self.response();
+                [traction, speed, resistance]
+            };
+            self.blend_frames = 0;
             self.current = sampled;
             self.candidate = None;
             self.candidate_frames = 0;
@@ -368,7 +401,7 @@ impl VehicleState {
         self.speed *= (1.0 - drag).max(0.0);
         self.speed = self.speed.clamp(
             -config.max_reverse_speed * speed_multiplier,
-            config.max_forward_speed * surface.speed_factor(),
+            config.max_forward_speed * speed_multiplier,
         );
 
         let speed_limit = if self.speed < 0.0 {
