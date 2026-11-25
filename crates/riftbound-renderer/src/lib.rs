@@ -196,6 +196,8 @@ impl Renderer {
             Mesh::environment_boulder(&device)
                 .ok_or("Failed to create environment boulder mesh")?,
             Mesh::environment_shrub(&device).ok_or("Failed to create environment shrub mesh")?,
+            Mesh::vehicle_body(&device).ok_or("Failed to create vehicle body mesh")?,
+            Mesh::vehicle_wheel(&device).ok_or("Failed to create vehicle wheel mesh")?,
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
