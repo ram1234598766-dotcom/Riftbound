@@ -36,6 +36,13 @@ impl InputState {
         self.released.clear();
     }
 
+    /// Clears held buttons and transient edges, for example after window focus is lost.
+    pub fn clear(&mut self) {
+        self.held.clear();
+        self.pressed.clear();
+        self.released.clear();
+    }
+
     /// Records a button transition. Repeated key-down events do not retrigger the pressed edge.
     pub fn set_button(&mut self, button: Button, is_down: bool) {
         if is_down {
@@ -69,6 +76,23 @@ impl InputState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clear_resets_held_buttons_and_transition_edges() {
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        input.set_button(Button::Jump, true);
+        input.begin_frame();
+        input.set_button(Button::Jump, false);
+
+        input.clear();
+
+        assert!(!input.is_held(Button::MoveForward));
+        assert!(!input.is_held(Button::Jump));
+        assert!(!input.was_pressed(Button::MoveForward));
+        assert!(!input.was_released(Button::Jump));
+        assert_eq!(input, InputState::default());
+    }
 
     #[test]
     fn transitions_are_edges_and_held_state_persists() {
