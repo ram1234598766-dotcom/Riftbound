@@ -1100,4 +1100,34 @@ mod tests {
         );
         assert!(vehicle.heading > 0.0);
     }
+
+    #[test]
+    fn every_terrain_surface_enforces_its_own_reverse_speed_limit() {
+        let config = VehicleConfig {
+            acceleration: 1_000.0,
+            drag: 0.0,
+            ..VehicleConfig::default()
+        };
+        let input = VehicleInput {
+            throttle: -1.0,
+            ..VehicleInput::default()
+        };
+        let surfaces = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Rock,
+            VehicleSurface::Sand,
+            VehicleSurface::Snow,
+            VehicleSurface::Mud,
+        ];
+
+        for surface in surfaces {
+            let mut vehicle = VehicleState::default();
+            for _ in 0..10 {
+                vehicle.update(input, surface, config, 0.05);
+            }
+            let surface_limit = config.max_reverse_speed * surface.speed_multiplier();
+            assert!((vehicle.speed + surface_limit).abs() < 0.001);
+        }
+    }
 }
