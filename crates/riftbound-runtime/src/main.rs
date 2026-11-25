@@ -1076,7 +1076,7 @@ impl ApplicationHandler for RiftboundApp {
                             let event = brain.update(
                                 &mut enemy_transform.translation,
                                 transform.translation,
-                                delta,
+                                simulation_delta,
                             );
                             let enemy_position = enemy_transform.translation;
                             enemy_transform.translation.y =
@@ -1161,7 +1161,7 @@ impl ApplicationHandler for RiftboundApp {
                         let event = brain.update(
                             &mut enemy_transform.translation,
                             transform.translation,
-                            delta,
+                            simulation_delta,
                         );
                         let enemy_position = enemy_transform.translation;
                         enemy_transform.translation.y =
