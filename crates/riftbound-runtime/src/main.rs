@@ -51,6 +51,7 @@ struct RiftboundApp {
     input: InputState,
     controller: CharacterController,
     last_frame: Option<Instant>,
+    last_autosave: Option<Instant>,
     camera_target: Vec3,
     pickups: PickupTracker,
     pickup_entities: Vec<EntityId>,
@@ -1309,6 +1310,32 @@ impl ApplicationHandler for RiftboundApp {
                                     },
                                 ),
                             });
+                            let now = Instant::now();
+                            let autosave_due = self.last_autosave.is_none_or(|last| {
+                                now.duration_since(last) >= Duration::from_secs(30)
+                            });
+                            if autosave_due {
+                                let saved_position = if self.driving {
+                                    self.vehicle_state.position
+                                } else {
+                                    transform.translation
+                                };
+                                let profile = make_saved_profile(
+                                    self.vehicle_upgrades,
+                                    self.inventory.clone(),
+                                    self.equipment,
+                                    self.progression,
+                                    self.checkpoint_progress.is_some_and(
+                                        CheckpointProgress::has_active_checkpoint,
+                                    ),
+                                    Some(saved_position),
+                                );
+                                if let Err(error) = save::save_profile(&profile) {
+                                    log::warn!("Periodic profile autosave failed: {error}");
+                                } else {
+                                    self.last_autosave = Some(now);
+                                }
+                            }
                         }
                         Ok(false) => {
                             log::error!("The player entity could not be updated");
