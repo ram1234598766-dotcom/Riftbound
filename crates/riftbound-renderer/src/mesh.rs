@@ -1632,14 +1632,17 @@ mod tests {
         }
         let skirt_vertex_count = 4 * (5 - 1) * 4;
         let skirt_start = distant.0.len() - skirt_vertex_count;
-        assert!(distant.0[skirt_start..].chunks_exact(4).all(|skirt| {
+        for (skirt_index, skirt) in distant.0[skirt_start..].chunks_exact(4).enumerate() {
             let first_depth = skirt[0].position[1] - skirt[1].position[1];
             let second_depth = skirt[2].position[1] - skirt[3].position[1];
-            first_depth.is_finite()
-                && second_depth.is_finite()
-                && (first_depth - second_depth).abs() < 1.0e-4
-                && first_depth >= WORLD_TERRAIN_SKIRT_DEPTH
-        }));
+            assert!(
+                first_depth.is_finite()
+                    && second_depth.is_finite()
+                    && (first_depth - second_depth).abs() < 1.0e-4
+                    && first_depth >= WORLD_TERRAIN_SKIRT_DEPTH,
+                "skirt {skirt_index} has depths {first_depth} and {second_depth}"
+            );
+        }
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
     }
@@ -1727,7 +1730,7 @@ mod tests {
                 (side - 1) * side + index,
             ];
             for edge_index in edge_indices {
-                let (before, after) = if edge_index < side {
+                let (before, after) = if edge_index < side || edge_index >= (side - 1) * side {
                     (edge_index - 1, edge_index + 1)
                 } else {
                     (edge_index - side, edge_index + side)
