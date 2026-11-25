@@ -74,6 +74,7 @@ struct RiftboundApp {
     equipment: Equipment,
     inventory_open: bool,
     garage_open: bool,
+    save_slot: save::SaveSlot,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -117,6 +118,38 @@ impl RiftboundApp {
             player_position,
         )
     }
+
+    fn load_selected_profile(&mut self) {
+        let profile = save::load_profile_from_slot(self.save_slot);
+        self.vehicle_upgrades = profile.upgrades;
+        self.inventory = profile.inventory;
+        self.equipment = profile.equipment;
+        self.progression = profile.progression;
+        if let (Some(progress), Some(checkpoint)) =
+            (self.checkpoint_progress.as_mut(), self.checkpoint)
+        {
+            let _ = progress.activate(checkpoint, checkpoint.position(), profile.checkpoint_active);
+        }
+        if let (Some(position), Some(renderer), Some(player)) =
+            (profile.player_position, self.renderer.as_mut(), self.player)
+        {
+            let mut scene = renderer.scene().clone();
+            let mut restored = position;
+            restored.y = world_terrain_sample(position.x, position.z).height + PLAYER_RADIUS + 0.01;
+            if let Some(transform) = scene.get_mut(player) {
+                transform.translation = restored;
+                if let Err(error) = renderer.set_scene(scene) {
+                    log::warn!("Could not apply saved player position: {error}");
+                } else {
+                    renderer.follow_camera(restored);
+                    self.camera_target = restored;
+                }
+            }
+        }
+        self.last_autosave = None;
+        log::info!("Loaded {}.", self.save_slot.label());
+    }
+
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -128,7 +161,7 @@ impl ApplicationHandler for RiftboundApp {
                 log::error!("Could not start LAN server thread: {error}");
             }
         }
-        let saved_profile = save::load_profile();
+        let saved_profile = save::load_profile_from_slot(self.save_slot);
         let checkpoint_active = saved_profile.checkpoint_active;
         let saved_position = saved_profile.player_position;
         self.vehicle_upgrades = saved_profile.upgrades;
@@ -296,7 +329,7 @@ impl ApplicationHandler for RiftboundApp {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Err(error) = save::save_profile(&self.saved_profile()) {
+        if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
             log::warn!("Could not save player profile while suspending: {error}");
         }
         self.renderer = None;
@@ -378,6 +411,22 @@ impl ApplicationHandler for RiftboundApp {
                 if let PhysicalKey::Code(key) = event.physical_key {
                     if event.state == ElementState::Pressed {
                         update_camera_controls(self.renderer.as_mut(), key);
+                    }
+                    if event.state == ElementState::Pressed && key == KeyCode::F6 {
+                        self.save_slot = self.save_slot.next();
+                        log::info!("Selected {}. F7 saves, F8 loads.", self.save_slot.label());
+                    }
+                    if event.state == ElementState::Pressed && key == KeyCode::F7 {
+                        if let Err(error) =
+                            save::save_profile_to_slot(self.save_slot, &self.saved_profile())
+                        {
+                            log::warn!("Could not save {}: {error}", self.save_slot.label());
+                        } else {
+                            log::info!("Saved {}.", self.save_slot.label());
+                        }
+                    }
+                    if event.state == ElementState::Pressed && key == KeyCode::F8 {
+                        self.load_selected_profile();
                     }
                     if event.state == ElementState::Pressed && key == KeyCode::KeyV {
                         self.driving = !self.driving;
@@ -1325,7 +1374,7 @@ impl ApplicationHandler for RiftboundApp {
                             renderer.set_hud(HudData {
                                 collected: self.pickups.collected(),
                                 total: self.pickups.total(),
-                                status: if self.driving { String::from("DRIVING PROTOTYPE • W/S DRIVE • A/D STEER • SPACE BRAKE • V EXIT") } else { String::from(status) },
+                                status: format!("{} • {}", self.save_slot.label(), if self.driving { "DRIVING • W/S DRIVE • A/D STEER • SPACE BRAKE • V EXIT" } else { status }),
                                 prompt,
                                 health: self.player_health.current(),
                                 max_health: self.player_health.maximum(),
