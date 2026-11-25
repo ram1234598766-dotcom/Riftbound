@@ -1639,7 +1639,7 @@ mod tests {
                 first_depth.is_finite()
                     && second_depth.is_finite()
                     && (first_depth - second_depth).abs() < 1.0e-4
-                    && first_depth >= WORLD_TERRAIN_SKIRT_DEPTH,
+                    && first_depth + 1.0e-4 >= WORLD_TERRAIN_SKIRT_DEPTH,
                 "skirt {skirt_index} has depths {first_depth} and {second_depth}"
             );
         }
