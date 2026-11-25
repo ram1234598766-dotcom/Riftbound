@@ -6,6 +6,60 @@
 
 use crate::VehicleSurface;
 
+/// A sample of the primary winding road crossing the procedural world.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WorldRoadSample {
+    /// Road centreline X coordinate at the supplied Z coordinate.
+    pub center_x: f32,
+    /// Absolute lateral distance from the road centreline.
+    pub lateral_distance: f32,
+    /// Half-width of the drivable asphalt surface.
+    pub half_width: f32,
+    /// Width of the gravel shoulder beyond each asphalt edge.
+    pub shoulder_width: f32,
+}
+
+impl WorldRoadSample {
+    /// Returns true when the sample lies on the asphalt driving surface.
+    #[must_use]
+    pub fn is_on_road(self) -> bool {
+        self.lateral_distance <= self.half_width
+    }
+
+    /// Returns true when the sample lies on asphalt or its gravel shoulder.
+    #[must_use]
+    pub fn is_on_road_corridor(self) -> bool {
+        self.lateral_distance <= self.half_width + self.shoulder_width
+    }
+}
+
+/// Samples the winding primary road in absolute world coordinates.
+#[must_use]
+pub fn world_road_sample(world_x: f32, world_z: f32) -> WorldRoadSample {
+    const ROAD_HALF_WIDTH: f32 = 5.5;
+    const ROAD_SHOULDER_WIDTH: f32 = 2.5;
+    if !world_x.is_finite()
+        || !world_z.is_finite()
+        || world_x.abs() > 1_000_000.0
+        || world_z.abs() > 1_000_000.0
+    {
+        return WorldRoadSample {
+            center_x: 0.0,
+            lateral_distance: f32::INFINITY,
+            half_width: ROAD_HALF_WIDTH,
+            shoulder_width: ROAD_SHOULDER_WIDTH,
+        };
+    }
+
+    let center_x = (world_z * 0.0012).sin() * 7.0;
+    WorldRoadSample {
+        center_x,
+        lateral_distance: (world_x - center_x).abs(),
+        half_width: ROAD_HALF_WIDTH,
+        shoulder_width: ROAD_SHOULDER_WIDTH,
+    }
+}
+
 /// A deterministic terrain sample suitable for both world mesh generation and driving.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorldTerrainSample {
@@ -37,9 +91,11 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
     let height = broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0;
 
-    let road_center = (world_z * 0.0012).sin() * 7.0;
-    let surface = if (world_x - road_center).abs() <= 2.4 {
+    let road = world_road_sample(world_x, world_z);
+    let surface = if road.is_on_road() {
         VehicleSurface::Asphalt
+    } else if road.is_on_road_corridor() {
+        VehicleSurface::Gravel
     } else if world_z < -650.0 {
         VehicleSurface::Snow
     } else if world_x > 650.0 {
@@ -201,7 +257,7 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        WorldTerrainSample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+        WorldTerrainSample, world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
         world_terrain_vehicle_surface,
     };
     use crate::VehicleSurface;
@@ -213,6 +269,43 @@ mod tests {
             assert_eq!(first, world_terrain_sample(x, z));
             assert!(first.height.is_finite());
             assert!(first.height.abs() < 30.0);
+        }
+    }
+
+    #[test]
+    fn winding_road_sample_has_stable_width_and_gravel_shoulders() {
+        let center = world_road_sample(0.0, 0.0);
+        assert!(center.is_on_road());
+        assert!(center.is_on_road_corridor());
+        assert_eq!(center.center_x, 0.0);
+        assert!((center.half_width - 5.5).abs() < f32::EPSILON);
+
+        let asphalt_edge = world_road_sample(center.center_x + center.half_width, 0.0);
+        assert!(asphalt_edge.is_on_road());
+        let shoulder = world_road_sample(center.center_x + center.half_width + 1.0, 0.0);
+        assert!(!shoulder.is_on_road());
+        assert!(shoulder.is_on_road_corridor());
+        let outside = world_road_sample(center.center_x + 20.0, 0.0);
+        assert!(!outside.is_on_road_corridor());
+        assert_eq!(center, world_road_sample(0.0, 0.0));
+    }
+
+    #[test]
+    fn road_surface_tracks_the_winding_centreline() {
+        for world_z in [-900.0, -250.0, 0.0, 375.0, 900.0] {
+            let road = world_road_sample(0.0, world_z);
+            assert_eq!(
+                world_terrain_sample(road.center_x, world_z).surface,
+                VehicleSurface::Asphalt
+            );
+            assert_eq!(
+                world_terrain_sample(
+                    road.center_x + road.half_width + 1.0,
+                    world_z
+                )
+                .surface,
+                VehicleSurface::Gravel
+            );
         }
     }
 
