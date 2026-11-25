@@ -725,7 +725,11 @@ mod tests {
 
     #[test]
     fn every_terrain_surface_enforces_its_own_forward_speed_limit() {
-        let config = VehicleConfig::default();
+        let config = VehicleConfig {
+            acceleration: 1_000.0,
+            drag: 0.0,
+            ..VehicleConfig::default()
+        };
         let input = VehicleInput {
             throttle: 1.0,
             ..VehicleInput::default()
@@ -738,20 +742,41 @@ mod tests {
             VehicleSurface::Snow,
             VehicleSurface::Mud,
         ];
-        let mut speeds = Vec::with_capacity(surfaces.len());
 
         for surface in surfaces {
             let mut vehicle = VehicleState::default();
-            for _ in 0..600 {
+            for _ in 0..10 {
                 vehicle.update(input, surface, config, 0.05);
             }
             let surface_limit = config.max_forward_speed * surface.speed_multiplier();
-            assert!(vehicle.speed > 0.0);
-            assert!(vehicle.speed <= surface_limit + 0.001);
+            assert!((vehicle.speed - surface_limit).abs() < 0.001);
+        }
+    }
+
+    #[test]
+    fn acceleration_response_decreases_with_surface_traction() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            throttle: 1.0,
+            ..VehicleInput::default()
+        };
+        let mut speeds = Vec::new();
+        for surface in [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Rock,
+            VehicleSurface::Sand,
+            VehicleSurface::Mud,
+            VehicleSurface::Snow,
+        ] {
+            let mut vehicle = VehicleState::default();
+            for _ in 0..20 {
+                vehicle.update(input, surface, config, 0.05);
+            }
             speeds.push(vehicle.speed);
         }
 
-        assert_eq!(speeds.len(), surfaces.len());
+        assert!(speeds.windows(2).all(|pair| pair[0] > pair[1]));
     }
 
     #[test]
