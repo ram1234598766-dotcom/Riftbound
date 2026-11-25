@@ -52,6 +52,7 @@ pub use vehicle::{
 pub use world_streaming::{
     MAX_WORLD_CHUNK_RADIUS, WORLD_CHUNK_SIZE, WorldChunkChanges, WorldChunkConfig, WorldChunkCoord,
     WorldChunkLod, WorldChunkRequest, WorldChunkSlot, WorldChunkSlotMap, WorldChunkStreamer,
+    WorldTerrainMeshData, WorldTerrainVertex, build_world_chunk_mesh,
 };
 pub use world_terrain::{
     WorldRoadSample, WorldTerrainSample, world_road_sample, world_terrain_sample,
