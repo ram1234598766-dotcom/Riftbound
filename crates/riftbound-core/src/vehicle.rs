@@ -552,8 +552,10 @@ impl VehicleState {
             delta_seconds,
         );
         let slip = next_vehicle.wheel_slip.slip_ratios();
+        let suspension_load = next_suspension.wheel_load_factors(suspension_config);
         let traction_with_slip = std::array::from_fn::<_, 4, _>(|index| {
-            wheel_traction[index] * (1.0 - 0.35 * slip[index].abs()).clamp(0.55, 1.0)
+            let slip_grip = (1.0 - 0.35 * slip[index].abs()).clamp(0.55, 1.0);
+            wheel_traction[index] * slip_grip * suspension_load[index]
         });
         next_vehicle.update_with_four_wheel_surface_response(
             input,
@@ -946,6 +948,20 @@ impl SuspensionState {
         self.pose(config)
     }
 
+    /// Estimates relative normal-load distribution from the four spring compressions.
+    /// Values are normalized around 1.0 and bounded to avoid unstable grip spikes.
+    #[must_use]
+    pub fn wheel_load_factors(&self, config: SuspensionConfig) -> [f32; 4] {
+        if !config.max_travel.is_finite() || config.max_travel <= f32::EPSILON {
+            return [1.0; 4];
+        }
+        let average = self.compression.iter().sum::<f32>() * 0.25;
+        std::array::from_fn(|index| {
+            (1.0 + (self.compression[index] - average) / config.max_travel * 0.8)
+                .clamp(0.65, 1.25)
+        })
+    }
+
     /// Reprojects wheel spring compression onto new contacts without advancing time.
     ///
     /// Use after collision resolution changes the vehicle's horizontal position.
@@ -1184,6 +1200,18 @@ mod tests {
         assert!((pose_30.average_ground_height - pose_60.average_ground_height).abs() < 0.0001);
         assert!((pose_30.pitch - pose_60.pitch).abs() < 0.0001);
         assert!((pose_30.roll - pose_60.roll).abs() < 0.0001);
+    }
+
+    #[test]
+    fn suspension_load_factors_transfer_grip_between_wheel_corners() {
+        let mut suspension = SuspensionState::default();
+        suspension.compression = [0.4, 0.2, 0.1, 0.1];
+        let loads = suspension.wheel_load_factors(SuspensionConfig::default());
+        assert!(loads[0] > loads[1]);
+        assert!(loads[1] > loads[2]);
+        assert!(loads.iter().all(|load| (0.65..=1.25).contains(load)));
+        let average = loads.iter().sum::<f32>() * 0.25;
+        assert!((average - 1.0).abs() < 0.0001);
     }
 
     #[test]
