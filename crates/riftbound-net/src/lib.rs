@@ -38,6 +38,7 @@ const SHARD_POSITIONS: [(f32, f32); 5] = [
 const EXTRACTION_POSITION: (f32, f32) = (1100.0, 750.0);
 const PLAYER_SPEED: f32 = 230.0;
 const MAX_INPUT_DELTA: f32 = 0.1;
+const MAX_PLAYERS: usize = 16;
 const PLAYER_RADIUS: f32 = 15.0;
 const WORLD_OBSTACLES: [(f32, f32, f32, f32); 11] = [
     (650.0, 170.0, 42.0, 350.0),
@@ -210,7 +211,15 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         y: WORLD_HEIGHT * 0.5,
         face: 0.0,
     };
-    state.players.lock().await.insert(id, initial);
+    {
+        let mut players = state.players.lock().await;
+        if !can_accept_player(players.len()) {
+            let (mut sender, _) = socket.split();
+            let _ = sender.send(Message::Close(None)).await;
+            return;
+        }
+        players.insert(id, initial);
+    }
 
     let (mut sender, mut receiver) = socket.split();
     let mut last_input_at = Instant::now();
@@ -423,6 +432,10 @@ fn within_extraction_range(x: f32, y: f32) -> bool {
     (x - EXTRACTION_POSITION.0).hypot(y - EXTRACTION_POSITION.1) <= 90.0
 }
 
+fn can_accept_player(current_players: usize) -> bool {
+    current_players < MAX_PLAYERS
+}
+
 fn clamp_world_position(value: f32, maximum: f32) -> f32 {
     value.clamp(0.0, maximum)
 }
@@ -430,6 +443,14 @@ fn clamp_world_position(value: f32, maximum: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_rejects_connections_after_player_capacity_is_reached() {
+        assert!(can_accept_player(0));
+        assert!(can_accept_player(MAX_PLAYERS - 1));
+        assert!(!can_accept_player(MAX_PLAYERS));
+        assert!(!can_accept_player(MAX_PLAYERS + 1));
+    }
 
     #[test]
     fn world_position_is_bounded() {
