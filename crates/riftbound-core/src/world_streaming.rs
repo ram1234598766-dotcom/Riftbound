@@ -551,12 +551,16 @@ mod tests {
         assert_eq!(original.request.lod, WorldChunkLod::Detailed);
 
         assert!(streamer.update_focus(WORLD_CHUNK_SIZE * 2.0, 0.0));
-        assert!(streamer.changes().updated().iter().any(|request| {
-            request.coord == origin && request.lod == WorldChunkLod::Distant
-        }));
+        assert!(
+            streamer.changes().updated().iter().any(|request| {
+                request.coord == origin && request.lod == WorldChunkLod::Distant
+            })
+        );
         assert!(slots.apply_changes(streamer.changes()));
 
-        let updated = slots.slot_for(origin).expect("origin remains in active window");
+        let updated = slots
+            .slot_for(origin)
+            .expect("origin remains in active window");
         assert_eq!(updated.slot_index, original.slot_index);
         assert_eq!(updated.request.lod, WorldChunkLod::Distant);
         assert_eq!(slots.occupied(), 25);
