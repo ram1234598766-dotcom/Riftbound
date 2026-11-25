@@ -3,6 +3,7 @@
 //! Keep this crate deterministic and testable. Platform, rendering, audio, and
 //! networking integrations belong in separate crates.
 
+mod audio;
 mod character;
 mod checkpoint;
 mod clock;
@@ -24,6 +25,7 @@ mod vehicle;
 mod world_streaming;
 mod world_terrain;
 
+pub use audio::{VehicleAudioMix, VehicleAudioState};
 pub use character::{
     CharacterController, CharacterMovementState, MovementConfig, VerticalMotionConfig,
 };
