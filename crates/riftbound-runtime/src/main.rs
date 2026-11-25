@@ -149,7 +149,6 @@ impl RiftboundApp {
         self.last_autosave = None;
         log::info!("Loaded {}.", self.save_slot.label());
     }
-
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -1374,7 +1373,15 @@ impl ApplicationHandler for RiftboundApp {
                             renderer.set_hud(HudData {
                                 collected: self.pickups.collected(),
                                 total: self.pickups.total(),
-                                status: format!("{} • {}", self.save_slot.label(), if self.driving { "DRIVING • W/S DRIVE • A/D STEER • SPACE BRAKE • V EXIT" } else { status }),
+                                status: format!(
+                                    "{} • {}",
+                                    self.save_slot.label(),
+                                    if self.driving {
+                                        "DRIVING • W/S DRIVE • A/D STEER • SPACE BRAKE • V EXIT"
+                                    } else {
+                                        status
+                                    }
+                                ),
                                 prompt,
                                 health: self.player_health.current(),
                                 max_health: self.player_health.maximum(),
