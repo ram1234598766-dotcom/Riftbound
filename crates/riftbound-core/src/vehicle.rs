@@ -776,6 +776,21 @@ mod tests {
     }
 
     #[test]
+    fn suspension_pose_tracks_combined_terrain_pitch_and_roll() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+
+        for _ in 0..120 {
+            suspension.update([0.3, 0.1, 0.1, -0.1], 0.58, config, 1.0 / 60.0);
+        }
+
+        let pose = suspension.pose(config);
+        assert!(pose.pitch > 0.0);
+        assert!(pose.roll > 0.0);
+        assert!(pose.pitch.is_finite() && pose.roll.is_finite());
+    }
+
+    #[test]
     fn suspension_compression_stays_within_travel_limits_on_extreme_terrain() {
         let config = SuspensionConfig::default();
         let mut suspension = SuspensionState::default();
