@@ -662,6 +662,32 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
     }
 }
 
+/// Returns a soft directional-light factor from the shared world height field.
+fn terrain_light_factor(world_x: f32, world_z: f32) -> f32 {
+    const SAMPLE_STEP: f32 = 2.0;
+    const LIGHT: [f32; 3] = [-0.42426407, 0.84852815, -0.31622776];
+    let left = world_terrain_sample(world_x - SAMPLE_STEP, world_z).height;
+    let right = world_terrain_sample(world_x + SAMPLE_STEP, world_z).height;
+    let back = world_terrain_sample(world_x, world_z - SAMPLE_STEP).height;
+    let front = world_terrain_sample(world_x, world_z + SAMPLE_STEP).height;
+    if ![left, right, back, front].iter().all(|height| height.is_finite()) {
+        return 0.82;
+    }
+    let normal = [
+        left - right,
+        SAMPLE_STEP * 2.0,
+        back - front,
+    ];
+    let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+    if !length.is_finite() || length <= f32::EPSILON {
+        return 0.82;
+    }
+    let diffuse = ((normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2])
+        / length)
+        .max(0.0);
+    (0.72 + diffuse * 0.28).clamp(0.72, 1.0)
+}
+
 /// Adds stable surface variation and blends biome colours across broad boundary zones.
 fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32; 3] {
     let x = world_x.round() as i32 as u32;
@@ -799,14 +825,17 @@ fn world_terrain_chunk_data(
             let local_x = -32.0 + f32::from(u8::try_from(x).ok()?) * step;
             let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
             let sample = world_terrain_sample(origin_x + local_x, origin_z + local_z);
-            let base = terrain_color_at(sample.surface, origin_x + local_x, origin_z + local_z);
+            let world_x = origin_x + local_x;
+            let world_z = origin_z + local_z;
+            let base = terrain_color_at(sample.surface, world_x, world_z);
+            let light = terrain_light_factor(world_x, world_z);
             let elevation_tint = sample.height.max(0.0) * 0.012;
             vertices.push(MeshVertex {
                 position: [local_x, sample.height, local_z],
                 color: [
-                    (base[0] + elevation_tint).min(1.0),
-                    (base[1] + elevation_tint).min(1.0),
-                    (base[2] + elevation_tint).min(1.0),
+                    (base[0] * light + elevation_tint).min(1.0),
+                    (base[1] * light + elevation_tint).min(1.0),
+                    (base[2] * light + elevation_tint).min(1.0),
                 ],
             });
         }
@@ -1558,6 +1587,17 @@ mod tests {
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
+    }
+
+    #[test]
+    fn terrain_directional_lighting_is_deterministic_and_bounded() {
+        for (x, z) in [(0.0, 0.0), (700.0, 120.0), (-700.0, 120.0), (120.0, -700.0)] {
+            let first = terrain_light_factor(x, z);
+            let second = terrain_light_factor(x, z);
+            assert!(first.is_finite());
+            assert!((0.72..=1.0).contains(&first));
+            assert_eq!(first, second);
+        }
     }
 
     #[test]
