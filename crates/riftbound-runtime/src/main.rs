@@ -456,6 +456,13 @@ impl ApplicationHandler for RiftboundApp {
                 // A lost focus can prevent key-release events from reaching the window.
                 // Clear held controls so movement and vehicle throttle cannot stick.
                 clear_held_controls_on_focus_loss(&mut self.input);
+                // Do not let time spent unfocused become a large simulation step.
+                self.last_frame = Some(Instant::now());
+                window.request_redraw();
+            }
+            WindowEvent::Focused(true) => {
+                // Start the frame timer fresh after returning from a background pause.
+                self.last_frame = Some(Instant::now());
                 window.request_redraw();
             }
             WindowEvent::Resized(size) => {
