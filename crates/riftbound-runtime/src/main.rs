@@ -1576,34 +1576,25 @@ fn spawn_world_obstacle_props(
         match variant {
             // A two-part tree silhouette: narrow trunk and broad faceted crown.
             0 => {
-                let trunk = Transform3::new(
-                    Vec3::new(x, ground + 0.85, z),
+                let tree = Transform3::new(
+                    Vec3::new(x, ground + 1.25, z),
                     Vec3::new(0.0, yaw, 0.0),
-                    Vec3::new(0.28, 1.7, 0.28),
+                    Vec3::new(half_x * 1.9, 1.0, half_z * 1.9),
                 );
-                if let Some(id) = scene.spawn_with_mesh(trunk, MeshId::CUBE) {
-                    scene.set_material(id, MaterialId::AMBER);
-                    entity_ids.push(id);
-                }
-                let crown = Transform3::new(
-                    Vec3::new(x, ground + 2.35, z),
-                    Vec3::new(0.0, yaw + 0.18, 0.0),
-                    Vec3::new(half_x * 2.5, 2.2, half_z * 2.5),
-                );
-                if let Some(id) = scene.spawn_with_mesh(crown, MeshId::PYRAMID) {
+                if let Some(id) = scene.spawn_with_mesh(tree, MeshId::ENV_TREE) {
                     scene.set_material(id, MaterialId::DEFAULT);
                     entity_ids.push(id);
                 }
             }
             // Angular boulders use the existing low-poly pyramid mesh.
             1 => {
-                let height = 1.0 + half_x * 0.65;
+                let height = 0.85 + half_x * 0.5;
                 let rock = Transform3::new(
                     Vec3::new(x, ground + height * 0.5, z),
                     Vec3::new(yaw * 0.7, yaw, 0.12),
-                    Vec3::new(half_x * 2.0, height, half_z * 2.0),
+                    Vec3::new(half_x * 1.8, height, half_z * 1.8),
                 );
-                if let Some(id) = scene.spawn_with_mesh(rock, MeshId::PYRAMID) {
+                if let Some(id) = scene.spawn_with_mesh(rock, MeshId::ENV_BOULDER) {
                     scene.set_material(id, MaterialId::DEFAULT);
                     entity_ids.push(id);
                 }
@@ -1611,11 +1602,11 @@ fn spawn_world_obstacle_props(
             // Low shrubs fill the gaps without adding expensive geometry.
             _ => {
                 let shrub = Transform3::new(
-                    Vec3::new(x, ground + 0.32, z),
+                    Vec3::new(x, ground + 0.38, z),
                     Vec3::new(0.0, yaw, 0.0),
-                    Vec3::new(half_x * 1.7, 0.64, half_z * 1.7),
+                    Vec3::new(half_x * 1.55, 0.72, half_z * 1.55),
                 );
-                if let Some(id) = scene.spawn_with_mesh(shrub, MeshId::CUBE) {
+                if let Some(id) = scene.spawn_with_mesh(shrub, MeshId::ENV_SHRUB) {
                     scene.set_material(id, MaterialId::DEFAULT);
                     entity_ids.push(id);
                 }
