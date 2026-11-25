@@ -50,7 +50,21 @@ impl FixedClock {
         } else {
             0.0
         };
-        self.accumulator += elapsed;
+        let total = self.accumulator + elapsed;
+        if !total.is_finite() {
+            // Two finite values can still overflow when added. Preserve a valid
+            // fractional remainder and report bounded work instead of poisoning
+            // interpolation with infinity or NaN.
+            let elapsed_remainder = elapsed % self.step_seconds;
+            let combined_remainder = self.accumulator + elapsed_remainder;
+            self.accumulator = combined_remainder % self.step_seconds;
+            return TickBatch {
+                steps: self.max_steps_per_advance,
+                alpha: self.accumulator / self.step_seconds,
+                dropped_seconds: elapsed - elapsed_remainder,
+            };
+        }
+        self.accumulator = total;
 
         let mut steps = 0;
         while steps < self.max_steps_per_advance && self.accumulator >= self.step_seconds {
@@ -122,6 +136,17 @@ mod tests {
         let mut clock = FixedClock::new(1.0 / 60.0, 4);
         assert_eq!(clock.advance(f64::NAN).steps, 0);
         assert_eq!(clock.advance(-1.0).steps, 0);
+    }
+
+    #[test]
+    fn finite_elapsed_overflow_keeps_interpolation_finite_and_work_bounded() {
+        let mut clock = FixedClock::new(0.01, 4);
+        let batch = clock.advance(f64::MAX);
+
+        assert_eq!(batch.steps, 4);
+        assert!(batch.alpha.is_finite());
+        assert!((0.0..1.0).contains(&batch.alpha));
+        assert!(batch.dropped_seconds.is_finite());
     }
 
     #[test]
