@@ -1507,6 +1507,7 @@ mod tests {
             average_ground_height: 0.0,
             average_ground_velocity: 0.0,
             ground_reference_initialized: true,
+            ..SuspensionState::default()
         };
         let mut uneven = flat;
         flat.update([0.2; 4], 0.58, config, 1.0 / 60.0);
@@ -1525,6 +1526,7 @@ mod tests {
             average_ground_height: 0.0,
             average_ground_velocity: 0.0,
             ground_reference_initialized: true,
+            ..SuspensionState::default()
         };
         let chassis_height = config.rest_length + 1.0;
         let step = 1.0 / 60.0;
@@ -1866,18 +1868,21 @@ mod tests {
             position: Vec3::new(1.0, 0.6, 2.0),
             heading: 0.4,
             speed: 5.0,
+            ..VehicleState::default()
         };
         let mut recovery = VehicleRecovery::new(initial);
         let safe = VehicleState {
             position: Vec3::new(4.0, 0.8, 6.0),
             heading: 1.2,
             speed: 9.0,
+            ..VehicleState::default()
         };
         assert!(recovery.record_safe_state(safe, 0.0, 1.0));
         let mut fallen = VehicleState {
             position: Vec3::new(4.0, -5.0, 6.0),
             heading: 0.0,
             speed: 12.0,
+            ..VehicleState::default()
         };
         assert!(recovery.recover_if_fallen(&mut fallen, -3.0));
         assert_eq!(fallen.position, safe.position);
@@ -2615,6 +2620,7 @@ mod wheel_traction_tests {
             position: Vec3::new(0.0, 0.0, 0.0),
             heading: 0.0,
             speed: 4.0,
+            ..VehicleState::default()
         };
         let before = vehicle;
         vehicle.update_with_four_wheel_surface_response(
