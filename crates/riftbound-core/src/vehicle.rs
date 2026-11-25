@@ -786,8 +786,7 @@ mod tests {
 
         let mut ridge_pose = SuspensionPose::default();
         for _ in 0..12 {
-            ridge_pose =
-                suspension.update([0.32, 0.0, 0.32, 0.0], 0.58, config, 1.0 / 60.0);
+            ridge_pose = suspension.update([0.32, 0.0, 0.32, 0.0], 0.58, config, 1.0 / 60.0);
         }
 
         assert!(ridge_pose.roll.abs() > 0.001);
