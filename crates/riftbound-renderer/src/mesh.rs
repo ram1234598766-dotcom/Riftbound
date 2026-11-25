@@ -1642,6 +1642,32 @@ mod tests {
     }
 
     #[test]
+    fn terrain_detail_noise_is_continuous_across_chunk_boundaries() {
+        for boundary in [-768.0_f32, -64.0, 0.0, 64.0, 768.0] {
+            for offset in [-18.0_f32, -4.5, 0.0, 4.5, 18.0] {
+                let z = boundary + offset;
+                let left = terrain_detail_noise(boundary - 0.001, z, 18.0);
+                let right = terrain_detail_noise(boundary + 0.001, z, 18.0);
+                assert!(
+                    (left - right).abs() < 0.001,
+                    "noise discontinuity at x={boundary}, z={z}: {left} vs {right}"
+                );
+            }
+        }
+        for boundary in [-768.0_f32, -64.0, 0.0, 64.0, 768.0] {
+            for offset in [-18.0_f32, -4.5, 0.0, 4.5, 18.0] {
+                let x = boundary + offset;
+                let north = terrain_detail_noise(x, boundary - 0.001, 4.5);
+                let south = terrain_detail_noise(x, boundary + 0.001, 4.5);
+                assert!(
+                    (north - south).abs() < 0.001,
+                    "noise discontinuity at x={x}, z={boundary}: {north} vs {south}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn terrain_detail_noise_is_smooth_deterministic_and_bounded() {
         for (x, z) in [(0.0, 0.0), (-700.0, 120.0), (700.0, -650.0)] {
             let first = terrain_detail_noise(x, z, 18.0);
