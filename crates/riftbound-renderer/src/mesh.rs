@@ -939,6 +939,35 @@ mod tests {
     }
 
     #[test]
+    fn eastbound_spur_markings_keep_world_spacing_across_chunks_and_lods() {
+        for side in [5, 9] {
+            for (chunk_x, first_dash, dash_count, station_count) in [
+                (0, 0.0, 4, 5),
+                (1, 32.0, 8, 9),
+                (2, 96.0, 8, 9),
+            ] {
+                let (vertices, indices) =
+                    world_terrain_chunk_data(chunk_x, 0, side).expect("spur marking chunk");
+                let primary_road_vertices = if chunk_x == 0 { side * 4 + 8 * 4 } else { 0 };
+                let spur_start = side * side + primary_road_vertices;
+                let marking_start = spur_start + station_count * 4;
+                let markings = &vertices[marking_start..marking_start + dash_count * 4];
+                assert_eq!(markings.len(), dash_count * 4);
+
+                for dash in 0..dash_count {
+                    let segment = &markings[dash * 4..dash * 4 + 4];
+                    let world_start = first_dash + f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
+                    assert!((segment[0].position[0] + f32::from(i16::try_from(chunk_x).expect("chunk fits i16")) * 64.0 - world_start).abs() < 1.0e-4);
+                    assert!((segment[2].position[0] - segment[0].position[0] - 4.0).abs() < 1.0e-4);
+                    assert!((segment[1].position[2] - segment[0].position[2] - 0.24).abs() < 1.0e-4);
+                    assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
+                }
+                assert!(valid_index_data(vertices.len(), &indices));
+            }
+        }
+    }
+
+    #[test]
     fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
