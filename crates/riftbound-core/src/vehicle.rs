@@ -950,6 +950,11 @@ impl SuspensionState {
             self.average_ground_velocity = 0.0;
             self.ground_reference_initialized = true;
         }
+        let target_compressions = wheel_ground_heights.map(|height| {
+            (height + config.rest_length - chassis_height).clamp(0.0, config.max_travel)
+        });
+        let average_target_compression =
+            target_compressions.iter().sum::<f32>() * 0.25;
         for _ in 0..substeps {
             let body_follow_strength = config.spring_strength * 0.35;
             let body_follow_acceleration = (target_ground_height - self.average_ground_height)
@@ -957,15 +962,21 @@ impl SuspensionState {
                 - self.average_ground_velocity * config.damping;
             self.average_ground_velocity += body_follow_acceleration * step_dt;
             self.average_ground_height += self.average_ground_velocity * step_dt;
-            for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
-                let target = (ground_height + config.rest_length - chassis_height)
-                    .clamp(0.0, config.max_travel);
-                // Rebound is damped slightly more than compression so the
-                // chassis settles after a landing instead of oscillating repeatedly.
-                let rebound_damping = if self.compression_velocity[index] < 0.0 {
-                    config.damping * 1.35
+            for (index, target) in target_compressions.iter().copied().enumerate() {
+                // Corners crossing a ridge or rut receive a small extra damping
+                // bias proportional to their deviation from the four-wheel mean.
+                let terrain_imbalance = if config.max_travel > f32::EPSILON {
+                    ((target - average_target_compression).abs() / config.max_travel)
+                        .clamp(0.0, 1.0)
                 } else {
-                    config.damping
+                    0.0
+                };
+                let terrain_damping = config.damping * (1.0 + terrain_imbalance * 0.2);
+                // Rebound receives additional damping to settle after landings.
+                let rebound_damping = if self.compression_velocity[index] < 0.0 {
+                    terrain_damping * 1.35
+                } else {
+                    terrain_damping
                 };
                 let acceleration = (target - self.compression[index]) * config.spring_strength
                     - self.compression_velocity[index] * rebound_damping;
@@ -1368,6 +1379,24 @@ mod tests {
         assert!(loads[1] > 0.0 && loads[1] < loads[2]);
         assert!(loads[2] < loads[3]);
         assert!(loads.iter().all(|load| (0.0..=1.25).contains(load)));
+    }
+
+    #[test]
+    fn uneven_terrain_adds_local_corner_damping_without_affecting_flat_ground() {
+        let config = SuspensionConfig::default();
+        let mut flat = SuspensionState {
+            compression: [0.2; 4],
+            compression_velocity: [2.0; 4],
+            average_ground_height: 0.0,
+            average_ground_velocity: 0.0,
+            ground_reference_initialized: true,
+        };
+        let mut uneven = flat;
+        flat.update([0.2; 4], 0.58, config, 1.0 / 60.0);
+        uneven.update([0.5, 0.1, 0.1, 0.1], 0.58, config, 1.0 / 60.0);
+        assert!(uneven.compression_velocity[0] < flat.compression_velocity[0]);
+        assert!(uneven.compression_velocity[1] > flat.compression_velocity[1]);
+        assert!(uneven.compression_velocity.iter().all(|v| v.is_finite()));
     }
 
     #[test]
