@@ -13,8 +13,7 @@ use riftbound_core::{
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
-    world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
-    world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
+    world_road_sample, world_terrain_sample,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -867,6 +866,7 @@ impl ApplicationHandler for RiftboundApp {
                                 ));
                             }
                         }
+                    }
                     }
                     if !self.driving {
                         // Return the front wheels to center after the player exits the vehicle.
