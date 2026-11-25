@@ -510,15 +510,23 @@ impl ApplicationHandler for RiftboundApp {
                         }
                     }
                     if let Some(parts) = self.player_parts {
-                        let movement = ((horizontal_velocity.x * horizontal_velocity.x
+                        let horizontal_speed = (horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
-                            .sqrt()
-                            / 4.5)
-                            .clamp(0.0, 1.0);
-                        let gait = self.animation_time * 8.0;
+                            .sqrt();
+                        let movement = (horizontal_speed / 4.5).clamp(0.0, 1.0);
+                        let gait = self.animation_time * (7.2 + movement * 2.0);
                         let leg_swing = gait.sin() * 0.72 * movement;
                         let arm_swing = -leg_swing * 0.78;
-                        let bob = gait.mul_add(2.0, 0.0).sin() * 0.045 * movement;
+                        let idle_breath = (self.animation_time * 1.65).sin()
+                            * 0.018
+                            * (1.0 - movement);
+                        let stride_bob = (gait * 2.0).sin() * 0.045 * movement;
+                        let bob = idle_breath + stride_bob;
+                        let forward_lean = (movement * 0.11).min(0.11);
+                        let lateral_lean = (-horizontal_velocity.x * 0.025).clamp(-0.07, 0.07);
+                        let idle_sway = (self.animation_time * 0.9).sin()
+                            * 0.025
+                            * (1.0 - movement);
                         self.animated_transforms.extend([
                             (
                                 parts.torso,
@@ -526,11 +534,11 @@ impl ApplicationHandler for RiftboundApp {
                                     0.0,
                                     0.48 + bob,
                                     0.0,
+                                    forward_lean,
                                     0.0,
-                                    0.0,
-                                    0.0,
+                                    lateral_lean + idle_sway,
                                     0.58,
-                                    0.72,
+                                    0.72 + idle_breath * 0.35,
                                     0.34,
                                 ),
                             ),
@@ -540,9 +548,9 @@ impl ApplicationHandler for RiftboundApp {
                                     0.0,
                                     1.15 + bob,
                                     0.0,
+                                    -forward_lean * 0.35,
                                     0.0,
-                                    0.0,
-                                    0.0,
+                                    -lateral_lean * 0.35 - idle_sway * 0.4,
                                     0.38,
                                     0.38,
                                     0.38,
@@ -554,7 +562,7 @@ impl ApplicationHandler for RiftboundApp {
                                     -0.43,
                                     0.48 + bob,
                                     0.0,
-                                    arm_swing,
+                                    arm_swing + idle_sway * 0.35,
                                     0.0,
                                     -0.08,
                                     0.20,
@@ -568,7 +576,7 @@ impl ApplicationHandler for RiftboundApp {
                                     0.43,
                                     0.48 + bob,
                                     0.0,
-                                    -arm_swing,
+                                    -arm_swing - idle_sway * 0.35,
                                     0.0,
                                     0.08,
                                     0.20,
