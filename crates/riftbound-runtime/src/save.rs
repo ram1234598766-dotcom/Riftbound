@@ -39,7 +39,7 @@ impl SaveSlot {
         }
     }
 
-    const fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::One => "SLOT 1",
             Self::Two => "SLOT 2",
@@ -282,6 +282,15 @@ pub fn save_profile(profile: &SavedProfile) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn save_slots_cycle_and_use_independent_files() {
+        assert_eq!(SaveSlot::One.next(), SaveSlot::Two);
+        assert_eq!(SaveSlot::Two.next(), SaveSlot::Three);
+        assert_eq!(SaveSlot::Three.next(), SaveSlot::One);
+        assert_ne!(SaveSlot::One.file_name(), SaveSlot::Two.file_name());
+        assert_ne!(SaveSlot::Two.file_name(), SaveSlot::Three.file_name());
+    }
 
     #[test]
     fn profile_round_trip_preserves_inventory_equipment_xp_and_upgrades() {
