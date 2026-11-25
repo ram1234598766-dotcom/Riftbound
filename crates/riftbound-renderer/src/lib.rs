@@ -487,6 +487,33 @@ impl Renderer {
         Ok(())
     }
 
+    /// Applies a CPU streamer's chunk delta to the bounded GPU slot registry.
+    ///
+    /// The slot map is updated transactionally first; removed slots are then released,
+    /// and added or LOD-updated chunks are uploaded into their stable slots.
+    pub fn sync_world_terrain(
+        &mut self,
+        changes: &riftbound_core::WorldChunkChanges,
+        slot_map: &mut riftbound_core::WorldChunkSlotMap,
+    ) -> bool {
+        let removed_slots: Vec<usize> = changes.removed().iter()
+            .filter_map(|coord| slot_map.slot_for(*coord).map(|slot| slot.slot_index))
+            .collect();
+        if !slot_map.apply_changes(changes) {
+            return false;
+        }
+        for slot_index in removed_slots {
+            let _ = self.clear_world_terrain_chunk(slot_index);
+        }
+        for request in changes.added().iter().chain(changes.updated()) {
+            let Some(slot) = slot_map.slot_for(request.coord) else { return false; };
+            if !self.set_world_terrain_chunk(slot.slot_index, request.coord, request.lod) {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Replaces one bounded world-terrain GPU slot with a chunk at an absolute coordinate.
     ///
     /// The mesh and its translated instance buffer are created together; the slot can be
