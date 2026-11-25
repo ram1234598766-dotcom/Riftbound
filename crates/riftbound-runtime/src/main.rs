@@ -88,6 +88,10 @@ impl RiftboundApp {
                 .and_then(|player| renderer.scene().get(player))
                 .map(|transform| transform.translation)
         });
+        self.saved_profile_at(player_position)
+    }
+
+    fn saved_profile_at(&self, player_position: Option<Vec3>) -> save::SavedProfile {
         save::SavedProfile {
             upgrades: self.vehicle_upgrades,
             inventory: self.inventory.clone(),
@@ -1005,6 +1009,11 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                                 let awarded_xp = (collected_count as u64) * 25;
                                 let levels_gained = self.progression.award_xp(awarded_xp);
+                                if let Err(error) = save::save_profile(
+                                    &self.saved_profile_at(Some(transform.translation)),
+                                ) {
+                                    log::warn!("Could not save shard rewards: {error}");
+                                }
                                 log::info!(
                                     "Collected {collected_count} rift shard(s): +{awarded_xp} XP, level {}{}",
                                     self.progression.level(),
@@ -1066,6 +1075,11 @@ impl ApplicationHandler for RiftboundApp {
                                             return;
                                         }
                                         self.loot_entities.remove(index);
+                                        if let Err(error) = save::save_profile(
+                                            &self.saved_profile_at(Some(transform.translation)),
+                                        ) {
+                                            log::warn!("Could not save collected loot: {error}");
+                                        }
                                         let label = match kind {
                                             ItemKind::Salvage => "salvage",
                                             ItemKind::Medkit => "medkit",
@@ -1091,8 +1105,7 @@ impl ApplicationHandler for RiftboundApp {
                                 log::info!(
                                     "Checkpoint activated; falling will return the player here"
                                 );
-                                let mut profile = self.saved_profile();
-                                profile.player_position = Some(checkpoint.position());
+                                let profile = self.saved_profile_at(Some(checkpoint.position()));
                                 if let Err(error) = save::save_profile(&profile) {
                                     log::warn!("Could not save activated checkpoint: {error}");
                                 }
@@ -1138,6 +1151,11 @@ impl ApplicationHandler for RiftboundApp {
                                 .try_extract(interact_pressed, inside_extraction)
                             {
                                 let levels_gained = self.progression.award_xp(100);
+                                if let Err(error) = save::save_profile(
+                                    &self.saved_profile_at(Some(transform.translation)),
+                                ) {
+                                    log::warn!("Could not save mission rewards: {error}");
+                                }
                                 window.set_title(&format!(
                                     "RIFTBOUND — Mission complete! • Level {}",
                                     self.progression.level()
