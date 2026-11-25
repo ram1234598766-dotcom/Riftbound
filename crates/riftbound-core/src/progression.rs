@@ -30,7 +30,8 @@ impl PlayerProgression {
         let mut high = u32::MAX;
         while low < high {
             let midpoint = low + (high - low) / 2 + 1;
-            if Self::xp_for_level(midpoint) <= total_xp {
+            let required_xp = Self::xp_for_level(midpoint);
+            if required_xp != u64::MAX && required_xp <= total_xp {
                 low = midpoint;
             } else {
                 high = midpoint - 1;
@@ -74,7 +75,7 @@ impl PlayerProgression {
         let n = (level - 1) as u64;
         100_u64
             .saturating_mul(n)
-            .saturating_add(25_u64.saturating_mul(n.saturating_mul(n.saturating_sub(1))))
+            .saturating_add(50_u64.saturating_mul(n.saturating_mul(n.saturating_sub(1))))
     }
 
     /// Experience earned toward the next level.
