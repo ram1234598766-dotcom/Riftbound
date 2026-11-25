@@ -95,6 +95,7 @@ impl VehicleSurfaceTracker {
 
     /// Returns the stable surface, accepting changes after repeated matching samples.
     pub fn update(&mut self, sampled: VehicleSurface) -> VehicleSurface {
+        let response_before_update = self.response();
         self.blend_frames = self
             .blend_frames
             .saturating_add(1)
@@ -113,10 +114,11 @@ impl VehicleSurfaceTracker {
         }
 
         if self.candidate_frames >= Self::CONFIRMATION_FRAMES {
-            self.blend_from = {
-                let (traction, speed, resistance) = self.response();
-                [traction, speed, resistance]
-            };
+            self.blend_from = [
+                response_before_update.0,
+                response_before_update.1,
+                response_before_update.2,
+            ];
             self.blend_frames = 0;
             self.current = sampled;
             self.target_response = [
