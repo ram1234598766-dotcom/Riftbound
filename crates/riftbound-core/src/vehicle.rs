@@ -646,10 +646,14 @@ impl VehicleState {
         let average = wheel_traction.iter().sum::<f32>() * 0.25;
         let left = (wheel_traction[0] + wheel_traction[2]) * 0.5;
         let right = (wheel_traction[1] + wheel_traction[3]) * 0.5;
-        self.update_with_wheel_surface_response(
+        let front = (wheel_traction[0] + wheel_traction[1]) * 0.5;
+        let rear = (wheel_traction[2] + wheel_traction[3]) * 0.5;
+        let axle_imbalance = (front - rear).abs();
+        self.update_with_wheel_surface_response_and_axle_balance(
             input,
             (average, surface_response.1, surface_response.2),
             (left, right),
+            axle_imbalance,
             config,
             delta_seconds,
         );
@@ -664,11 +668,27 @@ impl VehicleState {
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
+        self.update_with_wheel_surface_response_and_axle_balance(
+            input, surface_response, side_traction, 0.0, config, delta_seconds,
+        );
+    }
+
+    fn update_with_wheel_surface_response_and_axle_balance(
+        &mut self,
+        input: VehicleInput,
+        surface_response: (f32, f32, f32),
+        side_traction: (f32, f32),
+        axle_imbalance: f32,
+        config: VehicleConfig,
+        delta_seconds: f32,
+    ) {
         let (traction, speed_multiplier, rolling_resistance) = surface_response;
         let (left_traction, right_traction) = side_traction;
         if !traction.is_finite()
             || !left_traction.is_finite()
             || !right_traction.is_finite()
+            || !axle_imbalance.is_finite()
+            || !(0.0..=1.0).contains(&axle_imbalance)
             || left_traction < 0.0
             || left_traction > 1.0
             || right_traction < 0.0
@@ -741,7 +761,8 @@ impl VehicleState {
             config.max_forward_speed
         };
         let speed_fraction = (self.speed.abs() / speed_limit).clamp(0.0, 1.0);
-        let steering_stability = 1.0 - grip_imbalance.abs() * 0.12;
+        let steering_stability =
+            (1.0 - grip_imbalance.abs() * 0.12) * (1.0 - axle_imbalance * 0.08);
         self.heading += steering
             * config.steering_rate
             * steering_grip
@@ -1140,6 +1161,30 @@ mod tests {
         assert!(vehicle.speed > 0.0);
         assert!(vehicle.heading > heading_before);
         assert!(vehicle.heading < 0.05);
+    }
+
+    #[test]
+    fn uneven_front_rear_contact_reduces_steering_authority_slightly() {
+        let mut balanced = VehicleState {
+            speed: 8.0,
+            ..VehicleState::default()
+        };
+        let mut uneven = balanced;
+        let input = VehicleInput {
+            throttle: 0.0,
+            brake: 0.0,
+            steering: 1.0,
+        };
+        balanced.update_with_four_wheel_surface_response(
+            input, (1.0, 1.0, 0.0), [0.8, 0.8, 0.8, 0.8],
+            VehicleConfig::default(), 1.0 / 60.0,
+        );
+        uneven.update_with_four_wheel_surface_response(
+            input, (1.0, 1.0, 0.0), [1.0, 1.0, 0.6, 0.6],
+            VehicleConfig::default(), 1.0 / 60.0,
+        );
+        assert!(balanced.heading > uneven.heading);
+        assert!(uneven.heading > 0.0);
     }
 
     #[test]
