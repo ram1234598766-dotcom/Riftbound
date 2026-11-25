@@ -89,6 +89,7 @@ impl Default for VehicleConfig {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct VehicleUpgrades {
     engine_level: u8,
+    handling_level: u8,
 }
 
 impl VehicleUpgrades {
@@ -96,6 +97,8 @@ impl VehicleUpgrades {
     pub const MAX_ENGINE_LEVEL: u8 = 3;
     /// Salvage required for each successive engine tier.
     pub const ENGINE_UPGRADE_COSTS: [u16; 3] = [3, 5, 8];
+    /// Salvage required for successive handling and tire upgrades.
+    pub const HANDLING_UPGRADE_COSTS: [u16; 3] = [2, 4, 6];
 
     /// Current engine tuning tier.
     #[must_use]
@@ -129,12 +132,46 @@ impl VehicleUpgrades {
         true
     }
 
-    /// Applies the installed engine tiers to a base handling configuration.
+    /// Current handling and tire upgrade tier.
+    #[must_use]
+    pub const fn handling_level(self) -> u8 {
+        self.handling_level
+    }
+
+    /// Salvage required for the next handling upgrade.
+    #[must_use]
+    pub const fn next_handling_cost(self) -> Option<u16> {
+        if self.handling_level >= Self::MAX_ENGINE_LEVEL {
+            None
+        } else {
+            Some(Self::HANDLING_UPGRADE_COSTS[self.handling_level as usize])
+        }
+    }
+
+    /// Purchases handling and tire upgrades with Salvage.
+    pub fn purchase_handling_upgrade(&mut self, inventory: &mut Inventory) -> bool {
+        let Some(cost) = self.next_handling_cost() else {
+            return false;
+        };
+        if inventory.count(ItemKind::Salvage) < u32::from(cost) {
+            return false;
+        }
+        if inventory.remove(ItemKind::Salvage, cost) != cost {
+            return false;
+        }
+        self.handling_level += 1;
+        true
+    }
+
+    /// Applies installed engine and handling tiers to a base handling configuration.
     #[must_use]
     pub fn apply_to(self, mut config: VehicleConfig) -> VehicleConfig {
-        let level = self.engine_level.min(Self::MAX_ENGINE_LEVEL);
-        config.acceleration += f32::from(level) * 2.0;
-        config.max_forward_speed += f32::from(level) * 2.5;
+        let engine = self.engine_level.min(Self::MAX_ENGINE_LEVEL);
+        let handling = self.handling_level.min(Self::MAX_ENGINE_LEVEL);
+        config.acceleration += f32::from(engine) * 2.0;
+        config.max_forward_speed += f32::from(engine) * 2.5;
+        config.steering_rate += f32::from(handling) * 0.12;
+        config.drag = (config.drag - f32::from(handling) * 0.025).max(0.02);
         config
     }
 }
@@ -435,6 +472,23 @@ mod tests {
         assert_eq!(upgrades.engine_level(), VehicleUpgrades::MAX_ENGINE_LEVEL);
         assert_eq!(upgrades.next_engine_cost(), None);
         assert!(!upgrades.purchase_engine_upgrade(&mut inventory));
+    }
+
+    #[test]
+    fn handling_upgrades_cost_salvage_and_improve_steering_response() {
+        let mut inventory = Inventory::default();
+        let mut upgrades = VehicleUpgrades::default();
+        inventory.add(ItemKind::Salvage, 12);
+        assert!(upgrades.purchase_handling_upgrade(&mut inventory));
+        assert_eq!(upgrades.handling_level(), 1);
+        assert_eq!(inventory.count(ItemKind::Salvage), 10);
+        let tuned = upgrades.apply_to(VehicleConfig::default());
+        assert!((tuned.steering_rate - 1.92).abs() < 0.0001);
+        assert!((tuned.drag - 0.135).abs() < 0.0001);
+        assert!(upgrades.purchase_handling_upgrade(&mut inventory));
+        assert!(upgrades.purchase_handling_upgrade(&mut inventory));
+        assert_eq!(upgrades.next_handling_cost(), None);
+        assert!(!upgrades.purchase_handling_upgrade(&mut inventory));
     }
 
     #[test]
