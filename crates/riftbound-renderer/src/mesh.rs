@@ -634,6 +634,23 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
     }
 }
 
+/// Adds stable, low-amplitude surface variation without texture memory or per-frame work.
+fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32; 3] {
+    let x = world_x.round() as i32 as u32;
+    let z = world_z.round() as i32 as u32;
+    let mut hash = x.wrapping_mul(0x9E37_79B9) ^ z.wrapping_mul(0x85EB_CA6B);
+    hash ^= hash >> 16;
+    hash = hash.wrapping_mul(0x7FEB_352D);
+    hash ^= hash >> 15;
+    let variation = ((hash & 0xFFFF) as f32 / 65_535.0 - 0.5) * 0.035;
+    let base = terrain_surface_color(surface);
+    [
+        (base[0] + variation).clamp(0.0, 1.0),
+        (base[1] + variation * 0.72).clamp(0.0, 1.0),
+        (base[2] + variation * 0.42).clamp(0.0, 1.0),
+    ]
+}
+
 fn terrain_chunk_data(
     chunk_x: u8,
     chunk_z: u8,
@@ -666,7 +683,7 @@ fn terrain_chunk_data(
             ) * 0.012;
             let height = terrain_height(world_x, world_z);
             let elevation_tint = height.max(0.0) * 0.22;
-            let base_color = terrain_surface_color(terrain_surface(world_x, world_z));
+            let base_color = terrain_color_at(terrain_surface(world_x, world_z), world_x, world_z);
             vertices.push(MeshVertex {
                 position: [local_x, height, local_z],
                 color: [
@@ -720,7 +737,7 @@ fn world_terrain_chunk_data(
             let local_x = -32.0 + f32::from(u8::try_from(x).ok()?) * step;
             let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
             let sample = world_terrain_sample(origin_x + local_x, origin_z + local_z);
-            let base = terrain_surface_color(sample.surface);
+            let base = terrain_color_at(sample.surface, origin_x + local_x, origin_z + local_z);
             let elevation_tint = sample.height.max(0.0) * 0.012;
             vertices.push(MeshVertex {
                 position: [local_x, sample.height, local_z],
@@ -1793,6 +1810,16 @@ mod environment_mesh_tests {
 #[cfg(test)]
 mod vehicle_mesh_tests {
     use super::*;
+
+    #[test]
+    fn terrain_color_variation_is_stable_and_bounded() {
+        let first = terrain_color_at(VehicleSurface::Sand, 700.0, 120.0);
+        let repeated = terrain_color_at(VehicleSurface::Sand, 700.0, 120.0);
+        let nearby = terrain_color_at(VehicleSurface::Sand, 701.0, 120.0);
+        assert_eq!(first, repeated);
+        assert_ne!(first, nearby);
+        assert!(first.iter().all(|channel| (0.0..=1.0).contains(channel)));
+    }
 
     #[test]
     fn vehicle_meshes_have_valid_finite_geometry() {
