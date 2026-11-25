@@ -766,28 +766,9 @@ impl ApplicationHandler for RiftboundApp {
                         } else {
                             0.0
                         };
-                        let sampled_surface = world_terrain_vehicle_surface(
-                            self.vehicle_state.position.x,
-                            self.vehicle_state.position.z,
-                            self.vehicle_state.heading,
-                            0.78,
-                            1.32,
-                        );
-                        let wheel_surfaces = world_terrain_vehicle_surfaces(
-                            self.vehicle_state.position.x,
-                            self.vehicle_state.position.z,
-                            self.vehicle_state.heading,
-                            0.78,
-                            1.32,
-                        );
-                        self.vehicle_surface_tracker
-                            .update_wheel_contacts(sampled_surface, wheel_surfaces);
-                        let (traction, speed_multiplier, rolling_resistance) =
-                            self.vehicle_surface_tracker.response();
-                        let (left_traction, right_traction) =
-                            self.vehicle_surface_tracker.side_traction();
                         let vehicle_previous_position = self.vehicle_state.position;
-                        self.vehicle_state.update_with_wheel_surface_response(
+                        let suspension_config = SuspensionConfig::default();
+                        let suspension_pose = self.vehicle_state.update_on_world_terrain(
                             VehicleInput {
                                 throttle,
                                 brake: if self.input.is_held(Button::Jump) {
@@ -797,67 +778,47 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            (traction, speed_multiplier, rolling_resistance),
-                            (left_traction, right_traction),
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
+                            &mut self.vehicle_suspension,
+                            suspension_config,
+                            &mut self.vehicle_surface_tracker,
                             vehicle_delta,
                         );
-                        if let Some(collision) = self.collision.as_ref() {
-                            let movement = Vec3::new(
-                                self.vehicle_state.position.x - vehicle_previous_position.x,
-                                0.0,
-                                self.vehicle_state.position.z - vehicle_previous_position.z,
-                            );
-                            let resolved = collision.move_vehicle_oriented(
-                                vehicle_previous_position,
-                                movement,
-                                self.vehicle_state.heading,
-                                0.82,
-                                1.38,
-                            );
-                            self.vehicle_state.position.x = resolved.position.x;
-                            self.vehicle_state.position.z = resolved.position.z;
-                            if resolved.blocked_x || resolved.blocked_z {
-                                self.vehicle_state.speed = 0.0;
+                        if let Some(suspension_pose) = suspension_pose {
+                            if let Some(collision) = self.collision.as_ref() {
+                                let movement = Vec3::new(
+                                    self.vehicle_state.position.x - vehicle_previous_position.x,
+                                    0.0,
+                                    self.vehicle_state.position.z - vehicle_previous_position.z,
+                                );
+                                let resolved = collision.move_vehicle_oriented(
+                                    vehicle_previous_position,
+                                    movement,
+                                    self.vehicle_state.heading,
+                                    0.82,
+                                    1.38,
+                                );
+                                self.vehicle_state.position.x = resolved.position.x;
+                                self.vehicle_state.position.z = resolved.position.z;
+                                if resolved.blocked_x || resolved.blocked_z {
+                                    self.vehicle_state.speed = 0.0;
+                                }
                             }
-                        }
-                        if self
-                            .vehicle_recovery
-                            .recover_if_fallen(&mut self.vehicle_state, -3.0)
-                        {
-                            self.vehicle_suspension = SuspensionState::default();
-                            log::info!("Vehicle recovered at its latest safe terrain position");
-                        }
-                        let suspension_config = SuspensionConfig::default();
-                        // Sample the same deterministic terrain function used by the arena.
-                        // Derive contact offsets from the spring geometry so sampling and
-                        // chassis pitch/roll use one shared wheelbase and track width.
-                        // Corner order matches SuspensionState: front-left, front-right,
-                        // rear-left, rear-right.
-                        let ground_heights = world_terrain_vehicle_ground_heights(
-                            self.vehicle_state.position.x,
-                            self.vehicle_state.position.z,
-                            self.vehicle_state.heading,
-                            suspension_config.track_width * 0.5,
-                            suspension_config.wheelbase * 0.5,
-                        )
-                        .unwrap_or_else(|| {
-                            [world_terrain_sample(
+                            if self
+                                .vehicle_recovery
+                                .recover_if_fallen(&mut self.vehicle_state, -3.0)
+                            {
+                                self.vehicle_suspension = SuspensionState::default();
+                                log::info!("Vehicle recovered at its latest safe terrain position");
+                            }
+                            self.vehicle_state.position.y = suspension_pose.average_ground_height
+                                + suspension_config.rest_length
+                                - suspension_pose.average_compression;
+                            let average_ground = world_terrain_sample(
                                 self.vehicle_state.position.x,
                                 self.vehicle_state.position.z,
                             )
-                            .height; 4]
-                        });
-                        let suspension_pose = self.vehicle_suspension.update(
-                            ground_heights,
-                            self.vehicle_state.position.y,
-                            suspension_config,
-                            vehicle_delta,
-                        );
-                        let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
-                        self.vehicle_state.position.y = suspension_pose.average_ground_height
-                            + suspension_config.rest_length
-                            - suspension_pose.average_compression;
+                            .height;
                         let _ = self.vehicle_recovery.record_safe_state(
                             self.vehicle_state,
                             average_ground,
