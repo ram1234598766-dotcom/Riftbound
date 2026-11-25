@@ -508,9 +508,60 @@ impl Renderer {
         changes: &riftbound_core::WorldChunkChanges,
         slot_map: &mut riftbound_core::WorldChunkSlotMap,
     ) -> bool {
-        // The renderer's world window is fixed at 25 slots. Keep the small
-        // removal batch on the stack instead of allocating a Vec every time
-        // the player crosses a chunk boundary.
+        // Validate the CPU-side delta against a clone first. A failed mesh build
+        // must not leave the streamer's slot map ahead of the renderer's GPU state.
+        let mut next_slot_map = slot_map.clone();
+        if !next_slot_map.apply_changes(changes) {
+            return false;
+        }
+
+        let mut staged = Vec::with_capacity(changes.added().len() + changes.updated().len());
+        for request in changes.added().iter().chain(changes.updated()) {
+            let Some(slot) = next_slot_map.slot_for(request.coord) else {
+                return false;
+            };
+            if self.world_terrain_slots[slot.slot_index]
+                .as_ref()
+                .is_some_and(|current| current.coord == request.coord && current.lod == request.lod)
+            {
+                continue;
+            }
+            let mesh = match request.lod {
+                WorldChunkLod::Detailed => Mesh::world_terrain_chunk(
+                    &self.device, request.coord.x, request.coord.z,
+                ),
+                WorldChunkLod::Distant => Mesh::world_terrain_chunk_lod(
+                    &self.device, request.coord.x, request.coord.z,
+                ),
+            };
+            let Some(mesh) = mesh else {
+                return false;
+            };
+            let mut model = [0.0_f32; 16];
+            model[0] = 1.0;
+            model[5] = 1.0;
+            model[10] = 1.0;
+            model[15] = 1.0;
+            model[12] = request.coord.x as f32 * 64.0;
+            model[14] = request.coord.z as f32 * 64.0;
+            let instance = InstanceRaw::from_matrix(model, [1.0; 4]);
+            let mut bytes = Vec::with_capacity(80);
+            append_instance_bytes(&mut bytes, &instance);
+            let instance_buffer = self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("riftbound-world-terrain-instance"),
+                    contents: &bytes,
+                    usage: wgpu::BufferUsages::VERTEX,
+                },
+            );
+            staged.push((slot.slot_index, WorldTerrainGpuSlot {
+                coord: request.coord,
+                lod: request.lod,
+                mesh,
+                instance_buffer,
+            }));
+        }
+
         let mut removed_slots = [0_usize; 25];
         let mut removed_count = 0;
         for coord in changes.removed() {
@@ -522,20 +573,14 @@ impl Renderer {
                 removed_count += 1;
             }
         }
-        if !slot_map.apply_changes(changes) {
-            return false;
-        }
         for slot_index in removed_slots[..removed_count].iter().copied() {
             let _ = self.clear_world_terrain_chunk(slot_index);
         }
-        for request in changes.added().iter().chain(changes.updated()) {
-            let Some(slot) = slot_map.slot_for(request.coord) else {
-                return false;
-            };
-            if !self.set_world_terrain_chunk(slot.slot_index, request.coord, request.lod) {
-                return false;
-            }
+        for (slot_index, slot) in staged {
+            self.world_terrain_slots[slot_index] = Some(slot);
         }
+        *slot_map = next_slot_map;
+        self.visibility_dirty = true;
         true
     }
 
