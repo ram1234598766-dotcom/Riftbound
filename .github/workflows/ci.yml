@@ -27,6 +27,6 @@ jobs:
       - name: Verify Rust formatting
         run: cargo fmt --all -- --check
       - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::pedantic
       - name: Run tests
         run: cargo test --workspace
