@@ -752,6 +752,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn suspension_response_is_consistent_at_thirty_and_sixty_fps() {
+        let config = SuspensionConfig::default();
+        let terrain = [0.18, 0.31, 0.22, 0.39];
+        let mut at_30_fps = SuspensionState::default();
+        let mut at_60_fps = SuspensionState::default();
+
+        for _ in 0..30 {
+            at_30_fps.update(terrain, 0.92, config, 1.0 / 30.0);
+        }
+        for _ in 0..60 {
+            at_60_fps.update(terrain, 0.92, config, 1.0 / 60.0);
+        }
+
+        let pose_30 = at_30_fps.pose(config);
+        let pose_60 = at_60_fps.pose(config);
+        for (left, right) in pose_30
+            .wheel_compressions
+            .iter()
+            .zip(pose_60.wheel_compressions.iter())
+        {
+            assert!((left - right).abs() < 0.0001);
+        }
+        assert!((pose_30.average_ground_height - pose_60.average_ground_height).abs() < 0.0001);
+        assert!((pose_30.pitch - pose_60.pitch).abs() < 0.0001);
+        assert!((pose_30.roll - pose_60.roll).abs() < 0.0001);
+    }
+
+    #[test]
     fn suspension_pose_exposes_each_corner_compression_in_stable_order() {
         let config = SuspensionConfig::default();
         let mut suspension = SuspensionState::default();
