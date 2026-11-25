@@ -41,6 +41,8 @@ const MAX_INPUT_DELTA: f32 = 0.1;
 const MAX_PLAYERS: usize = 16;
 const MIN_MOVE_INTERVAL: Duration = Duration::from_millis(16);
 const PLAYER_RADIUS: f32 = 15.0;
+const VEHICLE_RADIUS: f32 = 24.0;
+const MAX_VEHICLE_COLLISION_STEP: f32 = 8.0;
 const WORLD_OBSTACLES: [(f32, f32, f32, f32); 11] = [
     (650.0, 170.0, 42.0, 350.0),
     (650.0, 520.0, 320.0, 42.0),
@@ -563,10 +565,37 @@ fn update_shared_vehicle(
     vehicle.speed = vehicle.speed.clamp(-90.0, 260.0);
     let steering_factor = (vehicle.speed.abs() / 35.0).clamp(0.0, 1.0);
     vehicle.heading += steering * steering_factor * 1.9 * dt * vehicle.speed.signum();
-    vehicle.x = (vehicle.x + vehicle.heading.sin() * vehicle.speed * dt)
-        .clamp(50.0, WORLD_WIDTH - 50.0);
-    vehicle.y = (vehicle.y - vehicle.heading.cos() * vehicle.speed * dt)
-        .clamp(50.0, WORLD_HEIGHT - 50.0);
+    let dx = vehicle.heading.sin() * vehicle.speed * dt;
+    let dy = -vehicle.heading.cos() * vehicle.speed * dt;
+    let steps = (dx.abs().max(dy.abs()) / MAX_VEHICLE_COLLISION_STEP)
+        .ceil()
+        .max(1.0) as usize;
+    let step_x = dx / steps as f32;
+    let step_y = dy / steps as f32;
+    for _ in 0..steps {
+        let next_x = (vehicle.x + step_x).clamp(50.0, WORLD_WIDTH - 50.0);
+        if !circle_hits_world_obstacle(next_x, vehicle.y, VEHICLE_RADIUS) {
+            vehicle.x = next_x;
+        } else {
+            vehicle.speed = 0.0;
+        }
+        let next_y = (vehicle.y + step_y).clamp(50.0, WORLD_HEIGHT - 50.0);
+        if !circle_hits_world_obstacle(vehicle.x, next_y, VEHICLE_RADIUS) {
+            vehicle.y = next_y;
+        } else {
+            vehicle.speed = 0.0;
+        }
+    }
+}
+
+fn circle_hits_world_obstacle(x: f32, y: f32, radius: f32) -> bool {
+    x <= 50.0 + radius
+        || x >= WORLD_WIDTH - 50.0 - radius
+        || y <= 50.0 + radius
+        || y >= WORLD_HEIGHT - 50.0 - radius
+        || WORLD_OBSTACLES
+            .iter()
+            .any(|wall| circle_intersects_rect(x, y, radius, *wall))
 }
 
 fn is_valid_move_input(dx: f32, dy: f32, face: f32) -> bool {
@@ -623,6 +652,27 @@ mod tests {
         assert!((50.0..=WORLD_WIDTH - 50.0).contains(&vehicle.x));
         assert!((50.0..=WORLD_HEIGHT - 50.0).contains(&vehicle.y));
         assert!(vehicle.heading.is_finite());
+    }
+
+    #[test]
+    fn vehicle_collision_stops_at_walls_and_world_edges() {
+        assert!(circle_hits_world_obstacle(630.0, 400.0, VEHICLE_RADIUS));
+        assert!(!circle_hits_world_obstacle(600.0, 400.0, VEHICLE_RADIUS));
+        assert!(circle_hits_world_obstacle(60.0, 750.0, VEHICLE_RADIUS));
+        assert!(circle_hits_world_obstacle(WORLD_WIDTH - 60.0, 750.0, VEHICLE_RADIUS));
+    }
+
+    #[test]
+    fn vehicle_collision_substeps_prevent_tunneling_through_thin_walls() {
+        let mut vehicle = SharedVehicleState {
+            x: 600.0,
+            y: 400.0,
+            heading: std::f32::consts::FRAC_PI_2,
+            speed: 260.0,
+        };
+        update_shared_vehicle(&mut vehicle, 0.0, 0.0, 0.0, 0.1);
+        assert!(vehicle.x < 650.0 - VEHICLE_RADIUS);
+        assert_eq!(vehicle.speed, 0.0);
     }
 
     #[test]
