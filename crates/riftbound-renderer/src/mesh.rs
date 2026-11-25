@@ -1,6 +1,8 @@
 //! CPU mesh descriptions and their GPU vertex/index-buffer representation.
 
-use riftbound_core::{VehicleSurface, terrain_height, terrain_surface, world_terrain_sample};
+use riftbound_core::{
+    VehicleSurface, terrain_height, terrain_surface, world_road_sample, world_terrain_sample,
+};
 use wgpu::util::DeviceExt;
 
 const WORLD_TERRAIN_SKIRT_DEPTH: f32 = 12.0;
@@ -411,6 +413,52 @@ fn world_terrain_chunk_data(
         }
     }
 
+    // A separate raised ribbon guarantees a continuous, clearly defined road even
+    // when the terrain grid does not place a vertex exactly on the road edges.
+    let road_start = u16::try_from(vertices.len()).ok()?;
+    for z in 0..side {
+        let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
+        let world_z = origin_z + local_z;
+        let road = world_road_sample(origin_x, world_z);
+        let edge_offsets = [
+            -road.half_width - road.shoulder_width,
+            -road.half_width,
+            road.half_width,
+            road.half_width + road.shoulder_width,
+        ];
+        for (edge_index, offset) in edge_offsets.into_iter().enumerate() {
+            let world_x = road.center_x + offset;
+            let local_x = world_x - origin_x;
+            let sample = world_terrain_sample(world_x, world_z);
+            let color = if edge_index == 0 || edge_index == 3 {
+                terrain_surface_color(VehicleSurface::Gravel)
+            } else {
+                [0.12, 0.14, 0.17]
+            };
+            vertices.push(MeshVertex {
+                position: [local_x, sample.height + 0.075, local_z],
+                color,
+            });
+        }
+    }
+    for z in 0..cells {
+        for band in 0..3 {
+            let top_left = road_start
+                + u16::try_from(z * 4 + band).expect("road vertex index fits u16");
+            let top_right = top_left + 1;
+            let bottom_left = top_left + 4;
+            let bottom_right = bottom_left + 1;
+            indices.extend_from_slice(&[
+                top_left,
+                bottom_left,
+                top_right,
+                top_right,
+                bottom_left,
+                bottom_right,
+            ]);
+        }
+    }
+
     // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
     // chunk. Each edge is generated from that chunk's own border samples, so
     // the overlap remains valid even when the two edge profiles differ.
@@ -609,10 +657,10 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4);
-        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4);
-        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6);
-        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6);
+        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4);
+        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4);
+        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6);
+        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6);
         assert!(valid_index_data(detailed.0.len(), &detailed.1));
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
@@ -632,6 +680,30 @@ mod tests {
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
+    }
+
+    #[test]
+    fn world_chunk_road_ribbon_is_raised_continuous_and_inside_chunk_edges() {
+        for side in [5, 9] {
+            let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("world chunk");
+            let road_start = if side == 9 { 81 + 4 * 8 * 4 } else { 25 + 4 * 4 * 4 };
+            let road_vertices = &vertices[road_start..road_start + side * 4];
+            assert_eq!(road_vertices.len(), side * 4);
+            assert!(road_vertices.iter().all(|vertex| {
+                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            }));
+            for row in 0..side {
+                let world_z = -32.0 + row as f32 * (64.0 / (side - 1) as f32);
+                let center = world_road_sample(0.0, world_z).center_x;
+                let left = road_vertices[row * 4 + 1];
+                let right = road_vertices[row * 4 + 2];
+                assert!((left.position[0] - (center - 5.5)).abs() < 1.0e-4);
+                assert!((right.position[0] - (center + 5.5)).abs() < 1.0e-4);
+                assert!(left.position[1] > world_terrain_sample(center - 5.5, world_z).height);
+                assert!(right.position[1] > world_terrain_sample(center + 5.5, world_z).height);
+            }
+            assert!(valid_index_data(vertices.len(), &indices));
+        }
     }
 
     #[test]
