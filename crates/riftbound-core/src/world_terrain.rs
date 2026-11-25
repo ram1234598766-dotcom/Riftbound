@@ -95,9 +95,9 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     // A short eastbound spur branches from the primary road at the origin.
     // Its fixed world-space bounds make the junction deterministic across chunks.
     let spur_distance = (world_z - 0.0).abs();
-    let on_spur = (0.0..=32.0).contains(&world_x) && spur_distance <= 5.5;
+    let on_spur = (0.0..=160.0).contains(&world_x) && spur_distance <= 5.5;
     let on_spur_shoulder =
-        (0.0..=34.5).contains(&world_x) && spur_distance <= 8.0 && !on_spur;
+        (0.0..=162.5).contains(&world_x) && spur_distance <= 8.0 && !on_spur;
     let surface = if road.is_on_road() || on_spur {
         VehicleSurface::Asphalt
     } else if road.is_on_road_corridor() || on_spur_shoulder {
@@ -321,7 +321,9 @@ mod tests {
         assert_eq!(world_terrain_sample(16.0, 6.5).surface, VehicleSurface::Gravel);
         assert_ne!(world_terrain_sample(16.0, 10.0).surface, VehicleSurface::Asphalt);
         assert_eq!(world_terrain_sample(32.0, 0.0).surface, VehicleSurface::Asphalt);
-        assert_ne!(world_terrain_sample(36.0, 0.0).surface, VehicleSurface::Asphalt);
+        assert_eq!(world_terrain_sample(128.0, 0.0).surface, VehicleSurface::Asphalt);
+        assert_eq!(world_terrain_sample(128.0, 6.5).surface, VehicleSurface::Gravel);
+        assert_ne!(world_terrain_sample(164.0, 0.0).surface, VehicleSurface::Asphalt);
     }
 
     #[test]
