@@ -1474,7 +1474,7 @@ mod tests {
     #[test]
     fn suspension_load_factors_transfer_grip_between_wheel_corners() {
         let suspension = SuspensionState {
-            compression: [0.4, 0.2, 0.1, 0.1],
+            compression: [0.3, 0.25, 0.2, 0.15],
             ground_reference_initialized: true,
             ..SuspensionState::default()
         };
