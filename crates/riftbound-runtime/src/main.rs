@@ -11,7 +11,8 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades,
+    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleSurfaceTracker,
+    VehicleUpgrades,
     WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample,
     world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
 };
@@ -45,6 +46,7 @@ struct RiftboundApp {
     vehicle: Option<EntityId>,
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_state: VehicleState,
+    vehicle_surface_tracker: VehicleSurfaceTracker,
     vehicle_upgrades: VehicleUpgrades,
     vehicle_suspension: SuspensionState,
     vehicle_recovery: VehicleRecovery,
@@ -289,6 +291,14 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle = Some(vehicle);
                 self.vehicle_wheels = Some(vehicle_wheels);
                 self.vehicle_state = vehicle_state;
+                self.vehicle_surface_tracker =
+                    VehicleSurfaceTracker::new(world_terrain_vehicle_surface(
+                        vehicle_state.position.x,
+                        vehicle_state.position.z,
+                        vehicle_state.heading,
+                        0.78,
+                        1.32,
+                    ));
                 self.vehicle_suspension = vehicle_suspension;
                 self.vehicle_recovery = vehicle_recovery;
                 self.driving = false;
@@ -705,13 +715,13 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            world_terrain_vehicle_surface(
+                            self.vehicle_surface_tracker.update(world_terrain_vehicle_surface(
                                 self.vehicle_state.position.x,
                                 self.vehicle_state.position.z,
                                 self.vehicle_state.heading,
                                 0.78,
                                 1.32,
-                            ),
+                            )),
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
