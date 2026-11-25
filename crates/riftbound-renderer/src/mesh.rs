@@ -436,7 +436,7 @@ fn world_terrain_chunk_data(
                 [0.12, 0.14, 0.17]
             };
             vertices.push(MeshVertex {
-                position: [local_x, sample.height + 0.075, local_z],
+                position: [local_x, sample.height + 0.2, local_z],
                 color,
             });
         }
@@ -693,7 +693,8 @@ mod tests {
                 vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
             }));
             for row in 0..side {
-                let world_z = -32.0 + row as f32 * (64.0 / (side - 1) as f32);
+                let world_z = -32.0 + f32::from(u8::try_from(row).expect("road row fits u8"))
+                    * (64.0 / f32::from(u8::try_from(side - 1).expect("road side fits u8")));
                 let center = world_road_sample(0.0, world_z).center_x;
                 let left = road_vertices[row * 4 + 1];
                 let right = road_vertices[row * 4 + 2];
