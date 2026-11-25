@@ -67,9 +67,7 @@ impl VehicleSurface {
         self.speed_multiplier()
     }
 
-    fn rolling_resistance(self) -> f32 {
-        VehicleSurface::rolling_resistance(self)
-    }
+
 }
 
 /// Tunable, unit-agnostic vehicle handling values.
