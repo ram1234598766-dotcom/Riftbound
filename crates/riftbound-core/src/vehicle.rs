@@ -798,6 +798,41 @@ impl SuspensionState {
         self.pose(config)
     }
 
+    /// Reprojects wheel spring compression onto new contacts without advancing time.
+    ///
+    /// Use after collision resolution changes the vehicle's horizontal position.
+    /// Spring velocities are preserved so the next fixed step continues smoothly.
+    pub fn rebase_ground_contacts(
+        &mut self,
+        wheel_ground_heights: [f32; 4],
+        chassis_height: f32,
+        config: SuspensionConfig,
+    ) -> bool {
+        if !chassis_height.is_finite()
+            || wheel_ground_heights.iter().any(|height| !height.is_finite())
+            || !config.max_travel.is_finite()
+            || !config.rest_length.is_finite()
+            || config.max_travel <= 0.0
+            || config.rest_length < 0.0
+        {
+            return false;
+        }
+
+        self.average_ground_height = wheel_ground_heights.iter().sum::<f32>() * 0.25;
+        self.average_ground_velocity = 0.0;
+        self.ground_reference_initialized = true;
+        for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
+            self.compression[index] = (ground_height + config.rest_length - chassis_height)
+                .clamp(0.0, config.max_travel);
+            if self.compression[index] <= f32::EPSILON
+                || self.compression[index] >= config.max_travel - f32::EPSILON
+            {
+                self.compression_velocity[index] = 0.0;
+            }
+        }
+        true
+    }
+
     /// Returns the current visual chassis response without advancing simulation.
     #[must_use]
     pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
@@ -871,6 +906,37 @@ mod tests {
             )
             .is_none());
         assert_eq!(vehicle, before);
+    }
+
+    #[test]
+    fn suspension_rebase_updates_contacts_without_advancing_spring_time() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        suspension.update([0.2; 4], 1.0, config, 1.0 / 60.0);
+        let before_velocity = suspension.compression_velocity;
+        assert!(suspension.rebase_ground_contacts(
+            [0.1, 0.3, 0.2, 0.4],
+            1.0,
+            config,
+        ));
+        let pose = suspension.pose(config);
+        assert_eq!(pose.wheel_compressions, [0.1 + config.rest_length - 1.0, 0.3 + config.rest_length - 1.0, 0.2 + config.rest_length - 1.0, 0.4 + config.rest_length - 1.0].map(|value| value.clamp(0.0, config.max_travel)));
+        assert_eq!(suspension.compression_velocity, before_velocity);
+        assert!((pose.average_ground_height - 0.25).abs() < 0.0001);
+    }
+
+    #[test]
+    fn suspension_rebase_rejects_invalid_contacts_without_mutation() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        suspension.update([0.2; 4], 1.0, config, 1.0 / 60.0);
+        let before = suspension;
+        assert!(!suspension.rebase_ground_contacts(
+            [0.1, f32::NAN, 0.2, 0.4],
+            1.0,
+            config,
+        ));
+        assert_eq!(suspension, before);
     }
 
     #[test]
