@@ -433,15 +433,18 @@ pub fn build_world_chunk_mesh(request: WorldChunkRequest) -> Option<WorldTerrain
         WorldChunkLod::Detailed => 9,
         WorldChunkLod::Distant => 5,
     };
-    let spacing = WORLD_CHUNK_SIZE / (resolution - 1) as f32;
-    let origin_x = request.coord.x as f32 * WORLD_CHUNK_SIZE;
-    let origin_z = request.coord.z as f32 * WORLD_CHUNK_SIZE;
+    let chunk_x = f32::from(i16::try_from(request.coord.x).ok()?);
+    let chunk_z = f32::from(i16::try_from(request.coord.z).ok()?);
+    let intervals = f32::from(u8::try_from(resolution - 1).ok()?);
+    let spacing = WORLD_CHUNK_SIZE / intervals;
+    let origin_x = chunk_x * WORLD_CHUNK_SIZE;
+    let origin_z = chunk_z * WORLD_CHUNK_SIZE;
     let mut vertices = Vec::with_capacity(resolution * resolution);
 
     for row in 0..resolution {
         for column in 0..resolution {
-            let x = origin_x + column as f32 * spacing;
-            let z = origin_z + row as f32 * spacing;
+            let x = origin_x + f32::from(u8::try_from(column).ok()?) * spacing;
+            let z = origin_z + f32::from(u8::try_from(row).ok()?) * spacing;
             let center = crate::world_terrain_sample(x, z);
             let left = crate::world_terrain_sample(x - NORMAL_STEP, z).height;
             let right = crate::world_terrain_sample(x + NORMAL_STEP, z).height;
