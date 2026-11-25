@@ -14,7 +14,7 @@ use riftbound_core::{
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
     world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
-    world_terrain_vehicle_surface,
+    world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -721,7 +721,15 @@ impl ApplicationHandler for RiftboundApp {
                             0.78,
                             1.32,
                         );
-                        self.vehicle_surface_tracker.update(sampled_surface);
+                        let wheel_surfaces = world_terrain_vehicle_surfaces(
+                            self.vehicle_state.position.x,
+                            self.vehicle_state.position.z,
+                            self.vehicle_state.heading,
+                            0.78,
+                            1.32,
+                        );
+                        self.vehicle_surface_tracker
+                            .update_wheel_contacts(sampled_surface, wheel_surfaces);
                         let (traction, speed_multiplier, rolling_resistance) =
                             self.vehicle_surface_tracker.response();
                         let vehicle_previous_position = self.vehicle_state.position;
