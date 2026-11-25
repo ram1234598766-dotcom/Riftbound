@@ -780,23 +780,33 @@ mod tests {
     }
 
     #[test]
-    fn low_grip_terrain_reduces_steering_response() {
+    fn steering_response_scales_consistently_across_all_terrain_surfaces() {
         let config = VehicleConfig::default();
         let input = VehicleInput {
             steering: 1.0,
             ..VehicleInput::default()
         };
-        let mut asphalt = VehicleState {
-            speed: 10.0,
-            ..VehicleState::default()
-        };
-        let mut snow = asphalt;
+        let surfaces = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Rock,
+            VehicleSurface::Sand,
+            VehicleSurface::Mud,
+            VehicleSurface::Snow,
+        ];
+        let mut headings = Vec::with_capacity(surfaces.len());
 
-        asphalt.update(input, VehicleSurface::Asphalt, config, 0.1);
-        snow.update(input, VehicleSurface::Snow, config, 0.1);
+        for surface in surfaces {
+            let mut vehicle = VehicleState {
+                speed: 10.0,
+                ..VehicleState::default()
+            };
+            vehicle.update(input, surface, config, 0.1);
+            headings.push(vehicle.heading);
+        }
 
-        assert!(asphalt.heading > snow.heading);
-        assert!(snow.heading > 0.0);
+        assert!(headings.iter().all(|heading| *heading > 0.0));
+        assert!(headings.windows(2).all(|pair| pair[0] > pair[1]));
     }
 
     #[test]
