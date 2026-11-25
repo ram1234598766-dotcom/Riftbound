@@ -84,7 +84,6 @@ impl Default for VehicleConfig {
     }
 }
 
-
 /** Persistent engine tuning purchased with recovered salvage. */
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct VehicleUpgrades {
@@ -101,7 +100,10 @@ impl VehicleUpgrades {
         if engine_level > Self::MAX_ENGINE_LEVEL || handling_level > Self::MAX_ENGINE_LEVEL {
             None
         } else {
-            Some(Self { engine_level, handling_level })
+            Some(Self {
+                engine_level,
+                handling_level,
+            })
         }
     }
 

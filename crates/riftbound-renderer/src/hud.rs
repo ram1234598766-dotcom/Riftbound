@@ -118,13 +118,44 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     text(out, &data.status, 38.0, 154.0, 1.5, white, width, height);
     if let Some(inventory) = &data.inventory {
         let narrow_layout = width < 680.0;
-        let panel_x = if narrow_layout { 22.0 } else { (width - 322.0).max(22.0) };
+        let panel_x = if narrow_layout {
+            22.0
+        } else {
+            (width - 322.0).max(22.0)
+        };
         let panel_y = if narrow_layout { 192.0 } else { 20.0 };
         rect(out, panel_x, panel_y, 300.0, 110.0, panel, width, height);
         rect(out, panel_x, panel_y, 3.0, 110.0, cyan, width, height);
-        text(out, "INVENTORY", panel_x + 16.0, panel_y + 12.0, 2.0, cyan, width, height);
-        text(out, inventory, panel_x + 16.0, panel_y + 38.0, 1.5, white, width, height);
-        text(out, &data.equipment, panel_x + 16.0, panel_y + 66.0, 1.5, white, width, height);
+        text(
+            out,
+            "INVENTORY",
+            panel_x + 16.0,
+            panel_y + 12.0,
+            2.0,
+            cyan,
+            width,
+            height,
+        );
+        text(
+            out,
+            inventory,
+            panel_x + 16.0,
+            panel_y + 38.0,
+            1.5,
+            white,
+            width,
+            height,
+        );
+        text(
+            out,
+            &data.equipment,
+            panel_x + 16.0,
+            panel_y + 66.0,
+            1.5,
+            white,
+            width,
+            height,
+        );
     }
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;

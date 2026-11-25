@@ -11,9 +11,8 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleUpgrades, terrain_height,
-    world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
-    WORLD_CHUNK_SIZE,
+    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleUpgrades, WORLD_CHUNK_SIZE,
+    WorldChunkRequest, terrain_height, world_terrain_sample, world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -112,13 +111,11 @@ impl RiftboundApp {
             self.inventory.clone(),
             self.equipment,
             self.progression,
-            self.checkpoint_progress.is_some_and(
-                CheckpointProgress::has_active_checkpoint,
-            ),
+            self.checkpoint_progress
+                .is_some_and(CheckpointProgress::has_active_checkpoint),
             player_position,
         )
     }
-
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -158,16 +155,14 @@ impl ApplicationHandler for RiftboundApp {
             Ok(mut renderer) => {
                 let mut scene = renderer.scene().clone();
                 build_arena(&mut scene);
-                let spawn_position = saved_position.map_or(
-                    Vec3::new(0.0, PLAYER_RADIUS + 0.01, -4.0),
-                    |saved| {
+                let spawn_position =
+                    saved_position.map_or(Vec3::new(0.0, PLAYER_RADIUS + 0.01, -4.0), |saved| {
                         Vec3::new(
                             saved.x,
                             world_terrain_sample(saved.x, saved.z).height + PLAYER_RADIUS + 0.01,
                             saved.z,
                         )
-                    },
-                );
+                    });
                 let player_transform = Transform3::new(
                     spawn_position,
                     Vec3::new(0.0, 0.0, 0.0),
@@ -224,7 +219,10 @@ impl ApplicationHandler for RiftboundApp {
                 let mut world_slot_map = riftbound_core::WorldChunkSlotMap::for_config(
                     riftbound_core::WorldChunkConfig::default(),
                 );
-                let _ = world_streamer.update_focus(player_transform.translation.x, player_transform.translation.z);
+                let _ = world_streamer.update_focus(
+                    player_transform.translation.x,
+                    player_transform.translation.z,
+                );
                 if !renderer.sync_world_terrain(world_streamer.changes(), &mut world_slot_map) {
                     log::error!("Initial world terrain chunk synchronization failed");
                 }
@@ -395,16 +393,29 @@ impl ApplicationHandler for RiftboundApp {
                     }
                     if event.state == ElementState::Pressed && key == KeyCode::KeyG {
                         let near_vehicle = self.driving
-                            || self.renderer.as_ref().and_then(|renderer| {
-                                self.player.and_then(|player| renderer.scene().get(player).copied())
-                            }).is_some_and(|player| {
-                                distance_squared(player.translation, self.vehicle_state.position) <= 3.5 * 3.5
-                            });
+                            || self
+                                .renderer
+                                .as_ref()
+                                .and_then(|renderer| {
+                                    self.player
+                                        .and_then(|player| renderer.scene().get(player).copied())
+                                })
+                                .is_some_and(|player| {
+                                    distance_squared(
+                                        player.translation,
+                                        self.vehicle_state.position,
+                                    ) <= 3.5 * 3.5
+                                });
                         if near_vehicle {
                             self.garage_open = !self.garage_open;
-                            log::info!("{}", if self.garage_open {
-                                "GARAGE OPEN: U engine upgrade, H handling/tires, G close"
-                            } else { "Garage closed" });
+                            log::info!(
+                                "{}",
+                                if self.garage_open {
+                                    "GARAGE OPEN: U engine upgrade, H handling/tires, G close"
+                                } else {
+                                    "Garage closed"
+                                }
+                            );
                         } else {
                             log::info!("Move near your vehicle to open the garage");
                         }
@@ -412,25 +423,46 @@ impl ApplicationHandler for RiftboundApp {
                     if event.state == ElementState::Pressed && self.garage_open {
                         match key {
                             KeyCode::KeyU => {
-                                if self.vehicle_upgrades.purchase_engine_upgrade(&mut self.inventory) {
-                                    log::info!("Engine upgraded to tier {}", self.vehicle_upgrades.engine_level());
+                                if self
+                                    .vehicle_upgrades
+                                    .purchase_engine_upgrade(&mut self.inventory)
+                                {
+                                    log::info!(
+                                        "Engine upgraded to tier {}",
+                                        self.vehicle_upgrades.engine_level()
+                                    );
                                     if let Err(error) = save::save_profile(&self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
-                                } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
-                                    log::info!("Engine upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
+                                } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost()
+                                {
+                                    log::info!(
+                                        "Engine upgrade needs {cost} Salvage; you have {}",
+                                        self.inventory.count(ItemKind::Salvage)
+                                    );
                                 } else {
                                     log::info!("Engine is already at maximum tier");
                                 }
                             }
                             KeyCode::KeyH => {
-                                if self.vehicle_upgrades.purchase_handling_upgrade(&mut self.inventory) {
-                                    log::info!("Handling and tires upgraded to tier {}", self.vehicle_upgrades.handling_level());
+                                if self
+                                    .vehicle_upgrades
+                                    .purchase_handling_upgrade(&mut self.inventory)
+                                {
+                                    log::info!(
+                                        "Handling and tires upgraded to tier {}",
+                                        self.vehicle_upgrades.handling_level()
+                                    );
                                     if let Err(error) = save::save_profile(&self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
-                                } else if let Some(cost) = self.vehicle_upgrades.next_handling_cost() {
-                                    log::info!("Handling upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
+                                } else if let Some(cost) =
+                                    self.vehicle_upgrades.next_handling_cost()
+                                {
+                                    log::info!(
+                                        "Handling upgrade needs {cost} Salvage; you have {}",
+                                        self.inventory.count(ItemKind::Salvage)
+                                    );
                                 } else {
                                     log::info!("Handling and tires are already at maximum tier");
                                 }
@@ -446,11 +478,15 @@ impl ApplicationHandler for RiftboundApp {
                                     if restored > 0 {
                                         self.inventory.remove(ItemKind::Medkit, 1);
                                         log::info!("Medkit used: restored {restored} health");
-                                        if let Err(error) = save::save_profile(&self.saved_profile()) {
+                                        if let Err(error) =
+                                            save::save_profile(&self.saved_profile())
+                                        {
                                             log::warn!("Could not save medkit use: {error}");
                                         }
                                     } else {
-                                        log::info!("Health is already full; medkit was not consumed");
+                                        log::info!(
+                                            "Health is already full; medkit was not consumed"
+                                        );
                                     }
                                 } else {
                                     log::info!("No medkits available");
@@ -461,34 +497,38 @@ impl ApplicationHandler for RiftboundApp {
                                     &mut self.equipment,
                                     ItemKind::ExplorerVest,
                                 ) {
-                                    log::info!("Explorer Vest equipped: incoming damage reduced by 8");
+                                    log::info!(
+                                        "Explorer Vest equipped: incoming damage reduced by 8"
+                                    );
                                 } else {
                                     log::info!("No Explorer Vest available in inventory");
                                 }
                             }
                             KeyCode::Digit2 => {
-                                if self.inventory.equip_from_inventory(
-                                    &mut self.equipment,
-                                    ItemKind::TrailBoots,
-                                ) {
-                                    log::info!("Trail Boots equipped: traversal speed increased by 8%");
+                                if self
+                                    .inventory
+                                    .equip_from_inventory(&mut self.equipment, ItemKind::TrailBoots)
+                                {
+                                    log::info!(
+                                        "Trail Boots equipped: traversal speed increased by 8%"
+                                    );
                                 } else {
                                     log::info!("No Trail Boots available in inventory");
                                 }
                             }
                             KeyCode::Digit3 => {
-                                if self.inventory.unequip_to_inventory(
-                                    &mut self.equipment,
-                                    EquipmentSlot::Body,
-                                ) {
+                                if self
+                                    .inventory
+                                    .unequip_to_inventory(&mut self.equipment, EquipmentSlot::Body)
+                                {
                                     log::info!("Body equipment returned to inventory");
                                 }
                             }
                             KeyCode::Digit4 => {
-                                if self.inventory.unequip_to_inventory(
-                                    &mut self.equipment,
-                                    EquipmentSlot::Feet,
-                                ) {
+                                if self
+                                    .inventory
+                                    .unequip_to_inventory(&mut self.equipment, EquipmentSlot::Feet)
+                                {
                                     log::info!("Foot equipment returned to inventory");
                                 }
                             }
@@ -551,9 +591,10 @@ impl ApplicationHandler for RiftboundApp {
                         collision.move_character(previous_position, displacement, PLAYER_RADIUS);
                     transform.translation.x = resolved.position.x;
                     transform.translation.z = resolved.position.z;
-                    let floor_height = world_terrain_sample(resolved.position.x, resolved.position.z).height
-                        + PLAYER_RADIUS
-                        + 0.01;
+                    let floor_height =
+                        world_terrain_sample(resolved.position.x, resolved.position.z).height
+                            + PLAYER_RADIUS
+                            + 0.01;
                     if !self.driving {
                         self.controller.update_vertical(
                             &mut transform,
@@ -709,16 +750,14 @@ impl ApplicationHandler for RiftboundApp {
                         let gait = self.animation_time * (7.2 + movement * 2.0);
                         let leg_swing = gait.sin() * 0.72 * movement;
                         let arm_swing = -leg_swing * 0.78;
-                        let idle_breath = (self.animation_time * 1.65).sin()
-                            * 0.018
-                            * (1.0 - movement);
+                        let idle_breath =
+                            (self.animation_time * 1.65).sin() * 0.018 * (1.0 - movement);
                         let stride_bob = (gait * 2.0).sin() * 0.045 * movement;
                         let bob = idle_breath + stride_bob;
                         let forward_lean = (movement * 0.11).min(0.11);
                         let lateral_lean = (-horizontal_velocity.x * 0.025).clamp(-0.07, 0.07);
-                        let idle_sway = (self.animation_time * 0.9).sin()
-                            * 0.025
-                            * (1.0 - movement);
+                        let idle_sway =
+                            (self.animation_time * 0.9).sin() * 0.025 * (1.0 - movement);
                         self.animated_transforms.extend([
                             (
                                 parts.torso,
@@ -1025,24 +1064,25 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                                 let awarded_xp = (collected_count as u64) * 25;
                                 let levels_gained = self.progression.award_xp(awarded_xp);
-                                if let Err(error) = save::save_profile(
-                                    &make_saved_profile(
-                                        self.vehicle_upgrades,
-                                        self.inventory.clone(),
-                                        self.equipment,
-                                        self.progression,
-                                        self.checkpoint_progress.is_some_and(
-                                            CheckpointProgress::has_active_checkpoint,
-                                        ),
-                                        Some(transform.translation),
-                                    ),
-                                ) {
+                                if let Err(error) = save::save_profile(&make_saved_profile(
+                                    self.vehicle_upgrades,
+                                    self.inventory.clone(),
+                                    self.equipment,
+                                    self.progression,
+                                    self.checkpoint_progress
+                                        .is_some_and(CheckpointProgress::has_active_checkpoint),
+                                    Some(transform.translation),
+                                )) {
                                     log::warn!("Could not save shard rewards: {error}");
                                 }
                                 log::info!(
                                     "Collected {collected_count} rift shard(s): +{awarded_xp} XP, level {}{}",
                                     self.progression.level(),
-                                    if levels_gained > 0 { " (level up!)" } else { "" },
+                                    if levels_gained > 0 {
+                                        " (level up!)"
+                                    } else {
+                                        ""
+                                    },
                                 );
                             }
                             if !collected.is_empty() {
@@ -1080,10 +1120,8 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
-                            let nearby_loot = self
-                                .loot_entities
-                                .iter()
-                                .position(|(entity, position, _)| {
+                            let nearby_loot =
+                                self.loot_entities.iter().position(|(entity, position, _)| {
                                     renderer.scene().get(*entity).is_some()
                                         && distance_squared(transform.translation, *position)
                                             <= 1.8 * 1.8
@@ -1095,23 +1133,23 @@ impl ApplicationHandler for RiftboundApp {
                                         let mut updated_scene = renderer.scene().clone();
                                         updated_scene.despawn(entity);
                                         if let Err(error) = renderer.set_scene(updated_scene) {
-                                            log::error!("Could not remove collected world loot: {error}");
+                                            log::error!(
+                                                "Could not remove collected world loot: {error}"
+                                            );
                                             event_loop.exit();
                                             return;
                                         }
                                         self.loot_entities.remove(index);
-                                        if let Err(error) = save::save_profile(
-                                            &make_saved_profile(
-                                        self.vehicle_upgrades,
-                                        self.inventory.clone(),
-                                        self.equipment,
-                                        self.progression,
-                                        self.checkpoint_progress.is_some_and(
-                                            CheckpointProgress::has_active_checkpoint,
-                                        ),
-                                        Some(transform.translation),
-                                    ),
-                                        ) {
+                                        if let Err(error) = save::save_profile(&make_saved_profile(
+                                            self.vehicle_upgrades,
+                                            self.inventory.clone(),
+                                            self.equipment,
+                                            self.progression,
+                                            self.checkpoint_progress.is_some_and(
+                                                CheckpointProgress::has_active_checkpoint,
+                                            ),
+                                            Some(transform.translation),
+                                        )) {
                                             log::warn!("Could not save collected loot: {error}");
                                         }
                                         let label = match kind {
@@ -1192,18 +1230,15 @@ impl ApplicationHandler for RiftboundApp {
                                 .try_extract(interact_pressed, inside_extraction)
                             {
                                 let levels_gained = self.progression.award_xp(100);
-                                if let Err(error) = save::save_profile(
-                                    &make_saved_profile(
-                                        self.vehicle_upgrades,
-                                        self.inventory.clone(),
-                                        self.equipment,
-                                        self.progression,
-                                        self.checkpoint_progress.is_some_and(
-                                            CheckpointProgress::has_active_checkpoint,
-                                        ),
-                                        Some(transform.translation),
-                                    ),
-                                ) {
+                                if let Err(error) = save::save_profile(&make_saved_profile(
+                                    self.vehicle_upgrades,
+                                    self.inventory.clone(),
+                                    self.equipment,
+                                    self.progression,
+                                    self.checkpoint_progress
+                                        .is_some_and(CheckpointProgress::has_active_checkpoint),
+                                    Some(transform.translation),
+                                )) {
                                     log::warn!("Could not save mission rewards: {error}");
                                 }
                                 window.set_title(&format!(
@@ -1213,7 +1248,11 @@ impl ApplicationHandler for RiftboundApp {
                                 log::info!(
                                     "Shardfall mission completed: +100 XP bonus, level {}{}",
                                     self.progression.level(),
-                                    if levels_gained > 0 { " (level up!)" } else { "" },
+                                    if levels_gained > 0 {
+                                        " (level up!)"
+                                    } else {
+                                        ""
+                                    },
                                 );
                             }
 
@@ -1262,7 +1301,9 @@ impl ApplicationHandler for RiftboundApp {
                                 "COLLECT RIFT SHARDS"
                             };
                             let prompt = if self.garage_open {
-                                Some(String::from("GARAGE: U ENGINE • H HANDLING/TIRES • G CLOSE"))
+                                Some(String::from(
+                                    "GARAGE: U ENGINE • H HANDLING/TIRES • G CLOSE",
+                                ))
                             } else if self.mission.is_complete() {
                                 None
                             } else if sentinel_can_be_disabled {
@@ -1325,9 +1366,8 @@ impl ApplicationHandler for RiftboundApp {
                                     self.inventory.clone(),
                                     self.equipment,
                                     self.progression,
-                                    self.checkpoint_progress.is_some_and(
-                                        CheckpointProgress::has_active_checkpoint,
-                                    ),
+                                    self.checkpoint_progress
+                                        .is_some_and(CheckpointProgress::has_active_checkpoint),
                                     Some(saved_position),
                                 );
                                 if let Err(error) = save::save_profile(&profile) {
@@ -1351,7 +1391,10 @@ impl ApplicationHandler for RiftboundApp {
                     let world_focus = if self.driving {
                         self.vehicle_state.position
                     } else {
-                        renderer.scene().get(player).map_or(self.camera_target, |transform| transform.translation)
+                        renderer
+                            .scene()
+                            .get(player)
+                            .map_or(self.camera_target, |transform| transform.translation)
                     };
                     if let (Some(streamer), Some(slot_map)) =
                         (self.world_streamer.as_mut(), self.world_slot_map.as_mut())
@@ -1993,7 +2036,9 @@ fn world_obstacle_footprints(chunks: &[WorldChunkRequest]) -> Vec<Aabb2> {
             riftbound_core::WorldChunkLod::Distant => 1_u32,
         };
         for index in 0..prop_count {
-            let selector = hash.rotate_left(index * 11).wrapping_add(index * 0x9E37_79B9);
+            let selector = hash
+                .rotate_left(index * 11)
+                .wrapping_add(index * 0x9E37_79B9);
             let side = if selector & 1 == 0 { -1.0 } else { 1.0 };
             let center_x = origin_x + side * (13.0 + (selector % 9) as f32);
             let center_z = origin_z + 10.0 + ((selector >> 8) % 40) as f32;
@@ -2002,17 +2047,11 @@ fn world_obstacle_footprints(chunks: &[WorldChunkRequest]) -> Vec<Aabb2> {
             // Keep generated props out of the primary road and both branch roads.
             // The extra margin accounts for the visible tree crown, not just its trunk.
             let main_road = world_road_sample(center_x, center_z);
-            let on_eastbound_spur = (0.0..=160.0).contains(&center_x)
-                && center_z.abs() <= 11.0;
-            let on_northbound_branch = (-132.0..=2.0).contains(&center_z)
-                && (center_x - 80.0).abs() <= 11.0;
-            let road_clearance = main_road.lateral_distance.abs()
-                > main_road.half_width + 3.0;
-            if selector % 5 != 0
-                && road_clearance
-                && !on_eastbound_spur
-                && !on_northbound_branch
-            {
+            let on_eastbound_spur = (0.0..=160.0).contains(&center_x) && center_z.abs() <= 11.0;
+            let on_northbound_branch =
+                (-132.0..=2.0).contains(&center_z) && (center_x - 80.0).abs() <= 11.0;
+            let road_clearance = main_road.lateral_distance.abs() > main_road.half_width + 3.0;
+            if selector % 5 != 0 && road_clearance && !on_eastbound_spur && !on_northbound_branch {
                 obstacles.push(Aabb2::new(
                     center_x - half_size,
                     center_x + half_size,
@@ -2112,7 +2151,6 @@ fn spawn_world_obstacle_props(
     }
 }
 
-
 #[cfg(test)]
 mod world_prop_tests {
     use super::*;
@@ -2174,26 +2212,11 @@ mod world_prop_tests {
 
     #[test]
     fn prop_silhouettes_follow_terrain_surface() {
-        assert_eq!(
-            world_prop_variant_for_surface(VehicleSurface::Snow, 0),
-            1
-        );
-        assert_eq!(
-            world_prop_variant_for_surface(VehicleSurface::Sand, 0),
-            2
-        );
-        assert_eq!(
-            world_prop_variant_for_surface(VehicleSurface::Mud, 0),
-            2
-        );
-        assert_eq!(
-            world_prop_variant_for_surface(VehicleSurface::Rock, 2),
-            1
-        );
-        assert_eq!(
-            world_prop_variant_for_surface(VehicleSurface::Gravel, 0),
-            0
-        );
+        assert_eq!(world_prop_variant_for_surface(VehicleSurface::Snow, 0), 1);
+        assert_eq!(world_prop_variant_for_surface(VehicleSurface::Sand, 0), 2);
+        assert_eq!(world_prop_variant_for_surface(VehicleSurface::Mud, 0), 2);
+        assert_eq!(world_prop_variant_for_surface(VehicleSurface::Rock, 2), 1);
+        assert_eq!(world_prop_variant_for_surface(VehicleSurface::Gravel, 0), 0);
         assert_eq!(
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2

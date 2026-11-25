@@ -74,9 +74,15 @@ fn encode(profile: &SavedProfile) -> String {
         item_code(profile.equipment.item(EquipmentSlot::Body)),
         item_code(profile.equipment.item(EquipmentSlot::Feet)),
         u8::from(profile.checkpoint_active),
-        profile.player_position.map_or_else(|| String::from("-"), |position| position.x.to_string()),
-        profile.player_position.map_or_else(|| String::from("-"), |position| position.y.to_string()),
-        profile.player_position.map_or_else(|| String::from("-"), |position| position.z.to_string()),
+        profile
+            .player_position
+            .map_or_else(|| String::from("-"), |position| position.x.to_string()),
+        profile
+            .player_position
+            .map_or_else(|| String::from("-"), |position| position.y.to_string()),
+        profile
+            .player_position
+            .map_or_else(|| String::from("-"), |position| position.z.to_string()),
     )
 }
 
@@ -100,13 +106,27 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     let handling = u8::try_from(number("handling")?).ok()?;
     let upgrades = VehicleUpgrades::from_levels(engine, handling)?;
     let xp = values.get("xp")?.parse::<u64>().ok()?;
-    let player_position = match (values.get("player_x"), values.get("player_y"), values.get("player_z")) {
+    let player_position = match (
+        values.get("player_x"),
+        values.get("player_y"),
+        values.get("player_z"),
+    ) {
         (None, None, None) | (Some("-"), Some("-"), Some("-")) => None,
         (Some(x), Some(y), Some(z)) => {
-            let position = Vec3::new(x.parse::<f32>().ok()?, y.parse::<f32>().ok()?, z.parse::<f32>().ok()?);
-            let valid = position.x.is_finite() && position.y.is_finite() && position.z.is_finite()
-                && position.x.abs() <= 100_000.0 && position.y.abs() <= 100_000.0 && position.z.abs() <= 100_000.0;
-            if !valid { return None; }
+            let position = Vec3::new(
+                x.parse::<f32>().ok()?,
+                y.parse::<f32>().ok()?,
+                z.parse::<f32>().ok()?,
+            );
+            let valid = position.x.is_finite()
+                && position.y.is_finite()
+                && position.z.is_finite()
+                && position.x.abs() <= 100_000.0
+                && position.y.abs() <= 100_000.0
+                && position.z.abs() <= 100_000.0;
+            if !valid {
+                return None;
+            }
             Some(position)
         }
         _ => return None,
@@ -135,8 +155,12 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     let body = decode_equipped(body_code, EquipmentSlot::Body)?;
     let feet = decode_equipped(feet_code, EquipmentSlot::Feet)?;
     let mut equipment = Equipment::default();
-    if let Some(item) = body { equipment.equip(item); }
-    if let Some(item) = feet { equipment.equip(item); }
+    if let Some(item) = body {
+        equipment.equip(item);
+    }
+    if let Some(item) = feet {
+        equipment.equip(item);
+    }
     Some(SavedProfile {
         upgrades,
         inventory,
@@ -149,8 +173,12 @@ fn decode(contents: &str) -> Option<SavedProfile> {
 
 /// Loads a profile, using a clean profile when no valid save exists.
 pub fn load_profile() -> SavedProfile {
-    let Ok(path) = save_path() else { return SavedProfile::default(); };
-    let Ok(contents) = fs::read_to_string(path) else { return SavedProfile::default(); };
+    let Ok(path) = save_path() else {
+        return SavedProfile::default();
+    };
+    let Ok(contents) = fs::read_to_string(path) else {
+        return SavedProfile::default();
+    };
     decode(&contents).unwrap_or_default()
 }
 
@@ -185,7 +213,10 @@ mod tests {
         assert_eq!(restored.upgrades.handling_level(), 3);
         assert_eq!(restored.inventory.count(ItemKind::Salvage), 17);
         assert_eq!(restored.inventory.count(ItemKind::Medkit), 2);
-        assert_eq!(restored.equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+        assert_eq!(
+            restored.equipment.item(EquipmentSlot::Body),
+            Some(ItemKind::ExplorerVest)
+        );
         assert_eq!(restored.progression.total_xp(), 375);
         assert!(restored.checkpoint_active);
         assert_eq!(restored.player_position, profile.player_position);
@@ -194,7 +225,8 @@ mod tests {
     #[test]
     fn legacy_profile_without_checkpoint_field_remains_loadable() {
         let profile = SavedProfile::default();
-        let legacy = encode(&profile).replace("checkpoint=0\nplayer_x=-\nplayer_y=-\nplayer_z=-\n", "");
+        let legacy =
+            encode(&profile).replace("checkpoint=0\nplayer_x=-\nplayer_y=-\nplayer_z=-\n", "");
         let restored = decode(&legacy).unwrap();
         assert!(!restored.checkpoint_active);
     }

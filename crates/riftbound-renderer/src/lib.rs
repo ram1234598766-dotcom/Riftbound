@@ -504,7 +504,9 @@ impl Renderer {
         changes: &riftbound_core::WorldChunkChanges,
         slot_map: &mut riftbound_core::WorldChunkSlotMap,
     ) -> bool {
-        let removed_slots: Vec<usize> = changes.removed().iter()
+        let removed_slots: Vec<usize> = changes
+            .removed()
+            .iter()
             .filter_map(|coord| slot_map.slot_for(*coord).map(|slot| slot.slot_index))
             .collect();
         if !slot_map.apply_changes(changes) {
@@ -514,7 +516,9 @@ impl Renderer {
             let _ = self.clear_world_terrain_chunk(slot_index);
         }
         for request in changes.added().iter().chain(changes.updated()) {
-            let Some(slot) = slot_map.slot_for(request.coord) else { return false; };
+            let Some(slot) = slot_map.slot_for(request.coord) else {
+                return false;
+            };
             if !self.set_world_terrain_chunk(slot.slot_index, request.coord, request.lod) {
                 return false;
             }
@@ -553,11 +557,13 @@ impl Renderer {
         let instance = InstanceRaw::from_matrix(model, [1.0; 4]);
         let mut bytes = Vec::with_capacity(80);
         append_instance_bytes(&mut bytes, &instance);
-        let instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("riftbound-world-terrain-instance"),
-            contents: &bytes,
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let instance_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("riftbound-world-terrain-instance"),
+                contents: &bytes,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
         self.world_terrain_slots[slot_index] = Some(WorldTerrainGpuSlot {
             coord,
             lod,
@@ -661,7 +667,10 @@ impl Renderer {
                 let _chunk_identity = (slot.coord, slot.lod);
                 pass.set_vertex_buffer(0, slot.mesh.vertex_buffer().slice(..));
                 pass.set_vertex_buffer(1, slot.instance_buffer.slice(..));
-                pass.set_index_buffer(slot.mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
+                pass.set_index_buffer(
+                    slot.mesh.index_buffer().slice(..),
+                    wgpu::IndexFormat::Uint16,
+                );
                 pass.draw_indexed(0..slot.mesh.index_count(), 0, 0..1);
             }
         }

@@ -104,21 +104,36 @@ impl Mesh {
     #[must_use]
     pub fn environment_tree(device: &wgpu::Device) -> Option<Self> {
         let (vertices, indices) = environment_tree_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-environment-tree-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-environment-tree-mesh",
+        )
     }
 
     /// Creates an irregular faceted boulder from joined low-poly rock forms.
     #[must_use]
     pub fn environment_boulder(device: &wgpu::Device) -> Option<Self> {
         let (vertices, indices) = environment_boulder_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-environment-boulder-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-environment-boulder-mesh",
+        )
     }
 
     /// Creates a compact three-lobed shrub mesh for dry and muddy biomes.
     #[must_use]
     pub fn environment_shrub(device: &wgpu::Device) -> Option<Self> {
         let (vertices, indices) = environment_shrub_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-environment-shrub-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-environment-shrub-mesh",
+        )
     }
 
     /// Creates a joined low-poly vehicle body with cabin, bumpers and lights.
@@ -425,7 +440,6 @@ fn environment_shrub_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-
 fn vehicle_body_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut vertices = Vec::with_capacity(144);
     let mut indices = Vec::with_capacity(216);
@@ -543,14 +557,7 @@ fn append_vehicle_wheel_arch(
     for segment in 0..segments {
         let start = base + segment * 2;
         let far = base + row + segment * 2;
-        indices.extend_from_slice(&[
-            start,
-            far,
-            start + 2,
-            start + 2,
-            far,
-            far + 2,
-        ]);
+        indices.extend_from_slice(&[start, far, start + 2, start + 2, far, far + 2]);
     }
 }
 
@@ -596,8 +603,22 @@ fn append_wheel_ring(
 fn vehicle_wheel_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut vertices = Vec::with_capacity(44);
     let mut indices = Vec::with_capacity(120);
-    append_wheel_ring(&mut vertices, &mut indices, 0.5, 0.24, [0.035, 0.045, 0.055], 12);
-    append_wheel_ring(&mut vertices, &mut indices, 0.27, 0.255, [0.58, 0.62, 0.66], 12);
+    append_wheel_ring(
+        &mut vertices,
+        &mut indices,
+        0.5,
+        0.24,
+        [0.035, 0.045, 0.055],
+        12,
+    );
+    append_wheel_ring(
+        &mut vertices,
+        &mut indices,
+        0.27,
+        0.255,
+        [0.58, 0.62, 0.66],
+        12,
+    );
     (vertices, indices)
 }
 
@@ -731,8 +752,7 @@ fn world_terrain_chunk_data(
     // Add the road ribbon only to chunks that fully contain its corridor.
     // This avoids drawing duplicate, translated copies in every streamed X column.
     let road_is_inside_chunk = (0..side).all(|z| {
-        let local_z =
-            -32.0 + f32::from(u8::try_from(z).expect("road row fits u8")) * step;
+        let local_z = -32.0 + f32::from(u8::try_from(z).expect("road row fits u8")) * step;
         let road = world_road_sample(origin_x, origin_z + local_z);
         let left = road.center_x - road.half_width - road.shoulder_width;
         let right = road.center_x + road.half_width + road.shoulder_width;
@@ -767,8 +787,8 @@ fn world_terrain_chunk_data(
         }
         for z in 0..cells {
             for band in 0..3 {
-                let top_left = road_start
-                    + u16::try_from(z * 4 + band).expect("road vertex index fits u16");
+                let top_left =
+                    road_start + u16::try_from(z * 4 + band).expect("road vertex index fits u16");
                 let top_right = top_left + 1;
                 let bottom_left = top_left + 4;
                 let bottom_right = bottom_left + 1;
@@ -798,8 +818,7 @@ fn world_terrain_chunk_data(
             let end_road = world_road_sample(origin_x, end_world_z);
             let start_height =
                 world_terrain_sample(start_road.center_x, start_world_z).height + 0.24;
-            let end_height =
-                world_terrain_sample(end_road.center_x, end_world_z).height + 0.24;
+            let end_height = world_terrain_sample(end_road.center_x, end_world_z).height + 0.24;
             let line_start = u16::try_from(vertices.len()).ok()?;
             let line_color = [0.95, 0.78, 0.28];
             vertices.extend_from_slice(&[
@@ -877,7 +896,11 @@ fn world_terrain_chunk_data(
                         [0.12, 0.14, 0.17]
                     };
                     vertices.push(MeshVertex {
-                        position: [*world_x - origin_x, sample.height + 0.23, world_z - origin_z],
+                        position: [
+                            *world_x - origin_x,
+                            sample.height + 0.23,
+                            world_z - origin_z,
+                        ],
                         color,
                     });
                 }
@@ -975,7 +998,11 @@ fn world_terrain_chunk_data(
                         [0.12, 0.14, 0.17]
                     };
                     vertices.push(MeshVertex {
-                        position: [world_x - origin_x, sample.height + 0.23, *world_z - origin_z],
+                        position: [
+                            world_x - origin_x,
+                            sample.height + 0.23,
+                            *world_z - origin_z,
+                        ],
                         color,
                     });
                 }
@@ -1015,19 +1042,35 @@ fn world_terrain_chunk_data(
                 let line_color = [0.95, 0.78, 0.28];
                 vertices.extend_from_slice(&[
                     MeshVertex {
-                        position: [80.0 - BRANCH_LINE_HALF_WIDTH - origin_x, start_height, start_z - origin_z],
+                        position: [
+                            80.0 - BRANCH_LINE_HALF_WIDTH - origin_x,
+                            start_height,
+                            start_z - origin_z,
+                        ],
                         color: line_color,
                     },
                     MeshVertex {
-                        position: [80.0 + BRANCH_LINE_HALF_WIDTH - origin_x, start_height, start_z - origin_z],
+                        position: [
+                            80.0 + BRANCH_LINE_HALF_WIDTH - origin_x,
+                            start_height,
+                            start_z - origin_z,
+                        ],
                         color: line_color,
                     },
                     MeshVertex {
-                        position: [80.0 - BRANCH_LINE_HALF_WIDTH - origin_x, end_height, end_z - origin_z],
+                        position: [
+                            80.0 - BRANCH_LINE_HALF_WIDTH - origin_x,
+                            end_height,
+                            end_z - origin_z,
+                        ],
                         color: line_color,
                     },
                     MeshVertex {
-                        position: [80.0 + BRANCH_LINE_HALF_WIDTH - origin_x, end_height, end_z - origin_z],
+                        position: [
+                            80.0 + BRANCH_LINE_HALF_WIDTH - origin_x,
+                            end_height,
+                            end_z - origin_z,
+                        ],
                         color: line_color,
                     },
                 ]);
@@ -1051,19 +1094,35 @@ fn world_terrain_chunk_data(
                         let deck_height = world_terrain_sample(rail_x, world_z).height;
                         vertices.extend_from_slice(&[
                             MeshVertex {
-                                position: [rail_x - 0.16 - origin_x, deck_height + 0.25, world_z - origin_z],
+                                position: [
+                                    rail_x - 0.16 - origin_x,
+                                    deck_height + 0.25,
+                                    world_z - origin_z,
+                                ],
                                 color: [0.42, 0.45, 0.48],
                             },
                             MeshVertex {
-                                position: [rail_x + 0.16 - origin_x, deck_height + 0.25, world_z - origin_z],
+                                position: [
+                                    rail_x + 0.16 - origin_x,
+                                    deck_height + 0.25,
+                                    world_z - origin_z,
+                                ],
                                 color: [0.42, 0.45, 0.48],
                             },
                             MeshVertex {
-                                position: [rail_x - 0.16 - origin_x, deck_height + 1.1, world_z - origin_z],
+                                position: [
+                                    rail_x - 0.16 - origin_x,
+                                    deck_height + 1.1,
+                                    world_z - origin_z,
+                                ],
                                 color: [0.58, 0.61, 0.64],
                             },
                             MeshVertex {
-                                position: [rail_x + 0.16 - origin_x, deck_height + 1.1, world_z - origin_z],
+                                position: [
+                                    rail_x + 0.16 - origin_x,
+                                    deck_height + 1.1,
+                                    world_z - origin_z,
+                                ],
                                 color: [0.58, 0.61, 0.64],
                             },
                         ]);
@@ -1333,10 +1392,22 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4 + 4 * 4);
-        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4 + 5 * 4 + 4 * 4);
-        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6);
-        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6);
+        assert_eq!(
+            detailed.0.len(),
+            81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4 + 4 * 4
+        );
+        assert_eq!(
+            distant.0.len(),
+            25 + 4 * 4 * 4 + 5 * 4 + 8 * 4 + 5 * 4 + 4 * 4
+        );
+        assert_eq!(
+            detailed.1.len(),
+            384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6
+        );
+        assert_eq!(
+            distant.1.len(),
+            96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6 + 4 * 3 * 6 + 4 * 6
+        );
         assert!(valid_index_data(detailed.0.len(), &detailed.1));
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
@@ -1399,12 +1470,8 @@ mod tests {
             assert_eq!(markings.len(), 32);
             for dash in 0..8 {
                 let segment = &markings[dash * 4..dash * 4 + 4];
-                assert!(
-                    (segment[1].position[0] - segment[0].position[0] - 0.24).abs() < 1.0e-4
-                );
-                assert!(
-                    (segment[3].position[0] - segment[2].position[0] - 0.24).abs() < 1.0e-4
-                );
+                assert!((segment[1].position[0] - segment[0].position[0] - 0.24).abs() < 1.0e-4);
+                assert!((segment[3].position[0] - segment[2].position[0] - 0.24).abs() < 1.0e-4);
                 assert!((segment[2].position[2] - segment[0].position[2] - 4.0).abs() < 1.0e-4);
                 assert!(
                     segment
@@ -1428,8 +1495,10 @@ mod tests {
                 assert_eq!(spur.len(), station_count * 4);
                 for station in 0..station_count {
                     let row = &spur[station * 4..station * 4 + 4];
-                    let world_x = first_x + f32::from(u8::try_from(station).expect("station fits u8")) * 8.0;
-                    let origin_x = f32::from(i16::try_from(chunk_x).expect("chunk x fits i16")) * 64.0;
+                    let world_x =
+                        first_x + f32::from(u8::try_from(station).expect("station fits u8")) * 8.0;
+                    let origin_x =
+                        f32::from(i16::try_from(chunk_x).expect("chunk x fits i16")) * 64.0;
                     assert!(row.iter().all(|vertex| {
                         (vertex.position[0] + origin_x - world_x).abs() < 1.0e-4
                     }));
@@ -1446,11 +1515,9 @@ mod tests {
     #[test]
     fn eastbound_spur_markings_keep_world_spacing_across_chunks_and_lods() {
         for side in [5, 9] {
-            for (chunk_x, first_dash, dash_count, station_count) in [
-                (0, 0.0, 4, 5),
-                (1, 32.0, 8, 9),
-                (2, 96.0, 8, 9),
-            ] {
+            for (chunk_x, first_dash, dash_count, station_count) in
+                [(0, 0.0, 4, 5), (1, 32.0, 8, 9), (2, 96.0, 8, 9)]
+            {
                 let (vertices, indices) =
                     world_terrain_chunk_data(chunk_x, 0, side).expect("spur marking chunk");
                 let primary_road_vertices = if chunk_x == 0 { side * 4 + 8 * 4 } else { 0 };
@@ -1466,9 +1533,7 @@ mod tests {
                     let origin_x =
                         f32::from(i16::try_from(chunk_x).expect("chunk fits i16")) * 64.0;
                     assert!((segment[0].position[0] + origin_x - world_start).abs() < 1.0e-4);
-                    assert!(
-                        (segment[2].position[0] - segment[0].position[0] - 4.0).abs() < 1.0e-4
-                    );
+                    assert!((segment[2].position[0] - segment[0].position[0] - 4.0).abs() < 1.0e-4);
                     assert!(
                         (segment[1].position[2] - segment[0].position[2] - 0.24).abs() < 1.0e-4
                     );
@@ -1486,11 +1551,9 @@ mod tests {
     #[test]
     fn northbound_branch_mesh_continues_across_streamed_chunks_and_lods() {
         for side in [5, 9] {
-            for (chunk_z, first_z, station_count, dash_count) in [
-                (0, 0.0, 5, 4),
-                (-1, -32.0, 9, 8),
-                (-2, -96.0, 5, 4),
-            ] {
+            for (chunk_z, first_z, station_count, dash_count) in
+                [(0, 0.0, 5, 4), (-1, -32.0, 9, 8), (-2, -96.0, 5, 4)]
+            {
                 let (vertices, indices) =
                     world_terrain_chunk_data(1, chunk_z, side).expect("northbound branch chunk");
                 let spur_vertices = if chunk_z == 0 { 9 * 4 + 8 * 4 } else { 0 };
@@ -1505,9 +1568,7 @@ mod tests {
                     let expected_start =
                         local_start - f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
                     assert!((segment[0].position[2] - expected_start).abs() < 1.0e-4);
-                    assert!(
-                        (segment[2].position[2] - segment[0].position[2] + 4.0).abs() < 1.0e-4
-                    );
+                    assert!((segment[2].position[2] - segment[0].position[2] + 4.0).abs() < 1.0e-4);
                     assert!(
                         segment
                             .iter()
@@ -1522,8 +1583,7 @@ mod tests {
     #[test]
     fn northbound_bridge_has_guardrails_and_support_piers_at_both_lods() {
         for side in [5, 9] {
-            let (vertices, indices) =
-                world_terrain_chunk_data(1, -1, side).expect("bridge chunk");
+            let (vertices, indices) = world_terrain_chunk_data(1, -1, side).expect("bridge chunk");
             let lower_rail_count = vertices
                 .iter()
                 .filter(|vertex| vertex.color == [0.42, 0.45, 0.48])
@@ -1728,7 +1788,6 @@ mod environment_mesh_tests {
         assert_ne!(boulder.0.len(), shrub.0.len());
     }
 }
-
 
 #[cfg(test)]
 mod vehicle_mesh_tests {

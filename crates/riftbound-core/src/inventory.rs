@@ -112,7 +112,9 @@ impl Inventory {
     /// Creates an inventory with the requested number of slots.
     #[must_use]
     pub fn new(slot_count: usize) -> Self {
-        Self { slots: vec![None; slot_count] }
+        Self {
+            slots: vec![None; slot_count],
+        }
     }
 
     /// Adds as many items as possible and returns the quantity that did not fit.
@@ -122,7 +124,12 @@ impl Inventory {
             return 0;
         }
         let limit = kind.max_stack();
-        for stack in self.slots.iter_mut().flatten().filter(|stack| stack.kind == kind) {
+        for stack in self
+            .slots
+            .iter_mut()
+            .flatten()
+            .filter(|stack| stack.kind == kind)
+        {
             let room = limit - stack.quantity;
             let added = room.min(remaining);
             stack.quantity += added;
@@ -134,7 +141,10 @@ impl Inventory {
         for slot in &mut self.slots {
             if slot.is_none() {
                 let added = limit.min(remaining);
-                *slot = Some(ItemStack { kind, quantity: added });
+                *slot = Some(ItemStack {
+                    kind,
+                    quantity: added,
+                });
                 remaining -= added;
                 if remaining == 0 {
                     return 0;
@@ -176,17 +186,16 @@ impl Inventory {
         self.remove(item, 1);
         if let Some(replaced) = equipment.equip(item) {
             let overflow = self.add(replaced, 1);
-            debug_assert_eq!(overflow, 0, "replacing equipment must free inventory capacity");
+            debug_assert_eq!(
+                overflow, 0,
+                "replacing equipment must free inventory capacity"
+            );
         }
         true
     }
 
     /// Moves equipped gear back into inventory when there is room.
-    pub fn unequip_to_inventory(
-        &mut self,
-        equipment: &mut Equipment,
-        slot: EquipmentSlot,
-    ) -> bool {
+    pub fn unequip_to_inventory(&mut self, equipment: &mut Equipment, slot: EquipmentSlot) -> bool {
         let Some(item) = equipment.item(slot) else {
             return false;
         };
@@ -326,7 +335,10 @@ mod tests {
             Some(ItemKind::ExplorerVest)
         );
         assert_eq!(equipment.armor_bonus(), 8);
-        assert_eq!(equipment.unequip(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+        assert_eq!(
+            equipment.unequip(EquipmentSlot::Body),
+            Some(ItemKind::ExplorerVest)
+        );
         assert_eq!(equipment.armor_bonus(), 0);
     }
 
@@ -339,12 +351,18 @@ mod tests {
 
         assert!(inventory.equip_from_inventory(&mut equipment, ItemKind::ExplorerVest));
         assert_eq!(inventory.count(ItemKind::ExplorerVest), 0);
-        assert_eq!(equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+        assert_eq!(
+            equipment.item(EquipmentSlot::Body),
+            Some(ItemKind::ExplorerVest)
+        );
 
         inventory.add(ItemKind::ExplorerVest, 1);
         assert!(inventory.equip_from_inventory(&mut equipment, ItemKind::ExplorerVest));
         assert_eq!(inventory.count(ItemKind::ExplorerVest), 1);
-        assert_eq!(equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+        assert_eq!(
+            equipment.item(EquipmentSlot::Body),
+            Some(ItemKind::ExplorerVest)
+        );
     }
 
     #[test]
@@ -355,7 +373,10 @@ mod tests {
         inventory.add(ItemKind::Salvage, 99);
 
         assert!(!inventory.unequip_to_inventory(&mut equipment, EquipmentSlot::Feet));
-        assert_eq!(equipment.item(EquipmentSlot::Feet), Some(ItemKind::TrailBoots));
+        assert_eq!(
+            equipment.item(EquipmentSlot::Feet),
+            Some(ItemKind::TrailBoots)
+        );
 
         inventory.remove(ItemKind::Salvage, 99);
         assert!(inventory.unequip_to_inventory(&mut equipment, EquipmentSlot::Feet));

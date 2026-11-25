@@ -17,7 +17,10 @@ impl PlayerProgression {
     /// Creates a level-one character with no earned experience.
     #[must_use]
     pub const fn new() -> Self {
-        Self { total_xp: 0, level: 1 }
+        Self {
+            total_xp: 0,
+            level: 1,
+        }
     }
 
     /// Restores progression from a saved lifetime XP total.
@@ -33,7 +36,10 @@ impl PlayerProgression {
                 high = midpoint - 1;
             }
         }
-        Self { total_xp, level: low }
+        Self {
+            total_xp,
+            level: low,
+        }
     }
 
     /// Adds experience and returns the number of levels gained.
@@ -66,7 +72,8 @@ impl PlayerProgression {
             return 0;
         }
         let n = (level - 1) as u64;
-        100_u64.saturating_mul(n)
+        100_u64
+            .saturating_mul(n)
             .saturating_add(25_u64.saturating_mul(n.saturating_mul(n.saturating_sub(1))))
     }
 

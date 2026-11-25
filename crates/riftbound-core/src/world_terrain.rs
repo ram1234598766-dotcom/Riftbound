@@ -96,25 +96,27 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     // Its fixed world-space bounds make the junction deterministic across chunks.
     let spur_distance = (world_z - 0.0).abs();
     let on_spur = (0.0..=160.0).contains(&world_x) && spur_distance <= 5.5;
-    let on_spur_shoulder =
-        (0.0..=162.5).contains(&world_x) && spur_distance <= 8.0 && !on_spur;
+    let on_spur_shoulder = (0.0..=162.5).contains(&world_x) && spur_distance <= 8.0 && !on_spur;
 
     // A northbound branch leaves the eastbound road at X=80 and runs
     // to Z=-128. Its fixed bounds make it stable across streamed chunks.
     let branch_distance = (world_x - 80.0).abs();
     let on_branch = (-128.0..=0.0).contains(&world_z) && branch_distance <= 5.5;
-    let on_branch_shoulder = (-130.5..=0.0).contains(&world_z)
-        && branch_distance <= 8.0
-        && !on_branch;
+    let on_branch_shoulder =
+        (-130.5..=0.0).contains(&world_z) && branch_distance <= 8.0 && !on_branch;
 
     // The north branch crosses a shallow ravine. A smooth 8-unit approach
     // raises the bridge deck by four units, and the same sample feeds vehicle
     // suspension so driving physics meets the rendered road surface.
-    let bridge_corridor = (72.0..=88.0).contains(&world_x)
-        && (-88.0..=-56.0).contains(&world_z);
+    let bridge_corridor = (72.0..=88.0).contains(&world_x) && (-88.0..=-56.0).contains(&world_z);
     let bridge_distance_to_ramp = (world_z + 88.0).min(-56.0 - world_z);
     let bridge_blend = smoothstep((bridge_distance_to_ramp / 8.0).clamp(0.0, 1.0));
-    let height = ground_height + if bridge_corridor { 4.0 * bridge_blend } else { 0.0 };
+    let height = ground_height
+        + if bridge_corridor {
+            4.0 * bridge_blend
+        } else {
+            0.0
+        };
 
     let surface = if road.is_on_road() || on_spur || on_branch {
         VehicleSurface::Asphalt
@@ -281,8 +283,8 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        WorldTerrainSample, world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
-        world_terrain_vehicle_surface,
+        WorldTerrainSample, world_road_sample, world_terrain_sample,
+        world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
     };
     use crate::VehicleSurface;
 
@@ -323,11 +325,7 @@ mod tests {
                 VehicleSurface::Asphalt
             );
             assert_eq!(
-                world_terrain_sample(
-                    road.center_x + road.half_width + 1.0,
-                    world_z
-                )
-                .surface,
+                world_terrain_sample(road.center_x + road.half_width + 1.0, world_z).surface,
                 VehicleSurface::Gravel
             );
         }
@@ -335,13 +333,34 @@ mod tests {
 
     #[test]
     fn eastbound_spur_has_asphalt_and_gravel_shoulders() {
-        assert_eq!(world_terrain_sample(16.0, 0.0).surface, VehicleSurface::Asphalt);
-        assert_eq!(world_terrain_sample(16.0, 6.5).surface, VehicleSurface::Gravel);
-        assert_ne!(world_terrain_sample(16.0, 10.0).surface, VehicleSurface::Asphalt);
-        assert_eq!(world_terrain_sample(32.0, 0.0).surface, VehicleSurface::Asphalt);
-        assert_eq!(world_terrain_sample(128.0, 0.0).surface, VehicleSurface::Asphalt);
-        assert_eq!(world_terrain_sample(128.0, 6.5).surface, VehicleSurface::Gravel);
-        assert_ne!(world_terrain_sample(164.0, 0.0).surface, VehicleSurface::Asphalt);
+        assert_eq!(
+            world_terrain_sample(16.0, 0.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            world_terrain_sample(16.0, 6.5).surface,
+            VehicleSurface::Gravel
+        );
+        assert_ne!(
+            world_terrain_sample(16.0, 10.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            world_terrain_sample(32.0, 0.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            world_terrain_sample(128.0, 0.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            world_terrain_sample(128.0, 6.5).surface,
+            VehicleSurface::Gravel
+        );
+        assert_ne!(
+            world_terrain_sample(164.0, 0.0).surface,
+            VehicleSurface::Asphalt
+        );
     }
 
     #[test]
@@ -349,8 +368,7 @@ mod tests {
         let ground_height = |world_x: f32, world_z: f32| {
             let broad = value_noise(world_x * 0.004, world_z * 0.004);
             let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
-            let ridge =
-                1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
+            let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
             broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0
         };
 
