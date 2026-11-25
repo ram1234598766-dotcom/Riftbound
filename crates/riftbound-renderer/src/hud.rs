@@ -318,6 +318,7 @@ mod tests {
             inventory: Some("SHARDS 3 SALV 2 MED 1".into()),
             equipment: "BODY VEST FEET BOOTS".into(),
             vehicle_info: Some("SPEED 48 KM/H • GRAVEL".into()),
+            vehicle_grip: Some(78),
         };
         let mut reused = Vec::with_capacity(4_096);
         build_vertices_into(&data, 1280, 720, &mut reused);
@@ -332,6 +333,25 @@ mod tests {
     }
 
     #[test]
+    fn vehicle_grip_panel_clamps_values_and_uses_warning_colors() {
+        let data = HudData {
+            vehicle_info: Some("SPEED 24 KM/H • SNOW".into()),
+            vehicle_grip: Some(30),
+            ..HudData::default()
+        };
+        let vertices = build_vertices(&data, 1280, 720);
+        assert!(vertices.iter().any(|vertex| vertex.color == [1.0, 0.36, 0.24, 1.0]));
+
+        let clamped = HudData {
+            vehicle_info: Some("SPEED 24 KM/H • SNOW".into()),
+            vehicle_grip: Some(255),
+            ..HudData::default()
+        };
+        let vertices = build_vertices(&clamped, 1280, 720);
+        assert!(vertices.iter().any(|vertex| vertex.color == [0.25, 0.88, 1.0, 1.0]));
+    }
+
+    #[test]
     fn hud_geometry_is_non_empty_and_finite() {
         let data = HudData {
             collected: 3,
@@ -343,6 +363,7 @@ mod tests {
             inventory: None,
             equipment: String::new(),
             vehicle_info: None,
+            vehicle_grip: None,
         };
         let vertices = build_vertices(&data, 1280, 720);
         assert_ne!(vertices.len(), 0);
