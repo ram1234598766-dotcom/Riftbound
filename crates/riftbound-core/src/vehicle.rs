@@ -936,8 +936,15 @@ impl SuspensionState {
             for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
                 let target = (ground_height + config.rest_length - chassis_height)
                     .clamp(0.0, config.max_travel);
+                // Rebound is damped slightly more than compression so the
+                // chassis settles after a landing instead of oscillating repeatedly.
+                let rebound_damping = if self.compression_velocity[index] < 0.0 {
+                    config.damping * 1.35
+                } else {
+                    config.damping
+                };
                 let acceleration = (target - self.compression[index]) * config.spring_strength
-                    - self.compression_velocity[index] * config.damping;
+                    - self.compression_velocity[index] * rebound_damping;
                 self.compression_velocity[index] += acceleration * step_dt;
                 self.compression[index] = (self.compression[index]
                     + self.compression_velocity[index] * step_dt)
@@ -1284,6 +1291,29 @@ mod tests {
         assert!(loads[1] > 0.0 && loads[1] < loads[2]);
         assert!(loads[2] < loads[3]);
         assert!(loads.iter().all(|load| (0.0..=1.25).contains(load)));
+    }
+
+    #[test]
+    fn suspension_rebound_uses_extra_damping_after_landing() {
+        let config = SuspensionConfig::default();
+        let mut state = SuspensionState {
+            compression: [0.5; 4],
+            compression_velocity: [-4.0; 4],
+            average_ground_height: 0.0,
+            average_ground_velocity: 0.0,
+            ground_reference_initialized: true,
+        };
+        let chassis_height = config.rest_length + 1.0;
+        let step = 1.0 / 60.0;
+        let expected_acceleration =
+            (0.0 - 0.5) * config.spring_strength - (-4.0 * config.damping * 1.35);
+        let expected_velocity = -4.0 + expected_acceleration * step;
+
+        state.update([0.0; 4], chassis_height, config, step);
+
+        assert!(state.compression_velocity[0] > -4.0);
+        assert!((state.compression_velocity[0] - expected_velocity).abs() < 0.001);
+        assert!(state.compression_velocity.iter().all(|velocity| velocity.is_finite()));
     }
 
     #[test]
