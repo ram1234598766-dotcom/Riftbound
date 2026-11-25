@@ -877,6 +877,26 @@ impl ApplicationHandler for RiftboundApp {
                             }
                         }
                     }
+                    if !self.driving {
+                        // Return the front wheels to center after the player exits the vehicle.
+                        self.vehicle_wheel_steering = smooth_wheel_steering(
+                            self.vehicle_wheel_steering,
+                            0.0,
+                            delta,
+                        );
+                        if let (Some(renderer), Some(wheels)) =
+                            (self.renderer.as_ref(), self.vehicle_wheels)
+                        {
+                            for wheel in wheels.iter().take(2) {
+                                if let Some(mut transform) =
+                                    renderer.scene().get(*wheel).copied()
+                                {
+                                    transform.rotation_radians.y = self.vehicle_wheel_steering;
+                                    self.animated_transforms.push((*wheel, transform));
+                                }
+                            }
+                        }
+                    }
                     if let Some(parts) = self.player_parts {
                         let horizontal_speed = (horizontal_velocity.x * horizontal_velocity.x
                             + horizontal_velocity.z * horizontal_velocity.z)
