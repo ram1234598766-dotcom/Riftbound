@@ -72,6 +72,17 @@ impl PlayerHealth {
         true
     }
 
+    /// Restores up to the requested health without exceeding the maximum.
+    /// Returns the number of health points actually restored.
+    pub fn heal(&mut self, amount: u8) -> u8 {
+        if amount == 0 || !self.is_alive() {
+            return 0;
+        }
+        let restored = amount.min(self.maximum - self.current);
+        self.current += restored;
+        restored
+    }
+
     /// Restores the player to full health and clears the protection timer.
     pub fn restore(&mut self) {
         self.current = self.maximum;
@@ -112,6 +123,19 @@ mod tests {
         health.restore();
         assert_eq!(health.current(), 40);
         assert!(health.is_alive());
+    }
+
+    #[test]
+    fn healing_is_bounded_and_does_not_revive_a_defeated_player() {
+        let mut health = PlayerHealth::new(80);
+        health.apply_damage(30, 1.0);
+        assert_eq!(health.heal(20), 20);
+        assert_eq!(health.current(), 70);
+        assert_eq!(health.heal(50), 10);
+        assert_eq!(health.current(), 80);
+        health.apply_damage(80, 1.0);
+        assert_eq!(health.heal(20), 0);
+        assert_eq!(health.current(), 0);
     }
 
     #[test]
