@@ -745,11 +745,8 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            traction,
-                            speed_multiplier,
-                            rolling_resistance,
-                            left_traction,
-                            right_traction,
+                            (traction, speed_multiplier, rolling_resistance),
+                            (left_traction, right_traction),
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
