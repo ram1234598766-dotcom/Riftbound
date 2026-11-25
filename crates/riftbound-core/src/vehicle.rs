@@ -125,9 +125,7 @@ impl VehicleSurfaceTracker {
         contacts: [VehicleSurface; 4],
     ) -> VehicleSurface {
         self.update(dominant_surface);
-        let current = self.response();
-        self.blend_from = [current.0, current.1, current.2];
-        self.target_response = [
+        let target = [
             contacts.iter().map(|surface| surface.traction()).sum::<f32>() * 0.25,
             contacts
                 .iter()
@@ -140,7 +138,12 @@ impl VehicleSurfaceTracker {
                 .sum::<f32>()
                 * 0.25,
         ];
-        self.blend_frames = 1;
+        if target != self.target_response {
+            let current = self.response();
+            self.blend_from = [current.0, current.1, current.2];
+            self.target_response = target;
+            self.blend_frames = 0;
+        }
         self.current
     }
 
@@ -714,6 +717,37 @@ mod tests {
         assert!((traction - expected_traction).abs() < 0.01);
         assert!((speed - expected_speed).abs() < 0.01);
         assert!((resistance - expected_resistance).abs() < 0.01);
+    }
+
+    #[test]
+    fn wheel_contact_blend_reaches_its_target_after_transition_frames() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let contacts = [VehicleSurface::Snow; 4];
+        tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        for _ in 0..VehicleSurfaceTracker::TRANSITION_FRAMES {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        }
+        let response = tracker.response();
+        assert!((response.0 - VehicleSurface::Snow.traction()).abs() < 0.0001);
+        assert!((response.1 - VehicleSurface::Snow.speed_multiplier()).abs() < 0.0001);
+        assert!((response.2 - VehicleSurface::Snow.rolling_resistance()).abs() < 0.0001);
+    }
+
+    #[test]
+    fn wheel_contact_blend_retargets_without_a_response_jump() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let snow = [VehicleSurface::Snow; 4];
+        let mud = [VehicleSurface::Mud; 4];
+        tracker.update_wheel_contacts(VehicleSurface::Asphalt, snow);
+        for _ in 0..7 {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, snow);
+        }
+        let before = tracker.response();
+        tracker.update_wheel_contacts(VehicleSurface::Mud, mud);
+        let after = tracker.response();
+        assert!((before.0 - after.0).abs() < 0.0001);
+        assert!((before.1 - after.1).abs() < 0.0001);
+        assert!((before.2 - after.2).abs() < 0.0001);
     }
 
     #[test]
