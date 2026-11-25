@@ -1019,7 +1019,12 @@ mod tests {
         }
 
         let before_bump = suspension.pose(config).average_ground_height;
-        let bump = suspension.update([0.48, 0.0, 0.0, 0.0], config.rest_length, config, 1.0 / 60.0);
+        let bump = suspension.update(
+            [0.48, 0.0, 0.0, 0.0],
+            config.rest_length,
+            config,
+            1.0 / 60.0,
+        );
         let raw_average = 0.12;
         assert!((bump.average_ground_height - before_bump).abs() < raw_average * 0.5);
         assert!(bump.average_ground_height.is_finite());
