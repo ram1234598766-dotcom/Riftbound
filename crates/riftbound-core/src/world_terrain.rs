@@ -200,7 +200,10 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{WorldTerrainSample, world_terrain_sample, world_terrain_vehicle_surface};
+    use super::{
+        WorldTerrainSample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+        world_terrain_vehicle_surface,
+    };
     use crate::VehicleSurface;
 
     #[test]
