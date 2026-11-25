@@ -630,6 +630,104 @@ fn world_terrain_chunk_data(
         }
     }
 
+    // The northbound branch occupies the X=1 column and descends from
+    // the eastbound spur through two streamed Z chunks.
+    if chunk_x == 1 {
+        let chunk_min_z = origin_z - 32.0;
+        let chunk_max_z = origin_z + 32.0;
+        let branch_max_z = chunk_max_z.min(0.0);
+        let branch_min_z = chunk_min_z.max(-128.0);
+        if branch_min_z <= branch_max_z {
+            let mut stations = Vec::with_capacity(10);
+            stations.push(branch_max_z);
+            for station in 1..20 {
+                let world_z = -f32::from(u8::try_from(station).ok()?) * 8.0;
+                if world_z < branch_max_z && world_z > branch_min_z {
+                    stations.push(world_z);
+                }
+            }
+            if branch_min_z < branch_max_z {
+                stations.push(branch_min_z);
+            }
+            let branch_start = u16::try_from(vertices.len()).ok()?;
+            for world_z in &stations {
+                for (band, offset) in [-8.0_f32, -5.5, 5.5, 8.0].into_iter().enumerate() {
+                    let world_x = 80.0 + offset;
+                    let sample = world_terrain_sample(world_x, *world_z);
+                    let color = if band == 0 || band == 3 {
+                        terrain_surface_color(VehicleSurface::Gravel)
+                    } else {
+                        [0.12, 0.14, 0.17]
+                    };
+                    vertices.push(MeshVertex {
+                        position: [world_x - origin_x, sample.height + 0.23, *world_z - origin_z],
+                        color,
+                    });
+                }
+            }
+            for station in 0..stations.len().saturating_sub(1) {
+                for band in 0..3 {
+                    let top_left = branch_start
+                        + u16::try_from(station * 4 + band).expect("branch vertex index fits u16");
+                    let top_right = top_left + 1;
+                    let bottom_left = top_left + 4;
+                    let bottom_right = bottom_left + 1;
+                    indices.extend_from_slice(&[
+                        top_left,
+                        top_right,
+                        bottom_left,
+                        top_right,
+                        bottom_right,
+                        bottom_left,
+                    ]);
+                }
+            }
+
+            // Yellow centre dashes are clipped by ownership, not duplicated
+            // at chunk borders, and retain their spacing at both terrain LODs.
+            const BRANCH_DASH_LENGTH: f32 = 4.0;
+            const BRANCH_DASH_STEP: f32 = 8.0;
+            const BRANCH_LINE_HALF_WIDTH: f32 = 0.12;
+            for dash in 0..16 {
+                let start_z = -f32::from(u8::try_from(dash).ok()?) * BRANCH_DASH_STEP;
+                let end_z = start_z - BRANCH_DASH_LENGTH;
+                if start_z > branch_max_z || end_z < branch_min_z {
+                    continue;
+                }
+                let start_height = world_terrain_sample(80.0, start_z).height + 0.27;
+                let end_height = world_terrain_sample(80.0, end_z).height + 0.27;
+                let line_start = u16::try_from(vertices.len()).ok()?;
+                let line_color = [0.95, 0.78, 0.28];
+                vertices.extend_from_slice(&[
+                    MeshVertex {
+                        position: [80.0 - BRANCH_LINE_HALF_WIDTH - origin_x, start_height, start_z - origin_z],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [80.0 + BRANCH_LINE_HALF_WIDTH - origin_x, start_height, start_z - origin_z],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [80.0 - BRANCH_LINE_HALF_WIDTH - origin_x, end_height, end_z - origin_z],
+                        color: line_color,
+                    },
+                    MeshVertex {
+                        position: [80.0 + BRANCH_LINE_HALF_WIDTH - origin_x, end_height, end_z - origin_z],
+                        color: line_color,
+                    },
+                ]);
+                indices.extend_from_slice(&[
+                    line_start,
+                    line_start + 2,
+                    line_start + 1,
+                    line_start + 1,
+                    line_start + 2,
+                    line_start + 3,
+                ]);
+            }
+        }
+    }
+
     // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
     // chunk. Each edge is generated from that chunk's own border samples, so
     // the overlap remains valid even when the two edge profiles differ.
@@ -972,6 +1070,32 @@ mod tests {
                             .iter()
                             .all(|vertex| vertex.color == [0.95, 0.78, 0.28])
                     );
+                }
+                assert!(valid_index_data(vertices.len(), &indices));
+            }
+        }
+    }
+
+    #[test]
+    fn northbound_branch_mesh_continues_across_streamed_chunks_and_lods() {
+        for side in [5, 9] {
+            for (chunk_z, first_z, station_count, dash_count) in [
+                (0, 0.0, 5, 4),
+                (-1, -32.0, 9, 8),
+                (-2, -96.0, 5, 4),
+            ] {
+                let (vertices, indices) =
+                    world_terrain_chunk_data(1, chunk_z, side).expect("northbound branch chunk");
+                let branch_start = side * side;
+                let markings_start = branch_start + station_count * 4;
+                let markings = &vertices[markings_start..markings_start + dash_count * 4];
+                for dash in 0..dash_count {
+                    let segment = &markings[dash * 4..dash * 4 + 4];
+                    let local_start = first_z - f32::from(i16::try_from(chunk_z).expect("chunk fits i16")) * 64.0;
+                    let expected_start = local_start - f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
+                    assert!((segment[0].position[2] - expected_start).abs() < 1.0e-4);
+                    assert!((segment[2].position[2] - segment[0].position[2] + 4.0).abs() < 1.0e-4);
+                    assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
                 }
                 assert!(valid_index_data(vertices.len(), &indices));
             }
