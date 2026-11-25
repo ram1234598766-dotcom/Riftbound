@@ -562,6 +562,33 @@ mod tests {
     }
 
     #[test]
+    fn suspension_pose_tracks_front_rear_pitch_and_left_right_roll() {
+        let config = SuspensionConfig::default();
+        let mut pitch_suspension = SuspensionState::default();
+        let mut pitch_pose = SuspensionPose::default();
+        let mut roll_suspension = SuspensionState::default();
+        let mut roll_pose = SuspensionPose::default();
+
+        for _ in 0..20 {
+            pitch_pose =
+                pitch_suspension.update([0.2, 0.2, 0.0, 0.0], 0.58, config, 0.05);
+            roll_pose =
+                roll_suspension.update([0.2, 0.0, 0.2, 0.0], 0.58, config, 0.05);
+        }
+
+        assert!(pitch_pose.pitch.abs() > 0.001);
+        assert!(pitch_pose.roll.abs() < 0.001);
+        assert!(roll_pose.roll.abs() > 0.001);
+        assert!(roll_pose.pitch.abs() < 0.001);
+        assert!(
+            pitch_pose.pitch.is_finite()
+                && pitch_pose.roll.is_finite()
+                && roll_pose.pitch.is_finite()
+                && roll_pose.roll.is_finite()
+        );
+    }
+
+    #[test]
     fn suspension_ignores_invalid_samples() {
         let mut suspension = SuspensionState::default();
         let before = suspension;
