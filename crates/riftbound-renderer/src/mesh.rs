@@ -874,7 +874,8 @@ mod tests {
             for (chunk_x, first_x, station_count) in [(0, 0.0, 5), (1, 32.0, 9), (2, 96.0, 9)] {
                 let (vertices, indices) =
                     world_terrain_chunk_data(chunk_x, 0, side).expect("spur chunk");
-                let spur_start = side * side + side * 4 + 8 * 4;
+                let road_vertices = if chunk_x == 0 { side * 4 + 8 * 4 } else { 0 };
+                let spur_start = side * side + road_vertices;
                 let spur = &vertices[spur_start..spur_start + station_count * 4];
                 assert_eq!(spur.len(), station_count * 4);
                 for station in 0..station_count {
