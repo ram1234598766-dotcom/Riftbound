@@ -140,18 +140,19 @@ impl VehicleSurfaceTracker {
         dominant_surface: VehicleSurface,
         contacts: [VehicleSurface; 4],
     ) -> VehicleSurface {
+        let response_before_update = self.response();
+        let side_before_update = self.side_traction();
         self.update(dominant_surface);
-        self.side_blend_frames = self
-            .side_blend_frames
-            .saturating_add(1)
-            .min(Self::TRANSITION_FRAMES);
         let side_target = [
             (contacts[0].traction() + contacts[2].traction()) * 0.5,
             (contacts[1].traction() + contacts[3].traction()) * 0.5,
         ];
+        self.side_blend_frames = self
+            .side_blend_frames
+            .saturating_add(1)
+            .min(Self::TRANSITION_FRAMES);
         if side_target != self.side_target {
-            let current = self.side_traction();
-            self.side_blend_from = [current.0, current.1];
+            self.side_blend_from = [side_before_update.0, side_before_update.1];
             self.side_target = side_target;
             self.side_blend_frames = 0;
         }
@@ -173,8 +174,11 @@ impl VehicleSurfaceTracker {
                 * 0.25,
         ];
         if target != self.target_response {
-            let current = self.response();
-            self.blend_from = [current.0, current.1, current.2];
+            self.blend_from = [
+                response_before_update.0,
+                response_before_update.1,
+                response_before_update.2,
+            ];
             self.target_response = target;
             self.blend_frames = 0;
         }
@@ -783,8 +787,10 @@ mod tests {
         assert!((speed - expected_speed).abs() < 0.01);
         assert!((resistance - expected_resistance).abs() < 0.01);
         let (left, right) = tracker.side_traction();
-        assert!((left - VehicleSurface::Asphalt.traction()).abs() < 0.01);
-        assert!((right - VehicleSurface::Snow.traction()).abs() < 0.01);
+        let expected_side_grip =
+            (VehicleSurface::Asphalt.traction() + VehicleSurface::Snow.traction()) * 0.5;
+        assert!((left - expected_side_grip).abs() < 0.01);
+        assert!((right - expected_side_grip).abs() < 0.01);
     }
 
     #[test]
