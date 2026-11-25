@@ -98,9 +98,17 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     let on_spur = (0.0..=160.0).contains(&world_x) && spur_distance <= 5.5;
     let on_spur_shoulder =
         (0.0..=162.5).contains(&world_x) && spur_distance <= 8.0 && !on_spur;
-    let surface = if road.is_on_road() || on_spur {
+
+    // A northbound branch leaves the eastbound road at X=80 and runs
+    // to Z=-128. Its fixed bounds make it stable across streamed chunks.
+    let branch_distance = (world_x - 80.0).abs();
+    let on_branch = (-128.0..=0.0).contains(&world_z) && branch_distance <= 5.5;
+    let on_branch_shoulder = (-130.5..=0.0).contains(&world_z)
+        && branch_distance <= 8.0
+        && !on_branch;
+    let surface = if road.is_on_road() || on_spur || on_branch {
         VehicleSurface::Asphalt
-    } else if road.is_on_road_corridor() || on_spur_shoulder {
+    } else if road.is_on_road_corridor() || on_spur_shoulder || on_branch_shoulder {
         VehicleSurface::Gravel
     } else if world_z < -650.0 {
         VehicleSurface::Snow
@@ -324,6 +332,28 @@ mod tests {
         assert_eq!(world_terrain_sample(128.0, 0.0).surface, VehicleSurface::Asphalt);
         assert_eq!(world_terrain_sample(128.0, 6.5).surface, VehicleSurface::Gravel);
         assert_ne!(world_terrain_sample(164.0, 0.0).surface, VehicleSurface::Asphalt);
+    }
+
+    #[test]
+    fn northbound_branch_has_asphalt_and_gravel_shoulders() {
+        for world_z in [-16.0, -64.0, -120.0, -128.0] {
+            assert_eq!(
+                world_terrain_sample(80.0, world_z).surface,
+                VehicleSurface::Asphalt
+            );
+            assert_eq!(
+                world_terrain_sample(86.5, world_z).surface,
+                VehicleSurface::Gravel
+            );
+        }
+        assert_ne!(
+            world_terrain_sample(80.0, -136.0).surface,
+            VehicleSurface::Asphalt
+        );
+        assert_ne!(
+            world_terrain_sample(96.0, -64.0).surface,
+            VehicleSurface::Asphalt
+        );
     }
 
     #[test]
