@@ -862,7 +862,7 @@ mod tests {
             for station in 0..5 {
                 let row = &spur[station * 4..station * 4 + 4];
                 let world_x = f32::from(u8::try_from(station).expect("station fits u8")) * 8.0;
-                assert!(row.iter().all(|vertex| (vertex.position[0] + 32.0 - world_x).abs() < 1.0e-4));
+                assert!(row.iter().all(|vertex| (vertex.position[0] - world_x).abs() < 1.0e-4));
                 assert!(row.iter().all(|vertex| vertex.position[1] > -30.0));
                 assert!((row[1].position[2] - row[0].position[2] - 2.5).abs() < 1.0e-4);
             }
