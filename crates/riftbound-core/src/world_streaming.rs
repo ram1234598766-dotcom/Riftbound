@@ -231,6 +231,14 @@ impl WorldChunkSlotMap {
             return false;
         }
 
+        // Validate the final change set before mutating slots. This keeps the
+        // operation atomic even when a caller supplies a malformed update.
+        for updated in &changes.updated {
+            if changes.added.iter().any(|added| added.coord == updated.coord) {
+                return false;
+            }
+        }
+
         for removed in &changes.removed {
             let Some(slot) = self
                 .slots
