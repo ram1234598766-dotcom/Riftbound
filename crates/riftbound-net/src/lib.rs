@@ -7,7 +7,7 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use axum::{
@@ -39,6 +39,7 @@ const EXTRACTION_POSITION: (f32, f32) = (1100.0, 750.0);
 const PLAYER_SPEED: f32 = 230.0;
 const MAX_INPUT_DELTA: f32 = 0.1;
 const MAX_PLAYERS: usize = 16;
+const MIN_MOVE_INTERVAL: Duration = Duration::from_millis(16);
 const PLAYER_RADIUS: f32 = 15.0;
 const WORLD_OBSTACLES: [(f32, f32, f32, f32); 11] = [
     (650.0, 170.0, 42.0, 350.0),
@@ -269,15 +270,17 @@ async fn handle_client_message(
             let (Some(dx), Some(dy), Some(face)) = (input.dx, input.dy, input.face) else {
                 return false;
             };
-            if !dx.is_finite() || !dy.is_finite() || !face.is_finite() {
+            if !is_valid_move_input(dx, dy, face) {
                 return false;
             }
+            let now = Instant::now();
+            let interval = now.duration_since(*last_input_at);
+            if interval < MIN_MOVE_INTERVAL {
+                return false;
+            }
+            let elapsed = interval.as_secs_f32().min(MAX_INPUT_DELTA);
+            *last_input_at = now;
             let magnitude = dx.hypot(dy);
-            if magnitude > 1.01 {
-                return false;
-            }
-            let elapsed = last_input_at.elapsed().as_secs_f32().min(MAX_INPUT_DELTA);
-            *last_input_at = Instant::now();
             let mut players = state.players.lock().await;
             if let Some(player) = players.get_mut(&id) {
                 let scale = if magnitude > 1.0 {
@@ -432,6 +435,13 @@ fn within_extraction_range(x: f32, y: f32) -> bool {
     (x - EXTRACTION_POSITION.0).hypot(y - EXTRACTION_POSITION.1) <= 90.0
 }
 
+fn is_valid_move_input(dx: f32, dy: f32, face: f32) -> bool {
+    dx.is_finite()
+        && dy.is_finite()
+        && face.is_finite()
+        && dx.hypot(dy) <= 1.01
+}
+
 fn can_accept_player(current_players: usize) -> bool {
     current_players < MAX_PLAYERS
 }
@@ -443,6 +453,17 @@ fn clamp_world_position(value: f32, maximum: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn movement_input_rejects_non_finite_and_excessive_values() {
+        assert!(is_valid_move_input(0.0, 0.0, 0.0));
+        assert!(is_valid_move_input(1.0, 1.0, 0.0));
+        assert!(!is_valid_move_input(f32::NAN, 0.0, 0.0));
+        assert!(!is_valid_move_input(0.0, f32::INFINITY, 0.0));
+        assert!(!is_valid_move_input(0.0, 0.0, f32::NEG_INFINITY));
+        assert!(!is_valid_move_input(1.0, 1.0, 0.0_f32) || 1.0_f32.hypot(1.0) <= 1.01);
+        assert!(!is_valid_move_input(1.1, 0.0, 0.0));
+    }
 
     #[test]
     fn host_rejects_connections_after_player_capacity_is_reached() {
