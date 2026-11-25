@@ -86,7 +86,10 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
         };
     }
 
-    let ground_height = procedural_ground_height(world_x, world_z);
+    let broad = value_noise(world_x * 0.004, world_z * 0.004);
+    let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
+    let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
+    let ground_height = broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0;
 
     let road = world_road_sample(world_x, world_z);
     // A short eastbound spur branches from the primary road at the origin.
@@ -112,16 +115,29 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     // This avoids a vertical height discontinuity where the bridge meets terrain.
     let bridge_distance_to_edge = (world_x - 72.0).min(88.0 - world_x);
     let bridge_side_blend = smoothstep((bridge_distance_to_edge / 2.0).clamp(0.0, 1.0));
-    let road_blend = if road.lateral_distance <= road.half_width {
-        1.0
-    } else {
-        let shoulder_progress =
-            ((road.lateral_distance - road.half_width) / road.shoulder_width).clamp(0.0, 1.0);
-        1.0 - smoothstep(shoulder_progress)
-    };
+    let road_blend = corridor_blend(road.lateral_distance, road.half_width, road.shoulder_width);
     let road_bed_height = procedural_ground_height(road.center_x, world_z);
+
+    let spur_blend = if (0.0..=160.0).contains(&world_x) {
+        corridor_blend(spur_distance, 5.5, 2.5)
+    } else {
+        0.0
+    };
+    let spur_bed_height = procedural_ground_height(world_x, 0.0);
+
+    let branch_blend = if (-128.0..=0.0).contains(&world_z) {
+        corridor_blend(branch_distance, 5.5, 2.5)
+    } else {
+        0.0
+    };
+    let branch_bed_height = procedural_ground_height(80.0, world_z);
+
+    // Blend each corridor independently. Their centre lines meet at matching
+    // junction elevations, so streamed chunks sample the same continuous road bed.
     let road_adjusted_height = lerp(ground_height, road_bed_height, road_blend);
-    let height = road_adjusted_height
+    let spur_adjusted_height = lerp(road_adjusted_height, spur_bed_height, spur_blend);
+    let branch_adjusted_height = lerp(spur_adjusted_height, branch_bed_height, branch_blend);
+    let height = branch_adjusted_height
         + if bridge_corridor {
             4.0 * bridge_blend * bridge_side_blend
         } else {
@@ -299,6 +315,16 @@ const fn surface_index(surface: VehicleSurface) -> usize {
         VehicleSurface::Sand => 3,
         VehicleSurface::Snow => 4,
         VehicleSurface::Rock => 5,
+    }
+}
+
+fn corridor_blend(lateral_distance: f32, half_width: f32, shoulder_width: f32) -> f32 {
+    if lateral_distance <= half_width {
+        1.0
+    } else {
+        let shoulder_progress =
+            ((lateral_distance - half_width) / shoulder_width).clamp(0.0, 1.0);
+        1.0 - smoothstep(shoulder_progress)
     }
 }
 
@@ -613,6 +639,21 @@ mod tests {
         let natural_shoulder =
             procedural_ground_height(road.center_x + road.half_width + road.shoulder_width * 0.5, 240.0);
         assert!((shoulder - center).abs() <= (natural_shoulder - center).abs());
+    }
+
+    #[test]
+    fn eastbound_spur_and_northbound_branch_have_continuous_road_beds() {
+        let spur_center = world_terrain_sample(80.0, 0.0).height;
+        let spur_left = world_terrain_sample(80.0, -3.0).height;
+        let spur_right = world_terrain_sample(80.0, 3.0).height;
+        assert!((spur_left - spur_center).abs() < 1.0e-5);
+        assert!((spur_right - spur_center).abs() < 1.0e-5);
+
+        let branch_center = world_terrain_sample(80.0, -40.0).height;
+        let branch_left = world_terrain_sample(77.0, -40.0).height;
+        let branch_right = world_terrain_sample(83.0, -40.0).height;
+        assert!((branch_left - branch_center).abs() < 1.0e-5);
+        assert!((branch_right - branch_center).abs() < 1.0e-5);
     }
 
     #[test]
