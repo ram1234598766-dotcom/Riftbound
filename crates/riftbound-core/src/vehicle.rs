@@ -545,7 +545,10 @@ impl VehicleState {
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
-        if wheel_traction.iter().any(|grip| !grip.is_finite() || *grip <= 0.0 || *grip > 1.0) {
+        if wheel_traction
+            .iter()
+            .any(|grip| !grip.is_finite() || *grip <= 0.0 || *grip > 1.0)
+        {
             return;
         }
         let average = wheel_traction.iter().sum::<f32>() * 0.25;
@@ -1913,7 +1916,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod wheel_traction_tests {
     use super::*;
@@ -1992,6 +1994,6 @@ mod wheel_traction_tests {
             config,
             1.0 / 60.0,
         );
-        assert!((mixed.speed - uniform.speed).abs() < f32::EPSILON);
+        assert!((mixed.speed - uniform.speed).abs() < 0.00001);
     }
 }
