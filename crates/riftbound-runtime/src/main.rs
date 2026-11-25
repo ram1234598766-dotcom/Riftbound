@@ -70,6 +70,7 @@ struct RiftboundApp {
     inventory: Inventory,
     equipment: Equipment,
     inventory_open: bool,
+    garage_open: bool,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -209,6 +210,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.inventory.add(ItemKind::Medkit, 2);
                 self.equipment = Equipment::default();
                 self.inventory_open = false;
+                self.garage_open = false;
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
                 self.loot_entities = loot_entities;
@@ -324,39 +326,43 @@ impl ApplicationHandler for RiftboundApp {
                     if event.state == ElementState::Pressed && key == KeyCode::KeyI {
                         self.inventory_open = !self.inventory_open;
                     }
-                    if event.state == ElementState::Pressed && key == KeyCode::KeyU {
+                    if event.state == ElementState::Pressed && key == KeyCode::KeyG {
                         let near_vehicle = self.driving
-                            || self
-                                .renderer
-                                .as_ref()
-                                .and_then(|renderer| {
-                                    self.player.and_then(|player| {
-                                        renderer.scene().get(player).copied()
-                                    })
-                                })
-                                .is_some_and(|player| {
-                                    distance_squared(
-                                        player.translation,
-                                        self.vehicle_state.position,
-                                    ) <= 3.5 * 3.5
-                                });
-                        if !near_vehicle {
-                            log::info!("Move near your vehicle or enter it to tune the engine");
-                        } else if self
-                            .vehicle_upgrades
-                            .purchase_engine_upgrade(&mut self.inventory)
-                        {
-                            log::info!(
-                                "Engine upgraded to tier {}: acceleration and top speed increased",
-                                self.vehicle_upgrades.engine_level()
-                            );
-                        } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
-                            log::info!(
-                                "Engine upgrade needs {cost} Salvage; you have {}",
-                                self.inventory.count(ItemKind::Salvage)
-                            );
+                            || self.renderer.as_ref().and_then(|renderer| {
+                                self.player.and_then(|player| renderer.scene().get(player).copied())
+                            }).is_some_and(|player| {
+                                distance_squared(player.translation, self.vehicle_state.position) <= 3.5 * 3.5
+                            });
+                        if near_vehicle {
+                            self.garage_open = !self.garage_open;
+                            log::info!("{}", if self.garage_open {
+                                "GARAGE OPEN: U engine upgrade, H handling/tires, G close"
+                            } else { "Garage closed" });
                         } else {
-                            log::info!("Engine is already at maximum tier");
+                            log::info!("Move near your vehicle to open the garage");
+                        }
+                    }
+                    if event.state == ElementState::Pressed && self.garage_open {
+                        match key {
+                            KeyCode::KeyU => {
+                                if self.vehicle_upgrades.purchase_engine_upgrade(&mut self.inventory) {
+                                    log::info!("Engine upgraded to tier {}", self.vehicle_upgrades.engine_level());
+                                } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
+                                    log::info!("Engine upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
+                                } else {
+                                    log::info!("Engine is already at maximum tier");
+                                }
+                            }
+                            KeyCode::KeyH => {
+                                if self.vehicle_upgrades.purchase_handling_upgrade(&mut self.inventory) {
+                                    log::info!("Handling and tires upgraded to tier {}", self.vehicle_upgrades.handling_level());
+                                } else if let Some(cost) = self.vehicle_upgrades.next_handling_cost() {
+                                    log::info!("Handling upgrade needs {cost} Salvage; you have {}", self.inventory.count(ItemKind::Salvage));
+                                } else {
+                                    log::info!("Handling and tires are already at maximum tier");
+                                }
+                            }
+                            _ => {}
                         }
                     }
                     if event.state == ElementState::Pressed {
@@ -1126,7 +1132,9 @@ impl ApplicationHandler for RiftboundApp {
                             } else {
                                 "COLLECT RIFT SHARDS"
                             };
-                            let prompt = if self.mission.is_complete() {
+                            let prompt = if self.garage_open {
+                                Some(String::from("GARAGE: U ENGINE • H HANDLING/TIRES • G CLOSE"))
+                            } else if self.mission.is_complete() {
                                 None
                             } else if sentinel_can_be_disabled {
                                 Some(String::from("F - DISABLE SENTINEL"))
@@ -1150,13 +1158,13 @@ impl ApplicationHandler for RiftboundApp {
                                 prompt,
                                 health: self.player_health.current(),
                                 max_health: self.player_health.maximum(),
-                                inventory: self.inventory_open.then(|| {
+                                inventory: (self.inventory_open || self.garage_open).then(|| {
                                     format!(
-                                        "SHARDS {} SALV {} MED {} ENG {}",
-                                        self.inventory.count(ItemKind::RiftShard),
+                                        "{} SALV {} ENG {} HAND {}",
+                                        if self.garage_open { "GARAGE" } else { "SHARDS" },
                                         self.inventory.count(ItemKind::Salvage),
-                                        self.inventory.count(ItemKind::Medkit),
                                         self.vehicle_upgrades.engine_level(),
+                                        self.vehicle_upgrades.handling_level(),
                                     )
                                 }),
                                 equipment: format!(
