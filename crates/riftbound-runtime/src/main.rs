@@ -1574,7 +1574,7 @@ fn spawn_world_obstacle_props(
         let variant = world_prop_variant_for_surface(terrain.surface, base_variant);
 
         match variant {
-            // A two-part tree silhouette: narrow trunk and broad faceted crown.
+            // One joined tree mesh keeps streamed vegetation to a single draw instance.
             0 => {
                 let tree = Transform3::new(
                     Vec3::new(x, ground + 1.25, z),
@@ -1586,7 +1586,7 @@ fn spawn_world_obstacle_props(
                     entity_ids.push(id);
                 }
             }
-            // Angular boulders use the existing low-poly pyramid mesh.
+            // Joined faceted forms give boulders a less uniform silhouette.
             1 => {
                 let height = 0.85 + half_x * 0.5;
                 let rock = Transform3::new(
@@ -1599,7 +1599,7 @@ fn spawn_world_obstacle_props(
                     entity_ids.push(id);
                 }
             }
-            // Low shrubs fill the gaps without adding expensive geometry.
+            // A compact joined shrub mesh adds foliage without separate scene parts.
             _ => {
                 let shrub = Transform3::new(
                     Vec3::new(x, ground + 0.38, z),
