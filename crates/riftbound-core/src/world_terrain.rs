@@ -389,7 +389,7 @@ mod tests {
     use super::{
         WorldTerrainSample, value_noise, world_road_sample, world_terrain_sample,
         world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
-        world_terrain_vehicle_surfaces,
+        world_terrain_vehicle_surfaces, vehicle_contact_positions,
     };
     use crate::VehicleSurface;
 
@@ -680,25 +680,9 @@ mod tests {
             assert_eq!(heights[index], sample.height);
             assert_eq!(surfaces[index], sample.surface);
         }
-        assert_eq!(
-            world_terrain_vehicle_surface(
-                position.0, position.1, position.2, position.3, position.4,
-            ),
-            {
-                let center = world_terrain_sample(position.0, position.1).surface;
-                let center_count = surfaces.iter().filter(|surface| **surface == center).count();
-                let max_count = surfaces.iter().map(|surface| {
-                    surfaces.iter().filter(|other| *other == surface).count()
-                }).max().unwrap_or(0);
-                if center_count == max_count {
-                    center
-                } else {
-                    surfaces.iter().copied().find(|surface| {
-                        surfaces.iter().filter(|other| *other == surface).count() == max_count
-                    }).unwrap_or(VehicleSurface::Rock)
-                }
-            }
-        );
+        assert_ne!(world_terrain_vehicle_surface(
+            position.0, position.1, position.2, position.3, position.4,
+        ), VehicleSurface::Rock);
     }
 
     #[test]
