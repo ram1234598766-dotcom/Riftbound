@@ -25,12 +25,8 @@ use winit::{
 };
 
 const PLAYER_RADIUS: f32 = 0.19;
-const VEHICLE_WHEEL_OFFSETS: [(f32, f32); 4] = [
-    (-0.78, -1.32),
-    (0.78, -1.32),
-    (-0.78, 1.32),
-    (0.78, 1.32),
-];
+const VEHICLE_WHEEL_OFFSETS: [(f32, f32); 4] =
+    [(-0.78, -1.32), (0.78, -1.32), (-0.78, 1.32), (0.78, 1.32)];
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
