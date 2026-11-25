@@ -68,6 +68,7 @@ struct RiftboundApp {
     lan_server_started: bool,
     world_streamer: Option<riftbound_core::WorldChunkStreamer>,
     world_slot_map: Option<riftbound_core::WorldChunkSlotMap>,
+    world_obstacle_entities: Vec<EntityId>,
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -159,6 +160,18 @@ impl ApplicationHandler for RiftboundApp {
                 if !renderer.sync_world_terrain(world_streamer.changes(), &mut world_slot_map) {
                     log::error!("Initial world terrain chunk synchronization failed");
                 }
+                let mut world_obstacle_entities = Vec::new();
+                let mut scene_with_props = renderer.scene().clone();
+                spawn_world_obstacle_props(
+                    &mut scene_with_props,
+                    &world_streamer.active_chunks(),
+                    &mut world_obstacle_entities,
+                );
+                if let Err(error) = renderer.set_scene(scene_with_props) {
+                    log::error!("Could not initialize streamed world props: {error}");
+                    event_loop.exit();
+                    return;
+                }
                 renderer.follow_camera(player_transform.translation);
                 self.camera_target = player_transform.translation;
                 log::info!("Riftbound arena, player, and collision world initialized");
@@ -167,6 +180,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.renderer = Some(renderer);
                 self.world_streamer = Some(world_streamer);
                 self.world_slot_map = Some(world_slot_map);
+                self.world_obstacle_entities = world_obstacle_entities;
                 self.player = Some(player);
                 self.player_parts = Some(player_parts);
                 self.vehicle = Some(vehicle);
@@ -964,6 +978,15 @@ impl ApplicationHandler for RiftboundApp {
                             if let Some(collision) = self.collision.as_mut() {
                                 sync_world_collision(collision, streamer.active_chunks());
                             }
+                            let mut updated_scene = renderer.scene().clone();
+                            spawn_world_obstacle_props(
+                                &mut updated_scene,
+                                streamer.active_chunks(),
+                                &mut self.world_obstacle_entities,
+                            );
+                            if let Err(error) = renderer.set_scene(updated_scene) {
+                                log::error!("World obstacle prop synchronization failed: {error}");
+                            }
                         }
                     }
                     renderer.render();
@@ -1453,39 +1476,67 @@ fn world_collision_world() -> CollisionWorld {
     ))
 }
 
-/// Rebuilds collision footprints from the same bounded chunk window as terrain streaming.
+/// Deterministic obstacle footprints for each active terrain chunk.
 #[allow(clippy::cast_precision_loss)] // Chunk indices and generated offsets are tightly bounded.
-fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
+fn world_obstacle_footprints(chunks: &[WorldChunkRequest]) -> Vec<Aabb2> {
     let mut obstacles = Vec::with_capacity(chunks.len() * 2);
     for request in chunks {
-        let chunk_x = request.coord.x;
-        let chunk_z = request.coord.z;
-        let mut hash = chunk_x.cast_unsigned().wrapping_mul(0x9E37_79B9)
-            ^ chunk_z.cast_unsigned().wrapping_mul(0x85EB_CA6B);
+        let mut hash = request.coord.x.cast_unsigned().wrapping_mul(0x9E37_79B9)
+            ^ request.coord.z.cast_unsigned().wrapping_mul(0x85EB_CA6B);
         hash ^= hash >> 16;
         hash = hash.wrapping_mul(0x7FEB_352D);
         hash ^= hash >> 15;
-
-        let origin_x = chunk_x as f32 * WORLD_CHUNK_SIZE;
-        let origin_z = chunk_z as f32 * WORLD_CHUNK_SIZE;
+        let origin_x = request.coord.x as f32 * WORLD_CHUNK_SIZE;
+        let origin_z = request.coord.z as f32 * WORLD_CHUNK_SIZE;
         for index in 0..2_u32 {
             let selector = hash.rotate_left(index * 11).wrapping_add(index * 0x9E37_79B9);
-            // Keep generated props away from the central road corridor.
             let side = if selector & 1 == 0 { -1.0 } else { 1.0 };
             let center_x = origin_x + side * (13.0 + (selector % 9) as f32);
             let center_z = origin_z + 10.0 + ((selector >> 8) % 40) as f32;
             let half_size = 0.65 + ((selector >> 16) % 8) as f32 * 0.12;
             if selector % 5 != 0 {
                 obstacles.push(Aabb2::new(
-                    center_x - half_size,
-                    center_x + half_size,
-                    center_z - half_size,
-                    center_z + half_size,
+                    center_x - half_size, center_x + half_size,
+                    center_z - half_size, center_z + half_size,
                 ));
             }
         }
     }
+    obstacles
+}
+
+/// Keeps visible blockout props and collision footprints aligned to active chunks.
+fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
+    let obstacles = world_obstacle_footprints(chunks);
     world.replace_obstacles(&obstacles);
+}
+
+/// Rebuilds the bounded set of visible world obstacle props from active chunks.
+fn spawn_world_obstacle_props(
+    scene: &mut Scene,
+    chunks: &[WorldChunkRequest],
+    entity_ids: &mut Vec<EntityId>,
+) {
+    for id in entity_ids.drain(..) {
+        scene.despawn(id);
+    }
+    for footprint in world_obstacle_footprints(chunks) {
+        let x = f32::midpoint(footprint.min_x, footprint.max_x);
+        let z = f32::midpoint(footprint.min_z, footprint.max_z);
+        let half_x = (footprint.max_x - footprint.min_x) * 0.5;
+        let half_z = (footprint.max_z - footprint.min_z) * 0.5;
+        let ground = world_terrain_sample(x, z).height;
+        let height = 1.4;
+        let transform = Transform3::new(
+            Vec3::new(x, ground + height * 0.5, z),
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(half_x * 2.0, height, half_z * 2.0),
+        );
+        if let Some(id) = scene.spawn(transform) {
+            scene.set_material(id, MaterialId::AMBER);
+            entity_ids.push(id);
+        }
+    }
 }
 
 fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
