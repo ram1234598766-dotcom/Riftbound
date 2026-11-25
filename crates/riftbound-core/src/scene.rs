@@ -24,6 +24,12 @@ impl MeshId {
     pub const TERRAIN_SW: Self = Self(5);
     /// South-east terrain quadrant.
     pub const TERRAIN_SE: Self = Self(6);
+    /// Detailed low-poly evergreen tree mesh for streamed environments.
+    pub const ENV_TREE: Self = Self(12);
+    /// Irregular faceted boulder mesh for rocky and snowy regions.
+    pub const ENV_BOULDER: Self = Self(13);
+    /// Clustered low shrub mesh for sand and mud regions.
+    pub const ENV_SHRUB: Self = Self(14);
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
