@@ -37,6 +37,10 @@ fn vehicle_wheel_local_offsets(config: SuspensionConfig) -> [(f32, f32); 4] {
         (half_track, half_wheelbase),
     ]
 }
+
+fn wheel_local_vertical_offset(compression: f32, rest_length: f32, radius: f32) -> f32 {
+    radius - rest_length + compression
+}
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -828,8 +832,11 @@ impl ApplicationHandler for RiftboundApp {
                             for (index, wheel) in wheels.iter().enumerate() {
                                 let front = index < 2;
                                 let steer = if front { steering * 0.35 } else { 0.0 };
-                                let local_y = 0.34 - suspension_config.rest_length
-                                    + suspension_pose.wheel_compressions[index];
+                                let local_y = wheel_local_vertical_offset(
+                                    suspension_pose.wheel_compressions[index],
+                                    suspension_config.rest_length,
+                                    0.34,
+                                );
                                 let (local_x, local_z) = wheel_offsets[index];
                                 self.animated_transforms.push((
                                     *wheel,
@@ -2361,6 +2368,21 @@ mod world_prop_tests {
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
         );
+    }
+
+    #[test]
+    fn wheel_visual_vertical_offset_tracks_suspension_travel() {
+        let rest_length = SuspensionConfig::default().rest_length;
+        let radius = 0.34;
+
+        assert!((wheel_local_vertical_offset(0.0, rest_length, radius)
+            - (radius - rest_length))
+            .abs()
+            < f32::EPSILON);
+        assert!((wheel_local_vertical_offset(0.2, rest_length, radius)
+            - (radius - rest_length + 0.2))
+            .abs()
+            < f32::EPSILON);
     }
 
     #[test]
