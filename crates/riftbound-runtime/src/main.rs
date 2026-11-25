@@ -52,6 +52,7 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
 }
 
 /// Estimates visible tyre slip from throttle/braking demand and available grip.
+#[cfg(test)]
 fn vehicle_slip_percent(
     throttle: f32,
     brake: f32,
@@ -129,6 +130,8 @@ fn build_vehicle_dust_particles(scene: &mut Scene) -> Vec<EntityId> {
     particles
 }
 
+// This helper keeps particle placement data explicit at the call site.
+#[allow(clippy::too_many_arguments)]
 fn append_vehicle_dust_transforms(
     entities: &[EntityId],
     position: Vec3,
