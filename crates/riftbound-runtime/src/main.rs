@@ -49,6 +49,15 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
         0.0
     }
 }
+
+fn smooth_wheel_steering(current: f32, target: f32, delta: f32) -> f32 {
+    if !current.is_finite() || !target.is_finite() || !delta.is_finite() {
+        return 0.0;
+    }
+    let blend = 1.0 - (-12.0 * delta.max(0.0)).exp();
+    current.clamp(-0.35, 0.35)
+        + (target.clamp(-0.35, 0.35) - current.clamp(-0.35, 0.35)) * blend
+}
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -67,6 +76,7 @@ struct RiftboundApp {
     vehicle: Option<EntityId>,
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_wheel_rotation: f32,
+    vehicle_wheel_steering: f32,
     vehicle_state: VehicleState,
     vehicle_surface_tracker: VehicleSurfaceTracker,
     vehicle_upgrades: VehicleUpgrades,
@@ -840,10 +850,16 @@ impl ApplicationHandler for RiftboundApp {
                                 + wheel_rotation_delta(self.vehicle_state.speed, delta, 0.34))
                                 .rem_euclid(std::f32::consts::TAU);
                             let wheel_spin = self.vehicle_wheel_rotation;
+                            self.vehicle_wheel_steering = smooth_wheel_steering(
+                                self.vehicle_wheel_steering,
+                                steering * 0.35,
+                                delta,
+                            );
+                            let wheel_steering = self.vehicle_wheel_steering;
                             let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
                             for (index, wheel) in wheels.iter().enumerate() {
                                 let front = index < 2;
-                                let steer = if front { steering * 0.35 } else { 0.0 };
+                                let steer = if front { wheel_steering } else { 0.0 };
                                 let local_y = wheel_local_vertical_offset(
                                     suspension_pose.wheel_compressions[index],
                                     suspension_config.rest_length,
@@ -2380,6 +2396,19 @@ mod world_prop_tests {
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
         );
+    }
+
+    #[test]
+    fn front_wheel_steering_smoothly_tracks_input_and_stays_bounded() {
+        let first = smooth_wheel_steering(0.0, 0.35, 1.0 / 60.0);
+        let settled = smooth_wheel_steering(first, 0.35, 1.0 / 60.0);
+        let returning = smooth_wheel_steering(settled, -0.35, 1.0 / 60.0);
+
+        assert!(first > 0.0 && first < 0.35);
+        assert!(settled > first && settled < 0.35);
+        assert!(returning < settled && returning > -0.35);
+        assert_eq!(smooth_wheel_steering(0.0, 1.0, 1.0), 0.35);
+        assert_eq!(smooth_wheel_steering(0.2, f32::NAN, 0.1), 0.0);
     }
 
     #[test]
