@@ -1472,13 +1472,16 @@ impl ApplicationHandler for RiftboundApp {
                             if !renderer.sync_world_terrain(streamer.changes(), slot_map) {
                                 log::error!("World terrain chunk synchronization failed");
                             }
+                            // Generate deterministic obstacle footprints once per chunk-window change.
+                            let obstacle_footprints =
+                                world_obstacle_footprints(streamer.active_chunks());
                             if let Some(collision) = self.collision.as_mut() {
-                                sync_world_collision(collision, streamer.active_chunks());
+                                sync_world_collision(collision, &obstacle_footprints);
                             }
                             let mut updated_scene = renderer.scene().clone();
                             spawn_world_obstacle_props(
                                 &mut updated_scene,
-                                streamer.active_chunks(),
+                                &obstacle_footprints,
                                 &mut self.world_obstacle_entities,
                             );
                             if let Err(error) = renderer.set_scene(updated_scene) {
@@ -2163,21 +2166,20 @@ fn world_stream_focus(driving: bool, vehicle_position: Vec3, player_position: Ve
     }
 }
 
-fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
-    let obstacles = world_obstacle_footprints(chunks);
-    world.replace_obstacles(&obstacles);
+fn sync_world_collision(world: &mut CollisionWorld, obstacles: &[Aabb2]) {
+    world.replace_obstacles(obstacles);
 }
 
 /// Rebuilds the bounded set of visible world obstacle props from active chunks.
 fn spawn_world_obstacle_props(
     scene: &mut Scene,
-    chunks: &[WorldChunkRequest],
+    obstacles: &[Aabb2],
     entity_ids: &mut Vec<EntityId>,
 ) {
     for id in entity_ids.drain(..) {
         scene.despawn(id);
     }
-    for footprint in world_obstacle_footprints(chunks) {
+    for footprint in obstacles {
         let x = f32::midpoint(footprint.min_x, footprint.max_x);
         let z = f32::midpoint(footprint.min_z, footprint.max_z);
         let half_x = (footprint.max_x - footprint.min_x) * 0.5;
