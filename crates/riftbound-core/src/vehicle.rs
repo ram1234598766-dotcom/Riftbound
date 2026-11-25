@@ -1056,8 +1056,12 @@ impl SuspensionState {
             || wheel_ground_heights.iter().any(|height| !height.is_finite())
             || !config.max_travel.is_finite()
             || !config.rest_length.is_finite()
+            || !config.track_width.is_finite()
+            || !config.wheelbase.is_finite()
             || config.max_travel <= 0.0
             || config.rest_length < 0.0
+            || config.track_width <= 0.0
+            || config.wheelbase <= 0.0
         {
             return false;
         }
@@ -1086,10 +1090,6 @@ impl SuspensionState {
     /// Returns the current visual chassis response without advancing simulation.
     #[must_use]
     pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
-        let front = f32::midpoint(self.compression[0], self.compression[1]);
-        let rear = f32::midpoint(self.compression[2], self.compression[3]);
-        let left = f32::midpoint(self.compression[0], self.compression[2]);
-        let right = f32::midpoint(self.compression[1], self.compression[3]);
         let front_velocity =
             f32::midpoint(self.compression_velocity[0], self.compression_velocity[1]);
         let rear_velocity =
