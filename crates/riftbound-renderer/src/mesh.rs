@@ -1530,6 +1530,39 @@ mod tests {
     }
 
     #[test]
+    fn terrain_skirts_extend_below_high_relief_edges_in_every_biome() {
+        for (chunk_x, chunk_z) in [(11, 0), (-11, 0), (0, -11), (0, 11)] {
+            for side in [5, 9] {
+                let (vertices, _) =
+                    world_terrain_chunk_data(chunk_x, chunk_z, side).expect("biome chunk");
+                let grid_count = side * side;
+                let skirt_vertices_per_edge = (side - 1) * 4;
+                let mut skirt_offset = grid_count;
+
+                let edges = [
+                    (0..side).collect::<Vec<_>>(),
+                    (0..side).map(|z| z * side + side - 1).collect(),
+                    ((side - 1) * side..side * side).collect(),
+                    (0..side).rev().map(|z| z * side).collect(),
+                ];
+                for edge in edges {
+                    let edge_min = edge
+                        .iter()
+                        .map(|index| vertices[*index].position[1])
+                        .fold(f32::INFINITY, f32::min);
+                    let edge_skirts = &vertices
+                        [skirt_offset..skirt_offset + skirt_vertices_per_edge];
+                    for quad in edge_skirts.chunks_exact(4) {
+                        assert!(quad[1].position[1] <= edge_min - 4.0);
+                        assert!(quad[3].position[1] <= edge_min - 4.0);
+                    }
+                    skirt_offset += skirt_vertices_per_edge;
+                }
+            }
+        }
+    }
+
+    #[test]
     fn world_chunk_road_ribbon_is_raised_continuous_and_inside_chunk_edges() {
         for side in [5, 9] {
             let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("world chunk");
