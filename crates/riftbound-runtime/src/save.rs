@@ -230,8 +230,10 @@ mod tests {
 
     #[test]
     fn profile_round_trip_preserves_inventory_equipment_xp_and_upgrades() {
-        let mut profile = SavedProfile::default();
-        profile.upgrades = VehicleUpgrades::from_levels(2, 3).unwrap();
+        let profile = SavedProfile {
+            upgrades: VehicleUpgrades::from_levels(2, 3).unwrap(),
+            ..SavedProfile::default()
+        };
         profile.inventory.add(ItemKind::Salvage, 17);
         profile.inventory.add(ItemKind::Medkit, 2);
         profile.equipment.equip(ItemKind::ExplorerVest);
