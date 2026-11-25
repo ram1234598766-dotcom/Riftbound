@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use riftbound_core::{MaterialId, MeshId, Scene, Transform3, Vec3};
+use riftbound_core::{MaterialId, MeshId, Scene, Transform3, Vec3, WorldChunkCoord, WorldChunkLod};
 use wgpu::util::DeviceExt;
 
 mod hud;
@@ -56,6 +56,7 @@ pub struct Renderer {
     hud_data: HudData,
     meshes: Vec<Mesh>,
     mesh_batches: Vec<MeshBatch>,
+    world_terrain_slots: Vec<Option<WorldTerrainGpuSlot>>,
     changed_ids: Vec<riftbound_core::EntityId>,
     affected_meshes: Vec<bool>,
     visibility_dirty: bool,
@@ -91,6 +92,13 @@ struct MeshBatch {
     instance_capacity: u64,
     instance_staging: Vec<u8>,
     instance_count: u32,
+}
+
+struct WorldTerrainGpuSlot {
+    coord: WorldChunkCoord,
+    lod: WorldChunkLod,
+    mesh: Mesh,
+    instance_buffer: wgpu::Buffer,
 }
 
 impl Renderer {
@@ -217,6 +225,7 @@ impl Renderer {
             },
             meshes,
             mesh_batches,
+            world_terrain_slots: std::iter::repeat_with(|| None).take(25).collect(),
             changed_ids: Vec::with_capacity(16),
             affected_meshes,
             visibility_dirty: true,
@@ -478,6 +487,62 @@ impl Renderer {
         Ok(())
     }
 
+    /// Replaces one bounded world-terrain GPU slot with a chunk at an absolute coordinate.
+    ///
+    /// The mesh and its translated instance buffer are created together; the slot can be
+    /// reused for another chunk when the streamer evicts this coordinate.
+    /// Returns false for an invalid slot or unsupported chunk coordinate.
+    pub fn set_world_terrain_chunk(
+        &mut self,
+        slot_index: usize,
+        coord: WorldChunkCoord,
+        lod: WorldChunkLod,
+    ) -> bool {
+        if slot_index >= self.world_terrain_slots.len() {
+            return false;
+        }
+        let mesh = match lod {
+            WorldChunkLod::Detailed => Mesh::world_terrain_chunk(&self.device, coord.x, coord.z),
+            WorldChunkLod::Distant => Mesh::world_terrain_chunk_lod(&self.device, coord.x, coord.z),
+        };
+        let Some(mesh) = mesh else {
+            return false;
+        };
+        let mut model = [0.0_f32; 16];
+        model[0] = 1.0;
+        model[5] = 1.0;
+        model[10] = 1.0;
+        model[15] = 1.0;
+        model[12] = coord.x as f32 * 64.0;
+        model[14] = coord.z as f32 * 64.0;
+        let instance = InstanceRaw::from_matrix(model, [1.0; 4]);
+        let mut bytes = Vec::with_capacity(80);
+        append_instance_bytes(&mut bytes, &instance);
+        let instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("riftbound-world-terrain-instance"),
+            contents: &bytes,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        self.world_terrain_slots[slot_index] = Some(WorldTerrainGpuSlot {
+            coord,
+            lod,
+            mesh,
+            instance_buffer,
+        });
+        self.visibility_dirty = true;
+        true
+    }
+
+    /// Releases a world-terrain GPU slot so the bounded streamer can reuse it.
+    pub fn clear_world_terrain_chunk(&mut self, slot_index: usize) -> bool {
+        let Some(slot) = self.world_terrain_slots.get_mut(slot_index) else {
+            return false;
+        };
+        *slot = None;
+        self.visibility_dirty = true;
+        true
+    }
+
     /// Updates the native mission HUD content.
     pub fn set_hud(&mut self, data: HudData) {
         self.hud_data = data;
@@ -555,6 +620,14 @@ impl Renderer {
                 pass.set_vertex_buffer(1, batch.instance_buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
                 pass.draw_indexed(0..mesh.index_count(), 0, 0..batch.instance_count);
+            }
+            for slot in self.world_terrain_slots.iter().flatten() {
+                // The slot owns its GPU mesh and one translated instance; no scene entity is needed.
+                let _chunk_identity = (slot.coord, slot.lod);
+                pass.set_vertex_buffer(0, slot.mesh.vertex_buffer().slice(..));
+                pass.set_vertex_buffer(1, slot.instance_buffer.slice(..));
+                pass.set_index_buffer(slot.mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
+                pass.draw_indexed(0..slot.mesh.index_count(), 0, 0..1);
             }
         }
         hud::build_vertices_into(
