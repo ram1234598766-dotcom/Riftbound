@@ -641,11 +641,11 @@ impl VehicleState {
         {
             return;
         }
-        // A fully unloaded axle still permits a small amount of air-control
-        // authority, while zero-load wheels contribute no drive grip.
-        let average = (wheel_traction.iter().sum::<f32>() * 0.25).max(0.05);
-        let left = ((wheel_traction[0] + wheel_traction[2]) * 0.5).max(0.05);
-        let right = ((wheel_traction[1] + wheel_traction[3]) * 0.5).max(0.05);
+        // Preserve true zero tyre load for acceleration and braking. Steering
+        // receives its own small airborne authority in the handling step.
+        let average = wheel_traction.iter().sum::<f32>() * 0.25;
+        let left = (wheel_traction[0] + wheel_traction[2]) * 0.5;
+        let right = (wheel_traction[1] + wheel_traction[3]) * 0.5;
         self.update_with_wheel_surface_response(
             input,
             (average, surface_response.1, surface_response.2),
@@ -669,13 +669,13 @@ impl VehicleState {
         if !traction.is_finite()
             || !left_traction.is_finite()
             || !right_traction.is_finite()
-            || left_traction <= 0.0
+            || left_traction < 0.0
             || left_traction > 1.0
-            || right_traction <= 0.0
+            || right_traction < 0.0
             || right_traction > 1.0
             || !speed_multiplier.is_finite()
             || !rolling_resistance.is_finite()
-            || traction < 0.05
+            || traction < 0.0
             || traction > 1.0
             || speed_multiplier <= 0.0
             || speed_multiplier > 1.0
@@ -712,6 +712,9 @@ impl VehicleState {
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
         let grip = traction;
+        // Keep propulsion and braking tied to actual tyre load, but retain
+        // modest steering authority when all four wheels are off the ground.
+        let steering_grip = grip.max(0.05);
         let grip_imbalance = right_traction - left_traction;
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
@@ -741,7 +744,7 @@ impl VehicleState {
         let steering_stability = 1.0 - grip_imbalance.abs() * 0.12;
         self.heading += steering
             * config.steering_rate
-            * grip
+            * steering_grip
             * steering_stability
             * speed_fraction
             * self.speed.signum()
