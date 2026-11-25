@@ -96,11 +96,11 @@ impl VehicleSurfaceTracker {
     /// Returns the stable surface, accepting changes after repeated matching samples.
     pub fn update(&mut self, sampled: VehicleSurface) -> VehicleSurface {
         let response_before_update = self.response();
-        self.blend_frames = self
-            .blend_frames
-            .saturating_add(1)
-            .min(Self::TRANSITION_FRAMES);
         if sampled == self.current {
+            self.blend_frames = self
+                .blend_frames
+                .saturating_add(1)
+                .min(Self::TRANSITION_FRAMES);
             self.candidate = None;
             self.candidate_frames = 0;
             return self.current;
