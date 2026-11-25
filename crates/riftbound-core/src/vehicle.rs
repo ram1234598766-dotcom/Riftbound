@@ -948,17 +948,25 @@ impl SuspensionState {
         self.pose(config)
     }
 
-    /// Estimates relative normal-load distribution from the four spring compressions.
-    /// Values are normalized around 1.0 and bounded to avoid unstable grip spikes.
+    /// Estimates each corner's usable grip from relative spring load and contact.
+    /// An uninitialized suspension keeps neutral grip; an initialized wheel at full
+    /// extension contributes no load, with a smooth ramp as the spring compresses.
     #[must_use]
     pub fn wheel_load_factors(&self, config: SuspensionConfig) -> [f32; 4] {
-        if !config.max_travel.is_finite() || config.max_travel <= f32::EPSILON {
+        if !self.ground_reference_initialized {
             return [1.0; 4];
+        }
+        if !config.max_travel.is_finite() || config.max_travel <= f32::EPSILON {
+            return [0.0; 4];
         }
         let average = self.compression.iter().sum::<f32>() * 0.25;
         std::array::from_fn(|index| {
-            (1.0 + (self.compression[index] - average) / config.max_travel * 0.8)
-                .clamp(0.65, 1.25)
+            let relative_load = (1.0
+                + (self.compression[index] - average) / config.max_travel * 0.8)
+                .clamp(0.65, 1.25);
+            let contact = (self.compression[index] / (config.max_travel * 0.25))
+                .clamp(0.0, 1.0);
+            relative_load * contact
         })
     }
 
@@ -1212,6 +1220,21 @@ mod tests {
         assert!(loads.iter().all(|load| (0.65..=1.25).contains(load)));
         let average = loads.iter().sum::<f32>() * 0.25;
         assert!((average - 1.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn suspension_load_factors_reduce_grip_for_unloaded_wheels() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        assert_eq!(suspension.wheel_load_factors(config), [1.0; 4]);
+
+        suspension.ground_reference_initialized = true;
+        suspension.compression = [0.0, 0.1, 0.2, 0.3];
+        let loads = suspension.wheel_load_factors(config);
+        assert_eq!(loads[0], 0.0);
+        assert!(loads[1] > 0.0 && loads[1] < loads[2]);
+        assert!(loads[2] < loads[3]);
+        assert!(loads.iter().all(|load| (0.0..=1.25).contains(load)));
     }
 
     #[test]
