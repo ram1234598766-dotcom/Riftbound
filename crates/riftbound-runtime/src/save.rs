@@ -8,8 +8,45 @@ use riftbound_core::{
     Equipment, EquipmentSlot, Inventory, ItemKind, PlayerProgression, Vec3, VehicleUpgrades,
 };
 
-const SAVE_FILE: &str = "riftbound-save-v1.txt";
+const LEGACY_SAVE_FILE: &str = "riftbound-save-v1.txt";
 const HEADER: &str = "RIFTBOUND_SAVE_V1";
+
+
+/// A separate local campaign profile.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SaveSlot {
+    #[default]
+    One,
+    Two,
+    Three,
+}
+
+impl SaveSlot {
+    /// Returns the next slot in the three-slot cycle.
+    pub const fn next(self) -> Self {
+        match self {
+            Self::One => Self::Two,
+            Self::Two => Self::Three,
+            Self::Three => Self::One,
+        }
+    }
+
+    const fn file_name(self) -> &'static str {
+        match self {
+            Self::One => "riftbound-slot-1.txt",
+            Self::Two => "riftbound-slot-2.txt",
+            Self::Three => "riftbound-slot-3.txt",
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::One => "SLOT 1",
+            Self::Two => "SLOT 2",
+            Self::Three => "SLOT 3",
+        }
+    }
+}
 
 pub struct SavedProfile {
     pub upgrades: VehicleUpgrades,
@@ -37,8 +74,8 @@ impl Default for SavedProfile {
     }
 }
 
-fn save_path() -> io::Result<PathBuf> {
-    Ok(std::env::current_dir()?.join(SAVE_FILE))
+fn save_path(slot: SaveSlot) -> io::Result<PathBuf> {
+    Ok(std::env::current_dir()?.join(slot.file_name()))
 }
 
 fn backup_path(path: &std::path::Path) -> PathBuf {
@@ -180,19 +217,32 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     })
 }
 
-/// Loads a profile, using a clean profile when no valid save exists.
-pub fn load_profile() -> SavedProfile {
-    let Ok(path) = save_path() else {
+/// Loads one slot, falling back to the original save file for legacy Slot 1 users.
+pub fn load_profile_from_slot(slot: SaveSlot) -> SavedProfile {
+    let Ok(path) = save_path(slot) else {
         return SavedProfile::default();
     };
     read_valid_profile(&path)
         .or_else(|| read_valid_profile(&backup_path(&path)))
+        .or_else(|| {
+            if slot == SaveSlot::One {
+                let legacy = std::env::current_dir().ok()?.join(LEGACY_SAVE_FILE);
+                read_valid_profile(&legacy)
+            } else {
+                None
+            }
+        })
         .unwrap_or_default()
 }
 
-/// Atomically replaces the profile save after writing a temporary file.
-pub fn save_profile(profile: &SavedProfile) -> io::Result<()> {
-    let path = save_path()?;
+/// Loads the default campaign slot.
+pub fn load_profile() -> SavedProfile {
+    load_profile_from_slot(SaveSlot::One)
+}
+
+/// Atomically replaces one slot after writing a temporary file.
+pub fn save_profile_to_slot(slot: SaveSlot, profile: &SavedProfile) -> io::Result<()> {
+    let path = save_path(slot)?;
     let backup = backup_path(&path);
     let temporary = path.with_extension("tmp");
     fs::write(&temporary, encode(profile))?;
@@ -222,6 +272,11 @@ pub fn save_profile(profile: &SavedProfile) -> io::Result<()> {
         return Err(error);
     }
     Ok(())
+}
+
+/// Saves to the default campaign slot.
+pub fn save_profile(profile: &SavedProfile) -> io::Result<()> {
+    save_profile_to_slot(SaveSlot::One, profile)
 }
 
 #[cfg(test)]
