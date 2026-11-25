@@ -231,6 +231,7 @@ impl Renderer {
                 inventory: None,
                 equipment: String::new(),
                 vehicle_info: None,
+                vehicle_grip: None,
             },
             meshes,
             mesh_batches,
