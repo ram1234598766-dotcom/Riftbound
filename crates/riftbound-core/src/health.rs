@@ -133,6 +133,7 @@ mod tests {
         assert_eq!(health.current(), 70);
         assert_eq!(health.heal(50), 10);
         assert_eq!(health.current(), 80);
+        health.update(1.0);
         health.apply_damage(80, 1.0);
         assert_eq!(health.heal(20), 0);
         assert_eq!(health.current(), 0);
