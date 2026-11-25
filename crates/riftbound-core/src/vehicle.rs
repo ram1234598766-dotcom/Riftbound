@@ -502,20 +502,25 @@ impl SuspensionState {
             return self.pose(config);
         }
 
+        // Smaller internal steps keep the spring integration stable when a frame stalls.
         let dt = delta_seconds.min(0.1);
-        for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
-            let target =
-                (ground_height + config.rest_length - chassis_height).clamp(0.0, config.max_travel);
-            let acceleration = (target - self.compression[index]) * config.spring_strength
-                - self.compression_velocity[index] * config.damping;
-            self.compression_velocity[index] += acceleration * dt;
-            self.compression[index] = (self.compression[index]
-                + self.compression_velocity[index] * dt)
-                .clamp(0.0, config.max_travel);
-            if self.compression[index] <= f32::EPSILON
-                || self.compression[index] >= config.max_travel - f32::EPSILON
-            {
-                self.compression_velocity[index] = 0.0;
+        let substeps = (dt / (1.0 / 60.0)).ceil() as u32;
+        let step_dt = dt / substeps as f32;
+        for _ in 0..substeps {
+            for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
+                let target = (ground_height + config.rest_length - chassis_height)
+                    .clamp(0.0, config.max_travel);
+                let acceleration = (target - self.compression[index]) * config.spring_strength
+                    - self.compression_velocity[index] * config.damping;
+                self.compression_velocity[index] += acceleration * step_dt;
+                self.compression[index] = (self.compression[index]
+                    + self.compression_velocity[index] * step_dt)
+                    .clamp(0.0, config.max_travel);
+                if self.compression[index] <= f32::EPSILON
+                    || self.compression[index] >= config.max_travel - f32::EPSILON
+                {
+                    self.compression_velocity[index] = 0.0;
+                }
             }
         }
         self.pose(config)
@@ -724,6 +729,42 @@ mod tests {
                 && roll_pose.pitch.is_finite()
                 && roll_pose.roll.is_finite()
         );
+    }
+
+    #[test]
+    fn suspension_settles_to_a_stable_flat_ground_compression() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        let mut pose = SuspensionPose::default();
+
+        for _ in 0..360 {
+            pose = suspension.update([0.2; 4], 0.58, config, 1.0 / 60.0);
+        }
+
+        assert!((pose.average_compression - 0.2).abs() < 0.01);
+        assert!(pose.pitch.abs() < 0.001);
+        assert!(pose.roll.abs() < 0.001);
+        assert!(suspension.compression_velocity.iter().all(|speed| speed.abs() < 0.01));
+    }
+
+    #[test]
+    fn suspension_recovers_smoothly_after_a_single_wheel_bump() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        for _ in 0..30 {
+            suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        }
+
+        let bump_pose = suspension.update([0.42, 0.0, 0.0, 0.0], 0.58, config, 1.0 / 60.0);
+        assert!(bump_pose.pitch.is_finite() && bump_pose.roll.is_finite());
+        assert!(bump_pose.pitch.abs() > 0.001);
+
+        let mut settled_pose = bump_pose;
+        for _ in 0..360 {
+            settled_pose = suspension.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        }
+        assert!(settled_pose.pitch.abs() < bump_pose.pitch.abs());
+        assert!(settled_pose.roll.abs() < 0.001);
     }
 
     #[test]
