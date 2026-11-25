@@ -16,6 +16,7 @@ pub struct SavedProfile {
     pub inventory: Inventory,
     pub equipment: Equipment,
     pub progression: PlayerProgression,
+    pub checkpoint_active: bool,
 }
 
 impl Default for SavedProfile {
@@ -29,6 +30,7 @@ impl Default for SavedProfile {
             inventory,
             equipment: Equipment::default(),
             progression: PlayerProgression::default(),
+            checkpoint_active: false,
         }
     }
 }
@@ -57,7 +59,7 @@ fn decode_equipped(code: u8, expected: EquipmentSlot) -> Option<Option<ItemKind>
 
 fn encode(profile: &SavedProfile) -> String {
     format!(
-        "{HEADER}\nengine={}\nhandling={}\nxp={}\nshards={}\nsalvage={}\nmedkits={}\nvests={}\nboots={}\nvehicle_parts={}\nbody={}\nfeet={}\n",
+        "{HEADER}\nengine={}\nhandling={}\nxp={}\nshards={}\nsalvage={}\nmedkits={}\nvests={}\nboots={}\nvehicle_parts={}\nbody={}\nfeet={}\ncheckpoint={}\n",
         profile.upgrades.engine_level(),
         profile.upgrades.handling_level(),
         profile.progression.total_xp(),
@@ -69,6 +71,7 @@ fn encode(profile: &SavedProfile) -> String {
         profile.inventory.count(ItemKind::VehiclePart),
         item_code(profile.equipment.item(EquipmentSlot::Body)),
         item_code(profile.equipment.item(EquipmentSlot::Feet)),
+        u8::from(profile.checkpoint_active),
     )
 }
 
@@ -84,7 +87,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
             return None;
         }
     }
-    if values.len() != 11 {
+    if values.len() != 11 && values.len() != 12 {
         return None;
     }
     let number = |key: &str| values.get(key)?.parse::<u32>().ok();
@@ -92,6 +95,11 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     let handling = u8::try_from(number("handling")?).ok()?;
     let upgrades = VehicleUpgrades::from_levels(engine, handling)?;
     let xp = values.get("xp")?.parse::<u64>().ok()?;
+    let checkpoint_active = match values.get("checkpoint") {
+        Some("0") | None => false,
+        Some("1") => true,
+        _ => return None,
+    };
     let mut inventory = Inventory::default();
     for (key, kind) in [
         ("shards", ItemKind::RiftShard),
@@ -118,6 +126,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
         inventory,
         equipment,
         progression: PlayerProgression::from_total_xp(xp),
+        checkpoint_active,
     })
 }
 
@@ -152,6 +161,7 @@ mod tests {
         profile.inventory.add(ItemKind::Medkit, 2);
         profile.equipment.equip(ItemKind::ExplorerVest);
         profile.progression.award_xp(375);
+        profile.checkpoint_active = true;
         let restored = decode(&encode(&profile)).unwrap();
         assert_eq!(restored.upgrades.engine_level(), 2);
         assert_eq!(restored.upgrades.handling_level(), 3);
@@ -159,6 +169,15 @@ mod tests {
         assert_eq!(restored.inventory.count(ItemKind::Medkit), 2);
         assert_eq!(restored.equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
         assert_eq!(restored.progression.total_xp(), 375);
+        assert!(restored.checkpoint_active);
+    }
+
+    #[test]
+    fn legacy_profile_without_checkpoint_field_remains_loadable() {
+        let profile = SavedProfile::default();
+        let legacy = encode(&profile).replace("checkpoint=0\\n", "");
+        let restored = decode(&legacy).unwrap();
+        assert!(!restored.checkpoint_active);
     }
 
     #[test]
