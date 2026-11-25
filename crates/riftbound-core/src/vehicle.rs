@@ -710,10 +710,10 @@ mod tests {
         let surfaces = [
             VehicleSurface::Asphalt,
             VehicleSurface::Gravel,
-            VehicleSurface::Mud,
+            VehicleSurface::Rock,
             VehicleSurface::Sand,
             VehicleSurface::Snow,
-            VehicleSurface::Rock,
+            VehicleSurface::Mud,
         ];
         let mut speeds = Vec::with_capacity(surfaces.len());
 
