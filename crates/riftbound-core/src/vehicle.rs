@@ -1,6 +1,9 @@
 //! Deterministic lightweight ground-vehicle handling for the open-world driving RPG.
 
-use crate::{Inventory, ItemKind, Vec3};
+use crate::{
+    Inventory, ItemKind, Vec3, world_terrain_vehicle_ground_heights,
+    world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
+};
 
 /// Surface response used by the vehicle simulation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -394,6 +397,66 @@ pub struct VehicleState {
 }
 
 impl VehicleState {
+    /// Advances handling and four-wheel suspension using the shared procedural world.
+    ///
+    /// Returns None when the vehicle pose is outside the supported terrain sampling
+    /// range; in that case neither handling nor suspension state is advanced.
+    pub fn update_on_world_terrain(
+        &mut self,
+        input: VehicleInput,
+        config: VehicleConfig,
+        suspension: &mut SuspensionState,
+        suspension_config: SuspensionConfig,
+        surface_tracker: &mut VehicleSurfaceTracker,
+        delta_seconds: f32,
+    ) -> Option<SuspensionPose> {
+        let half_track = suspension_config.track_width * 0.5;
+        let half_wheelbase = suspension_config.wheelbase * 0.5;
+        let ground_heights = world_terrain_vehicle_ground_heights(
+            self.position.x,
+            self.position.z,
+            self.heading,
+            half_track,
+            half_wheelbase,
+        )?;
+        let wheel_surfaces = world_terrain_vehicle_surfaces(
+            self.position.x,
+            self.position.z,
+            self.heading,
+            half_track,
+            half_wheelbase,
+        );
+        let dominant_surface = world_terrain_vehicle_surface(
+            self.position.x,
+            self.position.z,
+            self.heading,
+            half_track,
+            half_wheelbase,
+        );
+        surface_tracker.update_wheel_contacts(dominant_surface, wheel_surfaces);
+        self.update_with_wheel_surface_response(
+            input,
+            surface_tracker.response(),
+            surface_tracker.side_traction(),
+            config,
+            delta_seconds,
+        );
+        let updated_heights = world_terrain_vehicle_ground_heights(
+            self.position.x,
+            self.position.z,
+            self.heading,
+            half_track,
+            half_wheelbase,
+        )?;
+        let pose = suspension.update(
+            updated_heights,
+            self.position.y,
+            suspension_config,
+            delta_seconds,
+        );
+        Some(pose)
+    }
+
     /// Advances the vehicle without allocating. Delta time is bounded to avoid
     /// large jumps after stalls or application suspension.
     pub fn update(
@@ -750,6 +813,56 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn world_terrain_vehicle_update_combines_surface_grip_and_suspension() {
+        let mut vehicle = VehicleState {
+            position: Vec3::new(0.0, 1.0, 0.0),
+            ..VehicleState::default()
+        };
+        let mut suspension = SuspensionState::default();
+        let mut tracker = VehicleSurfaceTracker::default();
+        let pose = vehicle
+            .update_on_world_terrain(
+                VehicleInput {
+                    throttle: 1.0,
+                    ..VehicleInput::default()
+                },
+                VehicleConfig::default(),
+                &mut suspension,
+                SuspensionConfig::default(),
+                &mut tracker,
+                1.0 / 60.0,
+            )
+            .expect("origin is inside the supported terrain range");
+        assert!(vehicle.position.x.is_finite());
+        assert!(vehicle.position.z < 0.0);
+        assert!(pose.wheel_compressions.iter().all(|value| value.is_finite()));
+        assert_eq!(tracker.current(), VehicleSurface::Asphalt);
+    }
+
+    #[test]
+    fn world_terrain_vehicle_update_rejects_out_of_range_pose_without_mutation() {
+        let mut vehicle = VehicleState {
+            position: Vec3::new(1_000_001.0, 1.0, 0.0),
+            speed: 3.0,
+            ..VehicleState::default()
+        };
+        let before = vehicle;
+        let mut suspension = SuspensionState::default();
+        let mut tracker = VehicleSurfaceTracker::default();
+        assert!(vehicle
+            .update_on_world_terrain(
+                VehicleInput::default(),
+                VehicleConfig::default(),
+                &mut suspension,
+                SuspensionConfig::default(),
+                &mut tracker,
+                1.0 / 60.0,
+            )
+            .is_none());
+        assert_eq!(vehicle, before);
+    }
 
     #[test]
     fn suspension_response_is_consistent_at_thirty_and_sixty_fps() {
