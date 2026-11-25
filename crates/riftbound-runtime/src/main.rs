@@ -328,7 +328,9 @@ impl ApplicationHandler for RiftboundApp {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
+        if let Err(error) =
+                    save::save_profile_to_slot(self.save_slot, &self.saved_profile())
+                {
             log::warn!("Could not save player profile while suspending: {error}");
         }
         self.renderer = None;
@@ -384,7 +386,9 @@ impl ApplicationHandler for RiftboundApp {
         }
         match event {
             WindowEvent::CloseRequested => {
-                if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
+                if let Err(error) =
+                        save::save_profile_to_slot(self.save_slot, &self.saved_profile())
+                    {
                     log::warn!("Could not save vehicle upgrades: {error}");
                 }
                 event_loop.exit();
@@ -401,7 +405,10 @@ impl ApplicationHandler for RiftboundApp {
                 if event.state == ElementState::Pressed
                     && event.physical_key == PhysicalKey::Code(KeyCode::Escape)
                 {
-                    if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
+                    if let Err(error) = save::save_profile_to_slot(
+                                        self.save_slot,
+                                        &self.saved_profile(),
+                                    ) {
                         log::warn!("Could not save player profile: {error}");
                     }
                     event_loop.exit();
@@ -527,9 +534,10 @@ impl ApplicationHandler for RiftboundApp {
                                     if restored > 0 {
                                         self.inventory.remove(ItemKind::Medkit, 1);
                                         log::info!("Medkit used: restored {restored} health");
-                                        if let Err(error) =
-                                            save::save_profile_to_slot(self.save_slot, &self.saved_profile())
-                                        {
+                                        if let Err(error) = save::save_profile_to_slot(
+                                            self.save_slot,
+                                            &self.saved_profile(),
+                                        ) {
                                             log::warn!("Could not save medkit use: {error}");
                                         }
                                     } else {
