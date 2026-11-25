@@ -1878,9 +1878,11 @@ mod vehicle_mesh_tests {
             };
             let target = terrain_surface_color(surface);
             assert!(near.iter().all(|channel| (0.0..=1.0).contains(channel)));
-            assert!(far.iter().zip(target).all(|(actual, expected)| {
-                (actual - expected).abs() < 0.025
-            }));
+            assert!(
+                far.iter()
+                    .zip(target)
+                    .all(|(actual, expected)| { (actual - expected).abs() < 0.025 })
+            );
         }
 
         let before = terrain_color_at(VehicleSurface::Sand, 650.0, 120.0);
