@@ -487,11 +487,11 @@ mod tests {
 
     #[test]
     fn world_vehicle_surfaces_preserve_each_wheel_contact() {
-        let contacts = world_terrain_vehicle_surfaces(0.0, 0.0, 0.0, 4.0, 1.0);
-        assert_eq!(contacts[0], VehicleSurface::Gravel);
-        assert_eq!(contacts[1], VehicleSurface::Asphalt);
-        assert_eq!(contacts[2], VehicleSurface::Gravel);
-        assert_eq!(contacts[3], VehicleSurface::Asphalt);
+        let contacts = world_terrain_vehicle_surfaces(5.5, 0.0, 0.0, 4.0, 1.0);
+        assert_eq!(contacts[0], VehicleSurface::Asphalt);
+        assert_eq!(contacts[1], VehicleSurface::Gravel);
+        assert_eq!(contacts[2], VehicleSurface::Asphalt);
+        assert_eq!(contacts[3], VehicleSurface::Gravel);
     }
 
     #[test]
