@@ -14,7 +14,7 @@ use rodio::{OutputStream, Sink, Source};
 use riftbound_core::VehicleAudioMix;
 
 const SAMPLE_RATE: u32 = 44_100;
-const CONTROL_COUNT: usize = 5;
+const CONTROL_COUNT: usize = 6;
 
 /// Owns the native output stream and a continuously generated vehicle sound.
 pub struct VehicleAudioOutput {
@@ -44,6 +44,7 @@ impl VehicleAudioOutput {
             mix.tyre_gain,
             mix.skid_gain,
             mix.surface_gain,
+            mix.impact_gain,
         ];
         for (control, value) in self.controls.iter().zip(values) {
             let safe = if value.is_finite() { value.clamp(0.0, 1_000.0) } else { 0.0 };
@@ -81,6 +82,7 @@ impl VehicleSource {
         let tyre_gain = self.control(2).clamp(0.0, 1.0);
         let skid_gain = self.control(3).clamp(0.0, 1.0);
         let surface_gain = self.control(4).clamp(0.0, 1.0);
+        let impact_gain = self.control(5).clamp(0.0, 1.0);
 
         let engine = (self.phase.sin() + 0.32 * (self.phase * 2.0).sin()
             + 0.12 * (self.phase * 3.0).sin()) * engine_gain;
@@ -89,11 +91,13 @@ impl VehicleSource {
         let skid = (self.texture_phase * 7.3).sin() * skid_gain;
         let surface = ((self.texture_phase * 3.9).sin()
             + (self.texture_phase * 11.1).sin() * 0.35) * surface_gain;
+        let impact = ((self.texture_phase * 19.0).sin()
+            + (self.texture_phase * 31.0).sin() * 0.35) * impact_gain;
 
         self.phase = (self.phase + std::f32::consts::TAU * frequency / SAMPLE_RATE as f32)
             .rem_euclid(std::f32::consts::TAU);
         self.texture_phase = (self.texture_phase + 0.071).rem_euclid(std::f32::consts::TAU);
-        ((engine * 0.52 + rolling * 0.12 + skid * 0.10 + surface * 0.08) * 0.18)
+        ((engine * 0.52 + rolling * 0.12 + skid * 0.10 + surface * 0.08 + impact * 0.14) * 0.18)
             .clamp(-0.8, 0.8)
     }
 }
