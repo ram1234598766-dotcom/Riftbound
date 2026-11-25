@@ -15,6 +15,10 @@ pub struct HudData {
     pub health: u8,
     /// Maximum player health points.
     pub max_health: u8,
+    /// Compact inventory summary, shown while the inventory panel is open.
+    pub inventory: Option<String>,
+    /// Compact equipped-gear summary.
+    pub equipment: String,
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
@@ -112,6 +116,14 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
         height,
     );
     text(out, &data.status, 38.0, 154.0, 1.5, white, width, height);
+    if let Some(inventory) = &data.inventory {
+        let panel_x = (width - 322.0).max(22.0);
+        rect(out, panel_x, 20.0, 300.0, 110.0, panel, width, height);
+        rect(out, panel_x, 20.0, 3.0, 110.0, cyan, width, height);
+        text(out, "INVENTORY", panel_x + 16.0, 32.0, 2.0, cyan, width, height);
+        text(out, inventory, panel_x + 16.0, 58.0, 1.5, white, width, height);
+        text(out, &data.equipment, panel_x + 16.0, 86.0, 1.5, white, width, height);
+    }
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
         rect(out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
@@ -247,6 +259,8 @@ mod tests {
             prompt: Some("F - EXTRACT".into()),
             health: 75,
             max_health: 100,
+            inventory: None,
+            equipment: String::new(),
         };
         let mut reused = Vec::with_capacity(4_096);
         build_vertices_into(&data, 1280, 720, &mut reused);
@@ -269,6 +283,8 @@ mod tests {
             prompt: Some("F - EXTRACT".into()),
             health: 100,
             max_health: 100,
+            inventory: None,
+            equipment: String::new(),
         };
         let vertices = build_vertices(&data, 1280, 720);
         assert_ne!(vertices.len(), 0);
