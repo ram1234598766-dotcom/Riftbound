@@ -744,7 +744,12 @@ mod tests {
         assert!((pose.average_compression - 0.2).abs() < 0.01);
         assert!(pose.pitch.abs() < 0.001);
         assert!(pose.roll.abs() < 0.001);
-        assert!(suspension.compression_velocity.iter().all(|speed| speed.abs() < 0.01));
+        assert!(
+            suspension
+                .compression_velocity
+                .iter()
+                .all(|speed| speed.abs() < 0.01)
+        );
     }
 
     #[test]
