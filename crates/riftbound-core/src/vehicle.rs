@@ -227,7 +227,6 @@ impl VehicleSurface {
             Self::Rock => 1.8,
         }
     }
-
 }
 
 /// Tunable, unit-agnostic vehicle handling values.
