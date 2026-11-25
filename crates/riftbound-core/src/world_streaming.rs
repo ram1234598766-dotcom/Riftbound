@@ -358,16 +358,28 @@ impl WorldChunkStreamer {
         for z_offset in -radius..=radius {
             for x_offset in -radius..=radius {
                 let distance = x_offset.abs().max(z_offset.abs());
-                let lod = if distance <= self.config.detailed_radius {
+                let coord = WorldChunkCoord {
+                    x: focus.x + x_offset,
+                    z: focus.z + z_offset,
+                };
+                // Keep a previously detailed chunk for one extra ring while it
+                // moves away from the focus. Newly approaching chunks still
+                // become detailed at the configured radius, avoiding rapid
+                // detail changes as the player crosses chunk boundaries.
+                let was_detailed = self.previous.iter().any(|previous| {
+                    previous.coord == coord && previous.lod == WorldChunkLod::Detailed
+                });
+                let detail_exit_radius =
+                    (self.config.detailed_radius + 1).min(self.config.active_radius);
+                let detailed = distance <= self.config.detailed_radius
+                    || (was_detailed && distance <= detail_exit_radius);
+                let lod = if detailed {
                     WorldChunkLod::Detailed
                 } else {
                     WorldChunkLod::Distant
                 };
                 self.active.push(WorldChunkRequest {
-                    coord: WorldChunkCoord {
-                        x: focus.x + x_offset,
-                        z: focus.z + z_offset,
-                    },
+                    coord,
                     lod,
                     distance_squared: u32::try_from(distance * distance).unwrap_or_default(),
                 });
@@ -695,6 +707,47 @@ mod tests {
                 .iter()
                 .flatten()
                 .any(|request| request.coord == WorldChunkCoord { x: 3, z: 0 })
+        );
+    }
+
+    #[test]
+    fn detailed_lod_has_one_ring_of_exit_hysteresis() {
+        let mut streamer = WorldChunkStreamer::new(WorldChunkConfig::new(0, 2).unwrap());
+        assert!(streamer.update_focus(0.0, 0.0));
+        let origin = WorldChunkCoord { x: 0, z: 0 };
+        assert_eq!(
+            streamer
+                .active_chunks()
+                .iter()
+                .find(|request| request.coord == origin)
+                .unwrap()
+                .lod,
+            WorldChunkLod::Detailed
+        );
+
+        // Moving one chunk away leaves the old focus chunk detailed for one
+        // transition ring, while the newly focused chunk is detailed too.
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
+        assert_eq!(
+            streamer
+                .active_chunks()
+                .iter()
+                .find(|request| request.coord == origin)
+                .unwrap()
+                .lod,
+            WorldChunkLod::Detailed
+        );
+
+        // Once it moves beyond that ring, it returns to distant LOD.
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE * 2.0, 0.0));
+        assert_eq!(
+            streamer
+                .active_chunks()
+                .iter()
+                .find(|request| request.coord == origin)
+                .unwrap()
+                .lod,
+            WorldChunkLod::Distant
         );
     }
 
