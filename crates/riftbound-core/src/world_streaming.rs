@@ -170,11 +170,17 @@ impl WorldChunkSlotMap {
     /// Returns the stable renderer slot currently assigned to a chunk coordinate.
     #[must_use]
     pub fn slot_for(&self, coord: WorldChunkCoord) -> Option<WorldChunkSlot> {
-        self.slots.iter().enumerate().find_map(|(slot_index, request)| {
-            request
-                .filter(|request| request.coord == coord)
-                .map(|request| WorldChunkSlot { slot_index, request })
-        })
+        self.slots
+            .iter()
+            .enumerate()
+            .find_map(|(slot_index, request)| {
+                request
+                    .filter(|request| request.coord == coord)
+                    .map(|request| WorldChunkSlot {
+                        slot_index,
+                        request,
+                    })
+            })
     }
 
     /// Applies one streamer's delta while retaining slots for unchanged coordinates.
@@ -487,7 +493,13 @@ mod tests {
 
         assert!(streamer.update_focus(WORLD_CHUNK_SIZE, 0.0));
         assert!(slots.apply_changes(streamer.changes()));
-        assert_eq!(slots.slot_for(origin).expect("origin remains active").slot_index, original.slot_index);
+        assert_eq!(
+            slots
+                .slot_for(origin)
+                .expect("origin remains active")
+                .slot_index,
+            original.slot_index
+        );
         assert!(slots.slot_for(WorldChunkCoord { x: -2, z: 0 }).is_none());
     }
 
