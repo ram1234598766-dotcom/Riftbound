@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld,
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
-    Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
+    ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, PlayerProgression, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
     terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
