@@ -167,7 +167,7 @@ impl WorldChunkSlotMap {
         self.slots.iter().filter(|slot| slot.is_some()).count()
     }
 
-    /// Applies one streamer's delta while retaining slots for unchanged coordinates.
+    /// Returns the stable renderer slot currently assigned to a chunk coordinate.\n    #[must_use]\n    pub fn slot_for(&self, coord: WorldChunkCoord) -> Option<WorldChunkSlot> {\n        self.slots.iter().enumerate().find_map(|(slot_index, request)| {\n            request\n                .filter(|request| request.coord == coord)\n                .map(|request| WorldChunkSlot { slot_index, request })\n        })\n    }\n\n    /// Applies one streamer's delta while retaining slots for unchanged coordinates.
     ///
     /// Returns false and leaves the map unchanged if the delta is inconsistent or
     /// cannot fit in the fixed slot capacity.
