@@ -337,7 +337,7 @@ impl ApplicationHandler for RiftboundApp {
                         collision.move_character(previous_position, displacement, PLAYER_RADIUS);
                     transform.translation.x = resolved.position.x;
                     transform.translation.z = resolved.position.z;
-                    let floor_height = terrain_height(resolved.position.x, resolved.position.z)
+                    let floor_height = world_terrain_sample(resolved.position.x, resolved.position.z).height
                         + PLAYER_RADIUS
                         + 0.01;
                     if !self.driving {
