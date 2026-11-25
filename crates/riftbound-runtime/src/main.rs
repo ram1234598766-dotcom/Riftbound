@@ -1,5 +1,6 @@
 //! Native window lifecycle and application entry point for Riftbound.
 
+mod audio;
 mod save;
 
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
+    VehicleAudioState,
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
     VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
     world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
@@ -218,6 +220,8 @@ struct RiftboundApp {
     vehicle_upgrades: VehicleUpgrades,
     vehicle_suspension: SuspensionState,
     vehicle_recovery: VehicleRecovery,
+    vehicle_audio_state: VehicleAudioState,
+    vehicle_audio_output: Option<audio::VehicleAudioOutput>,
     driving: bool,
     collision: Option<CollisionWorld>,
     input: InputState,
@@ -448,6 +452,13 @@ impl ApplicationHandler for RiftboundApp {
                 }
                 renderer.follow_camera(player_transform.translation);
                 self.camera_target = player_transform.translation;
+                match audio::VehicleAudioOutput::new() {
+                    Ok(output) => {
+                        self.vehicle_audio_output = Some(output);
+                        log::info!("Native vehicle audio output initialized");
+                    }
+                    Err(error) => log::warn!("Vehicle audio is disabled: {error}"),
+                }
                 log::info!("Riftbound arena, player, and collision world initialized");
                 window.request_redraw();
                 self.window = Some(window);
@@ -808,6 +819,31 @@ impl ApplicationHandler for RiftboundApp {
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
                 let simulation_delta = bounded_simulation_delta(delta);
+                let audio_throttle = if self.driving && self.input.is_held(Button::MoveForward) {
+                    1.0
+                } else if self.driving && self.input.is_held(Button::MoveBackward) {
+                    0.55
+                } else {
+                    0.0
+                };
+                let audio_mix = self.vehicle_audio_state.update(
+                    if self.driving { self.vehicle_state.speed } else { 0.0 },
+                    audio_throttle,
+                    if self.driving {
+                        self.vehicle_state.wheel_slip.slip_ratios()
+                    } else {
+                        [0.0; 4]
+                    },
+                    if self.driving {
+                        self.vehicle_surface_tracker.current()
+                    } else {
+                        VehicleSurface::Asphalt
+                    },
+                    simulation_delta,
+                );
+                if let Some(output) = self.vehicle_audio_output.as_ref() {
+                    output.set_mix(audio_mix);
+                }
                 self.animation_time += delta.min(0.1);
                 self.player_health.update(simulation_delta);
                 if let (Some(renderer), Some(player), Some(collision)) =
