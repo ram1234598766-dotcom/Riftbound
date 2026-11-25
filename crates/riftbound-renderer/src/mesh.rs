@@ -844,10 +844,6 @@ fn world_terrain_chunk_data(
             ] {
                 let (before, after) = if edge_index < side {
                     (edge_index - 1, edge_index + 1)
-                } else if edge_index % side == 0 {
-                    (edge_index - side, edge_index + side)
-                } else if edge_index % side == side - 1 {
-                    (edge_index - side, edge_index + side)
                 } else {
                     (edge_index - side, edge_index + side)
                 };
