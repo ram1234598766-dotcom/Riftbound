@@ -41,6 +41,15 @@ fn save_path() -> io::Result<PathBuf> {
     Ok(std::env::current_dir()?.join(SAVE_FILE))
 }
 
+fn backup_path(path: &std::path::Path) -> PathBuf {
+    path.with_extension("bak")
+}
+
+fn read_valid_profile(path: &std::path::Path) -> Option<SavedProfile> {
+    let contents = fs::read_to_string(path).ok()?;
+    decode(&contents)
+}
+
 fn item_code(item: Option<ItemKind>) -> u8 {
     match item {
         None => 0,
@@ -176,19 +185,40 @@ pub fn load_profile() -> SavedProfile {
     let Ok(path) = save_path() else {
         return SavedProfile::default();
     };
-    let Ok(contents) = fs::read_to_string(path) else {
-        return SavedProfile::default();
-    };
-    decode(&contents).unwrap_or_default()
+    read_valid_profile(&path)
+        .or_else(|| read_valid_profile(&backup_path(&path)))
+        .unwrap_or_default()
 }
 
 /// Atomically replaces the profile save after writing a temporary file.
 pub fn save_profile(profile: &SavedProfile) -> io::Result<()> {
     let path = save_path()?;
+    let backup = backup_path(&path);
     let temporary = path.with_extension("tmp");
     fs::write(&temporary, encode(profile))?;
+
+    // Only replace the backup with a known-good primary save.
+    if read_valid_profile(&path).is_some() {
+        if let Err(error) = fs::copy(&path, &backup) {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+    }
+
+    // Removing first makes replacement work on platforms where rename
+    // cannot overwrite an existing destination. The backup enables recovery
+    // if the final rename fails.
+    if path.exists() {
+        if let Err(error) = fs::remove_file(&path) {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+    }
     if let Err(error) = fs::rename(&temporary, &path) {
         let _ = fs::remove_file(&temporary);
+        if backup.exists() {
+            let _ = fs::copy(&backup, &path);
+        }
         return Err(error);
     }
     Ok(())
