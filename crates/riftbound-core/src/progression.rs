@@ -66,7 +66,7 @@ impl PlayerProgression {
 
     /// Total experience required to reach the supplied level.
     ///
-    /// The first level requires 100 XP; each subsequent level costs 50 more.
+    /// Level two requires 100 XP; each later level adds 150 XP to the threshold.
     #[must_use]
     pub const fn xp_for_level(level: u32) -> u64 {
         if level <= 1 {
@@ -75,7 +75,7 @@ impl PlayerProgression {
         let n = (level - 1) as u64;
         100_u64
             .saturating_mul(n)
-            .saturating_add(50_u64.saturating_mul(n.saturating_mul(n.saturating_sub(1))))
+            .saturating_add(75_u64.saturating_mul(n.saturating_mul(n.saturating_sub(1))))
     }
 
     /// Experience earned toward the next level.
