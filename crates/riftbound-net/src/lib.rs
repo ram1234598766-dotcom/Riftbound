@@ -367,7 +367,7 @@ async fn handle_client_message(
             let Some(player) = players.get(&id) else {
                 return false;
             };
-            let mut vehicle = state.vehicle.lock().await;
+            let vehicle = state.vehicle.lock().await;
             if (player.x - vehicle.x).hypot(player.y - vehicle.y) > 90.0 {
                 return false;
             }
