@@ -9,7 +9,7 @@ use riftbound_core::{
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
-    terrain_height, terrain_vehicle_surface,
+    terrain_height, world_terrain_sample, world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -385,7 +385,7 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            terrain_vehicle_surface(
+                            world_terrain_vehicle_surface(
                                 self.vehicle_state.position.x,
                                 self.vehicle_state.position.z,
                                 self.vehicle_state.heading,
@@ -438,7 +438,7 @@ impl ApplicationHandler for RiftboundApp {
                                 + sin_heading * local_z;
                             let world_z = self.vehicle_state.position.z - sin_heading * local_x
                                 + cos_heading * local_z;
-                            ground_heights[index] = terrain_height(world_x, world_z);
+                            ground_heights[index] = world_terrain_sample(world_x, world_z).height;
                         }
                         let suspension_config = SuspensionConfig::default();
                         let suspension_pose = self.vehicle_suspension.update(
