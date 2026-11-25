@@ -29,6 +29,9 @@ pub struct VehicleSurfaceTracker {
     blend_from: [f32; 3],
     target_response: [f32; 3],
     blend_frames: u8,
+    side_blend_from: [f32; 2],
+    side_target: [f32; 2],
+    side_blend_frames: u8,
 }
 
 impl Default for VehicleSurfaceTracker {
@@ -59,6 +62,9 @@ impl VehicleSurfaceTracker {
                 initial.rolling_resistance(),
             ],
             blend_frames: Self::TRANSITION_FRAMES,
+            side_blend_from: [initial.traction(); 2],
+            side_target: [initial.traction(); 2],
+            side_blend_frames: Self::TRANSITION_FRAMES,
         }
     }
 
@@ -74,6 +80,16 @@ impl VehicleSurfaceTracker {
             self.blend_from[0] + (target[0] - self.blend_from[0]) * amount,
             self.blend_from[1] + (target[1] - self.blend_from[1]) * amount,
             self.blend_from[2] + (target[2] - self.blend_from[2]) * amount,
+        )
+    }
+
+    /// Returns blended left/right tyre grip, in vehicle-local side order.
+    #[must_use]
+    pub fn side_traction(self) -> (f32, f32) {
+        let amount = f32::from(self.side_blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        (
+            self.side_blend_from[0] + (self.side_target[0] - self.side_blend_from[0]) * amount,
+            self.side_blend_from[1] + (self.side_target[1] - self.side_blend_from[1]) * amount,
         )
     }
 
@@ -125,6 +141,17 @@ impl VehicleSurfaceTracker {
         contacts: [VehicleSurface; 4],
     ) -> VehicleSurface {
         self.update(dominant_surface);
+        self.side_blend_frames = self.side_blend_frames.saturating_add(1).min(Self::TRANSITION_FRAMES);
+        let side_target = [
+            (contacts[0].traction() + contacts[2].traction()) * 0.5,
+            (contacts[1].traction() + contacts[3].traction()) * 0.5,
+        ];
+        if side_target != self.side_target {
+            let current = self.side_traction();
+            self.side_blend_from = [current.0, current.1];
+            self.side_target = side_target;
+            self.side_blend_frames = 0;
+        }
         let target = [
             contacts.iter().map(|surface| surface.traction()).sum::<f32>() * 0.25,
             contacts
@@ -371,11 +398,13 @@ impl VehicleState {
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
-        self.update_with_surface_response(
+        self.update_with_wheel_surface_response(
             input,
             surface.traction(),
             surface.speed_multiplier(),
             surface.rolling_resistance(),
+            surface.traction(),
+            surface.traction(),
             config,
             delta_seconds,
         );
@@ -391,7 +420,30 @@ impl VehicleState {
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
+        self.update_with_wheel_surface_response(
+            input, traction, speed_multiplier, rolling_resistance, traction, traction, config, delta_seconds,
+        );
+    }
+
+    /// Advances handling with separate blended left/right tyre grip.
+    pub fn update_with_wheel_surface_response(
+        &mut self,
+        input: VehicleInput,
+        traction: f32,
+        speed_multiplier: f32,
+        rolling_resistance: f32,
+        left_traction: f32,
+        right_traction: f32,
+        config: VehicleConfig,
+        delta_seconds: f32,
+    ) {
         if !traction.is_finite()
+            || !left_traction.is_finite()
+            || !right_traction.is_finite()
+            || left_traction <= 0.0
+            || left_traction > 1.0
+            || right_traction <= 0.0
+            || right_traction > 1.0
             || !speed_multiplier.is_finite()
             || !rolling_resistance.is_finite()
             || traction <= 0.0
@@ -430,6 +482,7 @@ impl VehicleState {
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
         let grip = traction;
+        let grip_imbalance = right_traction - left_traction;
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
             // Available tire grip limits braking force on loose and slippery terrain.
@@ -453,8 +506,17 @@ impl VehicleState {
             config.max_forward_speed
         };
         let speed_fraction = (self.speed.abs() / speed_limit).clamp(0.0, 1.0);
-        self.heading +=
-            steering * config.steering_rate * grip * speed_fraction * self.speed.signum() * dt;
+        let steering_stability = 1.0 - grip_imbalance.abs() * 0.12;
+        self.heading += steering
+            * config.steering_rate
+            * grip
+            * steering_stability
+            * speed_fraction
+            * self.speed.signum()
+            * dt;
+        // Unequal braking grip creates a small, physically motivated pull toward
+        // the side with more grip; blending the side values softens road-edge transitions.
+        self.heading += grip_imbalance * brake * speed_fraction * 0.25 * dt;
         self.position.x += self.heading.sin() * self.speed * dt;
         self.position.z -= self.heading.cos() * self.speed * dt;
     }
@@ -717,6 +779,47 @@ mod tests {
         assert!((traction - expected_traction).abs() < 0.01);
         assert!((speed - expected_speed).abs() < 0.01);
         assert!((resistance - expected_resistance).abs() < 0.01);
+        let (left, right) = tracker.side_traction();
+        assert!((left - VehicleSurface::Asphalt.traction()).abs() < 0.01);
+        assert!((right - VehicleSurface::Snow.traction()).abs() < 0.01);
+    }
+
+    #[test]
+    fn asymmetric_braking_grip_pulls_vehicle_toward_higher_grip_side() {
+        let config = VehicleConfig::default();
+        let mut balanced = VehicleState {
+            speed: 12.0,
+            ..VehicleState::default()
+        };
+        let mut uneven = balanced;
+        balanced.update_with_wheel_surface_response(
+            VehicleInput { brake: 0.8, ..VehicleInput::default() },
+            0.69, 1.0, 1.5, 0.69, 0.69, config, 0.05,
+        );
+        uneven.update_with_wheel_surface_response(
+            VehicleInput { brake: 0.8, ..VehicleInput::default() },
+            0.69, 1.0, 1.5, 0.38, 1.0, config, 0.05,
+        );
+        assert!(uneven.heading > balanced.heading);
+    }
+
+    #[test]
+    fn side_grip_blends_without_a_heading_input_discontinuity() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let split = [
+            VehicleSurface::Snow,
+            VehicleSurface::Asphalt,
+            VehicleSurface::Snow,
+            VehicleSurface::Asphalt,
+        ];
+        tracker.update_wheel_contacts(VehicleSurface::Asphalt, split);
+        let initial = tracker.side_traction();
+        assert!((initial.0 - initial.1).abs() < 0.0001);
+        for _ in 0..VehicleSurfaceTracker::TRANSITION_FRAMES {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, split);
+        }
+        let settled = tracker.side_traction();
+        assert!(settled.1 > settled.0);
     }
 
     #[test]
