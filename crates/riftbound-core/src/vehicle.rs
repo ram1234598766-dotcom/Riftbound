@@ -552,9 +552,8 @@ impl VehicleState {
             delta_seconds,
         );
         let slip = next_vehicle.wheel_slip.slip_ratios();
-        let traction_with_slip = wheel_traction.map(|grip| grip);
         let traction_with_slip = std::array::from_fn::<_, 4, _>(|index| {
-            traction_with_slip[index] * (1.0 - 0.35 * slip[index].abs()).clamp(0.55, 1.0)
+            wheel_traction[index] * (1.0 - 0.35 * slip[index].abs()).clamp(0.55, 1.0)
         });
         next_vehicle.update_with_four_wheel_surface_response(
             input,
