@@ -870,7 +870,7 @@ impl ApplicationHandler for RiftboundApp {
                                     ));
                                 }
                             }
-                    }
+                        }
                     }
                     if !self.driving {
                         // Return the front wheels to center after the player exits the vehicle.
