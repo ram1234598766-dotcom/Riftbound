@@ -45,7 +45,7 @@ pub use terrain::{terrain_height, terrain_surface, terrain_vehicle_surface};
 pub use transform::Transform3;
 pub use vehicle::{
     SuspensionConfig, SuspensionPose, SuspensionState, VehicleConfig, VehicleInput,
-    VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades,
+    VehicleRecovery, VehicleState, VehicleSurface, VehicleSurfaceTracker, VehicleUpgrades,
 };
 pub use world_streaming::{
     MAX_WORLD_CHUNK_RADIUS, WORLD_CHUNK_SIZE, WorldChunkChanges, WorldChunkConfig, WorldChunkCoord,
