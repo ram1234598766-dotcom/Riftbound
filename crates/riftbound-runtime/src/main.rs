@@ -8,7 +8,7 @@ use riftbound_core::{
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, PlayerProgression, Scene, SuspensionConfig,
-    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
+    SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleUpgrades,
     terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
     WORLD_CHUNK_SIZE,
 };
@@ -40,6 +40,7 @@ struct RiftboundApp {
     vehicle: Option<EntityId>,
     vehicle_wheels: Option<[EntityId; 4]>,
     vehicle_state: VehicleState,
+    vehicle_upgrades: VehicleUpgrades,
     vehicle_suspension: SuspensionState,
     vehicle_recovery: VehicleRecovery,
     driving: bool,
@@ -322,6 +323,41 @@ impl ApplicationHandler for RiftboundApp {
                     if event.state == ElementState::Pressed && key == KeyCode::KeyI {
                         self.inventory_open = !self.inventory_open;
                     }
+                    if event.state == ElementState::Pressed && key == KeyCode::KeyU {
+                        let near_vehicle = self.driving
+                            || self
+                                .renderer
+                                .as_ref()
+                                .and_then(|renderer| {
+                                    self.player.and_then(|player| {
+                                        renderer.scene().get(player).copied()
+                                    })
+                                })
+                                .is_some_and(|player| {
+                                    distance_squared(
+                                        player.translation,
+                                        self.vehicle_state.position,
+                                    ) <= 3.5 * 3.5
+                                });
+                        if !near_vehicle {
+                            log::info!("Move near your vehicle or enter it to tune the engine");
+                        } else if self
+                            .vehicle_upgrades
+                            .purchase_engine_upgrade(&mut self.inventory)
+                        {
+                            log::info!(
+                                "Engine upgraded to tier {}: acceleration and top speed increased",
+                                self.vehicle_upgrades.engine_level()
+                            );
+                        } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
+                            log::info!(
+                                "Engine upgrade needs {cost} Salvage; you have {}",
+                                self.inventory.count(ItemKind::Salvage)
+                            );
+                        } else {
+                            log::info!("Engine is already at maximum tier");
+                        }
+                    }
                     if event.state == ElementState::Pressed {
                         match key {
                             KeyCode::Digit5 => {
@@ -487,7 +523,7 @@ impl ApplicationHandler for RiftboundApp {
                                 0.78,
                                 1.32,
                             ),
-                            VehicleConfig::default(),
+                            self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
                         if let Some(collision) = self.collision.as_ref() {
@@ -1115,10 +1151,11 @@ impl ApplicationHandler for RiftboundApp {
                                 max_health: self.player_health.maximum(),
                                 inventory: self.inventory_open.then(|| {
                                     format!(
-                                        "SHARDS {} SALV {} MED {}",
+                                        "SHARDS {} SALV {} MED {} ENG {}",
                                         self.inventory.count(ItemKind::RiftShard),
                                         self.inventory.count(ItemKind::Salvage),
                                         self.inventory.count(ItemKind::Medkit),
+                                        self.vehicle_upgrades.engine_level(),
                                     )
                                 }),
                                 equipment: format!(
