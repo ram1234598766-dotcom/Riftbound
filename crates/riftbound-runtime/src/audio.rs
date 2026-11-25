@@ -59,7 +59,6 @@ impl VehicleAudioOutput {
             control.store(safe.to_bits(), Ordering::Relaxed);
         }
     }
-
 }
 
 struct VehicleSource {
