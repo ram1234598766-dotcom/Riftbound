@@ -171,6 +171,15 @@ pub fn world_terrain_vehicle_ground_heights(
     for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
         let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
         let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
+        // Do not mix valid terrain heights with the zero-height fallback used
+        // outside the world's supported precision range.
+        if !contact_x.is_finite()
+            || !contact_z.is_finite()
+            || contact_x.abs() > 1_000_000.0
+            || contact_z.abs() > 1_000_000.0
+        {
+            return None;
+        }
         heights[index] = world_terrain_sample(contact_x, contact_z).height;
     }
     Some(heights)
@@ -471,6 +480,14 @@ mod tests {
             .expect("valid vehicle geometry should sample all four corners");
         assert!(heights.iter().all(|height| height.is_finite()));
         assert_ne!(heights[0], heights[3]);
+    }
+
+    #[test]
+    fn vehicle_ground_sampling_rejects_wheel_contacts_outside_world_precision() {
+        assert_eq!(
+            world_terrain_vehicle_ground_heights(999_999.5, 0.0, 0.0, 1.0, 1.0),
+            None
+        );
     }
 
     #[test]
