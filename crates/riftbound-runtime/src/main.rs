@@ -135,14 +135,20 @@ fn append_vehicle_dust_transforms(
     speed: f32,
     surface: VehicleSurface,
     time: f32,
+    landing_intensity: f32,
     transforms: &mut Vec<(EntityId, Transform3)>,
 ) {
+    let landing_boost = if landing_intensity.is_finite() {
+        landing_intensity.clamp(0.0, 1.0) * 0.35
+    } else {
+        0.0
+    };
     let cosine = heading.cos();
     let sine = heading.sin();
     for (index, entity) in entities.iter().enumerate() {
         let index_phase = f32::from(u8::try_from(index).unwrap_or(0));
         let phase = time * 7.0 + index_phase * 1.7;
-        let scale = vehicle_dust_scale(speed, surface, phase);
+        let scale = vehicle_dust_scale(speed, surface, phase) * (1.0 + landing_boost);
         if scale <= 0.0 {
             transforms.push((
                 *entity,
@@ -840,7 +846,10 @@ impl ApplicationHandler for RiftboundApp {
                         VehicleSurface::Asphalt
                     },
                     if self.driving {
-                        self.vehicle_suspension.pose(SuspensionConfig::default()).impact_intensity
+                        {
+                            let pose = self.vehicle_suspension.pose(SuspensionConfig::default());
+                            pose.impact_intensity.max(pose.landing_intensity * 1.2).min(1.0)
+                        }
                     } else {
                         0.0
                     },
@@ -1067,6 +1076,7 @@ impl ApplicationHandler for RiftboundApp {
                                 self.vehicle_state.speed,
                                 self.vehicle_surface_tracker.current(),
                                 self.animation_time,
+                                self.vehicle_suspension.pose(SuspensionConfig::default()).landing_intensity,
                                 &mut self.animated_transforms,
                             );
                         }
@@ -1079,6 +1089,7 @@ impl ApplicationHandler for RiftboundApp {
                             0.0,
                             self.vehicle_surface_tracker.current(),
                             self.animation_time,
+                            0.0,
                             &mut self.animated_transforms,
                         );
                         // Return the front wheels to center after the player exits the vehicle.
@@ -2599,6 +2610,7 @@ mod world_prop_tests {
             0.0,
             0.0,
             VehicleSurface::Gravel,
+            0.0,
             0.0,
             &mut transforms,
         );
