@@ -111,9 +111,13 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     let bridge_corridor = (72.0..=88.0).contains(&world_x) && (-88.0..=-56.0).contains(&world_z);
     let bridge_distance_to_ramp = (world_z + 88.0).min(-56.0 - world_z);
     let bridge_blend = smoothstep((bridge_distance_to_ramp / 8.0).clamp(0.0, 1.0));
+    // Fade the raised deck across its side edges as well as its approaches.
+    // This avoids a vertical height discontinuity where the bridge meets terrain.
+    let bridge_distance_to_edge = (world_x - 72.0).min(88.0 - world_x);
+    let bridge_side_blend = smoothstep((bridge_distance_to_edge / 2.0).clamp(0.0, 1.0));
     let height = ground_height
         + if bridge_corridor {
-            4.0 * bridge_blend
+            4.0 * bridge_blend * bridge_side_blend
         } else {
             0.0
         };
@@ -426,6 +430,15 @@ mod tests {
         assert!((bridge_deck.height - ground_height(80.0, -72.0) - 4.0).abs() < 1.0e-4);
         let approach = world_terrain_sample(80.0, -84.0);
         assert!((approach.height - ground_height(80.0, -84.0) - 2.0).abs() < 1.0e-4);
+
+        // The deck fades to the surrounding ground at both side edges.
+        for world_x in [72.0, 88.0] {
+            let edge = world_terrain_sample(world_x, -72.0);
+            assert!((edge.height - ground_height(world_x, -72.0)).abs() < 1.0e-4);
+        }
+        let side_approach = world_terrain_sample(73.0, -72.0);
+        assert!((side_approach.height - ground_height(73.0, -72.0) - 2.0).abs() < 1.0e-4);
+
         assert_eq!(
             world_terrain_sample(96.0, -72.0).height,
             ground_height(96.0, -72.0)
