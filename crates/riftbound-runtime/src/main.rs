@@ -376,7 +376,7 @@ impl ApplicationHandler for RiftboundApp {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(window) = self.window.as_ref() else {
+        let Some(window) = self.window.as_ref().cloned() else {
             return;
         };
         if window.id() != window_id {
@@ -384,7 +384,7 @@ impl ApplicationHandler for RiftboundApp {
         }
         match event {
             WindowEvent::CloseRequested => {
-                if let Err(error) = save::save_profile(&self.saved_profile()) {
+                if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
                     log::warn!("Could not save vehicle upgrades: {error}");
                 }
                 event_loop.exit();
@@ -401,7 +401,7 @@ impl ApplicationHandler for RiftboundApp {
                 if event.state == ElementState::Pressed
                     && event.physical_key == PhysicalKey::Code(KeyCode::Escape)
                 {
-                    if let Err(error) = save::save_profile(&self.saved_profile()) {
+                    if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
                         log::warn!("Could not save player profile: {error}");
                     }
                     event_loop.exit();
@@ -480,7 +480,7 @@ impl ApplicationHandler for RiftboundApp {
                                         "Engine upgraded to tier {}",
                                         self.vehicle_upgrades.engine_level()
                                     );
-                                    if let Err(error) = save::save_profile(&self.saved_profile()) {
+                                    if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost()
@@ -502,7 +502,7 @@ impl ApplicationHandler for RiftboundApp {
                                         "Handling and tires upgraded to tier {}",
                                         self.vehicle_upgrades.handling_level()
                                     );
-                                    if let Err(error) = save::save_profile(&self.saved_profile()) {
+                                    if let Err(error) = save::save_profile_to_slot(self.save_slot, &self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) =
@@ -528,7 +528,7 @@ impl ApplicationHandler for RiftboundApp {
                                         self.inventory.remove(ItemKind::Medkit, 1);
                                         log::info!("Medkit used: restored {restored} health");
                                         if let Err(error) =
-                                            save::save_profile(&self.saved_profile())
+                                            save::save_profile_to_slot(self.save_slot, &self.saved_profile())
                                         {
                                             log::warn!("Could not save medkit use: {error}");
                                         }
