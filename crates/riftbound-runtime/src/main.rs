@@ -1770,7 +1770,7 @@ fn build_vehicle(scene: &mut Scene) -> (EntityId, [EntityId; 4]) {
                 MeshId::VEHICLE_WHEEL,
             )
             .expect("vehicle wheel entity ID space available");
-        scene.set_material(wheel, MaterialId::AMBER);
+        scene.set_material(wheel, MaterialId::DEFAULT);
         assert!(scene.set_parent(wheel, Some(body)));
         wheels.push(wheel);
     }
