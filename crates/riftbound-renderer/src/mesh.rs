@@ -847,9 +847,15 @@ fn world_terrain_chunk_data(
                 } else {
                     (edge_index - side, edge_index + side)
                 };
-                let height = (vertices.get(before)?.position[1]
-                    + vertices.get(after)?.position[1]) * 0.5;
-                vertices.get_mut(edge_index)?.position[1] = height;
+                let before_vertex = *vertices.get(before)?;
+                let after_vertex = *vertices.get(after)?;
+                let midpoint = vertices.get_mut(edge_index)?;
+                midpoint.position[1] =
+                    (before_vertex.position[1] + after_vertex.position[1]) * 0.5;
+                for channel in 0..3 {
+                    midpoint.color[channel] =
+                        (before_vertex.color[channel] + after_vertex.color[channel]) * 0.5;
+                }
             }
         }
     }
@@ -1571,11 +1577,20 @@ mod tests {
                 } else {
                     (edge_index - side, edge_index + side)
                 };
-                let expected = (vertices[before].position[1] + vertices[after].position[1]) * 0.5;
+                let expected_height =
+                    (vertices[before].position[1] + vertices[after].position[1]) * 0.5;
                 assert!(
-                    (vertices[edge_index].position[1] - expected).abs() < 1.0e-5,
+                    (vertices[edge_index].position[1] - expected_height).abs() < 1.0e-5,
                     "edge midpoint {edge_index} does not lie on the coarse edge"
                 );
+                for channel in 0..3 {
+                    let expected_color =
+                        (vertices[before].color[channel] + vertices[after].color[channel]) * 0.5;
+                    assert!(
+                        (vertices[edge_index].color[channel] - expected_color).abs() < 1.0e-5,
+                        "edge midpoint {edge_index} has discontinuous color channel {channel}"
+                    );
+                }
             }
         }
     }
