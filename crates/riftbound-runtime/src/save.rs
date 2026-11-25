@@ -75,8 +75,8 @@ fn encode(profile: &SavedProfile) -> String {
         item_code(profile.equipment.item(EquipmentSlot::Feet)),
         u8::from(profile.checkpoint_active),
         profile.player_position.map_or_else(|| String::from("-"), |position| position.x.to_string()),
-        profile.player_position.map_or_else(|| String::from(""), |position| position.y.to_string()),
-        profile.player_position.map_or_else(|| String::from(""), |position| position.z.to_string()),
+        profile.player_position.map_or_else(|| String::from("-"), |position| position.y.to_string()),
+        profile.player_position.map_or_else(|| String::from("-"), |position| position.z.to_string()),
     )
 }
 
