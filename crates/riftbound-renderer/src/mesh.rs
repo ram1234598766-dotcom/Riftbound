@@ -1092,11 +1092,20 @@ mod tests {
                 let markings = &vertices[markings_start..markings_start + dash_count * 4];
                 for dash in 0..dash_count {
                     let segment = &markings[dash * 4..dash * 4 + 4];
-                    let local_start = first_z - f32::from(i16::try_from(chunk_z).expect("chunk fits i16")) * 64.0;
-                    let expected_start = local_start - f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
+                    let chunk_origin_z =
+                        f32::from(i16::try_from(chunk_z).expect("chunk fits i16")) * 64.0;
+                    let local_start = first_z - chunk_origin_z;
+                    let expected_start =
+                        local_start - f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
                     assert!((segment[0].position[2] - expected_start).abs() < 1.0e-4);
-                    assert!((segment[2].position[2] - segment[0].position[2] + 4.0).abs() < 1.0e-4);
-                    assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
+                    assert!(
+                        (segment[2].position[2] - segment[0].position[2] + 4.0).abs() < 1.0e-4
+                    );
+                    assert!(
+                        segment
+                            .iter()
+                            .all(|vertex| vertex.color == [0.95, 0.78, 0.28])
+                    );
                 }
                 assert!(valid_index_data(vertices.len(), &indices));
             }
@@ -1108,10 +1117,16 @@ mod tests {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
         assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
-        // This X-neighbour owns the eastbound spur, not the primary road ribbon
-        // or its centre markings. Its remaining extra vertices are the terrain skirts.
-        assert_eq!(distant_chunk.0.len(), 81 + 9 * 4 + 8 * 4 + 4 * 8 * 4);
-        assert_eq!(distant_chunk.1.len(), 384 + 8 * 3 * 6 + 8 * 6 + 4 * 8 * 6);
+        // The neighbouring chunk owns the eastbound spur and northbound branch,
+        // but not the primary winding road ribbon.
+        assert_eq!(
+            distant_chunk.0.len(),
+            81 + 9 * 4 + 8 * 4 + 5 * 4 + 4 * 4 + 4 * 8 * 4
+        );
+        assert_eq!(
+            distant_chunk.1.len(),
+            384 + 8 * 3 * 6 + 8 * 6 + 5 * 3 * 6 + 4 * 6 + 4 * 8 * 6
+        );
     }
 
     #[test]
