@@ -192,6 +192,9 @@ impl Renderer {
                 .ok_or("Failed to create south-west terrain LOD mesh")?,
             Mesh::terrain_chunk_lod(&device, 1, 1)
                 .ok_or("Failed to create south-east terrain LOD mesh")?,
+            Mesh::environment_tree(&device).ok_or("Failed to create environment tree mesh")?,
+            Mesh::environment_boulder(&device).ok_or("Failed to create environment boulder mesh")?,
+            Mesh::environment_shrub(&device).ok_or("Failed to create environment shrub mesh")?,
         ];
         let scene = starter_scene();
         let mesh_batches = create_mesh_batches(&device, &scene, meshes.len())?;
