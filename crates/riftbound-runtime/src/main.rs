@@ -1592,6 +1592,25 @@ mod world_prop_tests {
     use super::*;
 
     #[test]
+    fn distant_chunks_use_half_the_detailed_prop_budget() {
+        let coord = riftbound_core::WorldChunkCoord { x: 4, z: -2 };
+        let detailed = [WorldChunkRequest {
+            coord,
+            lod: riftbound_core::WorldChunkLod::Detailed,
+            distance_squared: 0,
+        }];
+        let distant = [WorldChunkRequest {
+            coord,
+            lod: riftbound_core::WorldChunkLod::Distant,
+            distance_squared: 1,
+        }];
+        assert_eq!(
+            world_obstacle_footprints(&detailed).len(),
+            world_obstacle_footprints(&distant).len() * 2
+        );
+    }
+
+    #[test]
     fn obstacle_footprints_are_deterministic_and_chunk_local() {
         let chunks = [
             WorldChunkRequest {
