@@ -62,6 +62,7 @@ pub struct CharacterController {
     grounded: bool,
     config: MovementConfig,
     vertical_config: VerticalMotionConfig,
+    movement_bonus: f32,
 }
 
 impl Default for CharacterController {
@@ -79,6 +80,7 @@ impl CharacterController {
             vertical_velocity: 0.0,
             grounded: false,
             config,
+            movement_bonus: 0.0,
             vertical_config: VerticalMotionConfig {
                 gravity: 22.0,
                 jump_speed: 7.2,
@@ -98,7 +100,17 @@ impl CharacterController {
             grounded: false,
             config,
             vertical_config,
+            movement_bonus: 0.0,
         }
+    }
+
+    /// Sets the additive equipment movement bonus, bounded to a safe range.
+    pub fn set_movement_bonus(&mut self, bonus: f32) {
+        self.movement_bonus = if bonus.is_finite() {
+            bonus.clamp(0.0, 0.5)
+        } else {
+            0.0
+        };
     }
 
     /// Current vertical velocity.
@@ -228,8 +240,9 @@ impl CharacterController {
         } else {
             1.0
         };
-        let target_x = world_x * self.config.max_speed * speed_multiplier;
-        let target_z = world_z * self.config.max_speed * speed_multiplier;
+        let equipment_multiplier = 1.0 + self.movement_bonus;
+        let target_x = world_x * self.config.max_speed * speed_multiplier * equipment_multiplier;
+        let target_z = world_z * self.config.max_speed * speed_multiplier * equipment_multiplier;
         let rate = if has_input {
             self.config.acceleration
         } else {
@@ -381,6 +394,22 @@ mod tests {
         let normal_speed =
             (controller.velocity().x.powi(2) + controller.velocity().z.powi(2)).sqrt();
         assert!((normal_speed - 4.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn equipment_movement_bonus_increases_speed_with_a_bound() {
+        let mut controller = CharacterController::default();
+        let mut transform = Transform3::IDENTITY;
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        controller.set_movement_bonus(0.08);
+        for _ in 0..120 {
+            controller.update(&mut transform, &input, 1.0 / 60.0);
+        }
+        assert!((controller.velocity().z.abs() - 4.86).abs() < 0.001);
+
+        controller.set_movement_bonus(f32::INFINITY);
+        assert_eq!(controller.movement_bonus, 0.0);
     }
 
     #[test]
