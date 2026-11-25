@@ -631,6 +631,8 @@ impl Default for SuspensionConfig {
 pub struct SuspensionPose {
     /// Mean spring compression across all wheels.
     pub average_compression: f32,
+    /// Damped average terrain height followed by the sprung chassis.
+    pub average_ground_height: f32,
     /// Front-to-rear chassis angle in radians.
     pub pitch: f32,
     /// Left-to-right chassis angle in radians.
@@ -643,6 +645,9 @@ pub struct SuspensionPose {
 pub struct SuspensionState {
     compression: [f32; 4],
     compression_velocity: [f32; 4],
+    average_ground_height: f32,
+    average_ground_velocity: f32,
+    ground_reference_initialized: bool,
 }
 
 impl SuspensionState {
@@ -681,7 +686,19 @@ impl SuspensionState {
         let dt = delta_seconds.min(0.1);
         let substeps = (dt / (1.0 / 60.0)).ceil() as u32;
         let step_dt = dt / substeps as f32;
+        let target_ground_height = wheel_ground_heights.iter().sum::<f32>() * 0.25;
+        if !self.ground_reference_initialized {
+            self.average_ground_height = target_ground_height;
+            self.average_ground_velocity = 0.0;
+            self.ground_reference_initialized = true;
+        }
         for _ in 0..substeps {
+            let body_follow_strength = config.spring_strength * 0.35;
+            let body_follow_acceleration = (target_ground_height - self.average_ground_height)
+                * body_follow_strength
+                - self.average_ground_velocity * config.damping;
+            self.average_ground_velocity += body_follow_acceleration * step_dt;
+            self.average_ground_height += self.average_ground_velocity * step_dt;
             for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
                 let target = (ground_height + config.rest_length - chassis_height)
                     .clamp(0.0, config.max_travel);
@@ -710,6 +727,11 @@ impl SuspensionState {
         let right = f32::midpoint(self.compression[1], self.compression[3]);
         SuspensionPose {
             average_compression: self.compression.iter().sum::<f32>() * 0.25,
+            average_ground_height: if self.ground_reference_initialized {
+                self.average_ground_height
+            } else {
+                0.0
+            },
             pitch: ((front - rear) / config.wheelbase.max(f32::EPSILON)).atan(),
             roll: ((left - right) / config.track_width.max(f32::EPSILON)).atan(),
         }
@@ -986,6 +1008,27 @@ mod tests {
         assert!(!recovery.recover_if_fallen(&mut valid, -3.0));
         assert_eq!(valid.speed, 3.0);
         assert_eq!(recovery.last_safe_state(), initial);
+    }
+
+    #[test]
+    fn suspension_chassis_height_smooths_a_single_wheel_bump() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        for _ in 0..60 {
+            suspension.update([0.0; 4], config.rest_length, config, 1.0 / 60.0);
+        }
+
+        let before_bump = suspension.pose(config).average_ground_height;
+        let bump = suspension.update([0.48, 0.0, 0.0, 0.0], config.rest_length, config, 1.0 / 60.0);
+        let raw_average = 0.12;
+        assert!((bump.average_ground_height - before_bump).abs() < raw_average * 0.5);
+        assert!(bump.average_ground_height.is_finite());
+
+        let mut recovered = bump;
+        for _ in 0..360 {
+            recovered = suspension.update([0.0; 4], config.rest_length, config, 1.0 / 60.0);
+        }
+        assert!(recovered.average_ground_height.abs() < 0.005);
     }
 
     #[test]
