@@ -725,6 +725,98 @@ fn world_terrain_chunk_data(
                     line_start + 3,
                 ]);
             }
+
+            // Concrete guardrails follow the bridge approach and deck.
+            // Their vertices use the same raised terrain samples as the road.
+            if chunk_z == -1 {
+                let bridge_stations = [-56.0_f32, -64.0, -72.0, -80.0, -88.0];
+                for rail_x in [72.0_f32, 88.0] {
+                    let rail_start = u16::try_from(vertices.len()).ok()?;
+                    for world_z in bridge_stations {
+                        let deck_height = world_terrain_sample(rail_x, world_z).height;
+                        vertices.extend_from_slice(&[
+                            MeshVertex {
+                                position: [rail_x - 0.16 - origin_x, deck_height + 0.25, world_z - origin_z],
+                                color: [0.42, 0.45, 0.48],
+                            },
+                            MeshVertex {
+                                position: [rail_x + 0.16 - origin_x, deck_height + 0.25, world_z - origin_z],
+                                color: [0.42, 0.45, 0.48],
+                            },
+                            MeshVertex {
+                                position: [rail_x - 0.16 - origin_x, deck_height + 1.1, world_z - origin_z],
+                                color: [0.58, 0.61, 0.64],
+                            },
+                            MeshVertex {
+                                position: [rail_x + 0.16 - origin_x, deck_height + 1.1, world_z - origin_z],
+                                color: [0.58, 0.61, 0.64],
+                            },
+                        ]);
+                    }
+                    for station in 0..bridge_stations.len() - 1 {
+                        let base = rail_start
+                            + u16::try_from(station * 4).expect("rail vertex offset fits u16");
+                        indices.extend_from_slice(&[
+                            base,
+                            base + 4,
+                            base + 2,
+                            base + 2,
+                            base + 4,
+                            base + 6,
+                            base + 1,
+                            base + 3,
+                            base + 5,
+                            base + 3,
+                            base + 7,
+                            base + 5,
+                        ]);
+                    }
+                }
+
+                // Two square piers support the centre of the bridge span.
+                for pier_x in [76.0_f32, 84.0] {
+                    let deck_height = world_terrain_sample(pier_x, -72.0).height;
+                    let base_height = deck_height - 4.0;
+                    let half_width = 0.42;
+                    let half_depth = 0.42;
+                    let pier_start = u16::try_from(vertices.len()).ok()?;
+                    for (y, x_offset, z_offset) in [
+                        (base_height, -half_width, -half_depth),
+                        (base_height, half_width, -half_depth),
+                        (base_height, half_width, half_depth),
+                        (base_height, -half_width, half_depth),
+                        (deck_height - 0.2, -half_width, -half_depth),
+                        (deck_height - 0.2, half_width, -half_depth),
+                        (deck_height - 0.2, half_width, half_depth),
+                        (deck_height - 0.2, -half_width, half_depth),
+                    ] {
+                        vertices.push(MeshVertex {
+                            position: [
+                                pier_x + x_offset - origin_x,
+                                y,
+                                -72.0 + z_offset - origin_z,
+                            ],
+                            color: [0.38, 0.4, 0.43],
+                        });
+                    }
+                    for face in [
+                        [0_u16, 1, 5, 4],
+                        [1, 2, 6, 5],
+                        [2, 3, 7, 6],
+                        [3, 0, 4, 7],
+                        [4, 5, 6, 7],
+                    ] {
+                        indices.extend_from_slice(&[
+                            pier_start + face[0],
+                            pier_start + face[1],
+                            pier_start + face[2],
+                            pier_start + face[0],
+                            pier_start + face[2],
+                            pier_start + face[3],
+                        ]);
+                    }
+                }
+            }
         }
     }
 
