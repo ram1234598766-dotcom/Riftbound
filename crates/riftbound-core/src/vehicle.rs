@@ -502,8 +502,10 @@ impl VehicleState {
                 self.speed - self.speed.signum() * reduction
             };
         }
-        let drag = (config.drag + rolling_resistance * 0.025) * dt;
-        self.speed *= (1.0 - drag).max(0.0);
+        let drag_rate = config.drag + rolling_resistance * 0.025;
+        // Exponential damping is stable for every supported step and composes
+        // consistently when the same elapsed time is split across frame rates.
+        self.speed *= (-drag_rate * dt).exp();
         self.speed = self.speed.clamp(
             -config.max_reverse_speed * speed_multiplier,
             config.max_forward_speed * speed_multiplier,
@@ -1233,6 +1235,27 @@ mod tests {
         }
         assert!(vehicle.speed > 0.0);
         assert!(vehicle.position.z < 0.0);
+    }
+
+    #[test]
+    fn passive_vehicle_drag_is_consistent_across_frame_rates() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput::default();
+        let mut at_30_fps = VehicleState {
+            speed: 18.0,
+            ..VehicleState::default()
+        };
+        let mut at_60_fps = at_30_fps;
+
+        for _ in 0..30 {
+            at_30_fps.update(input, VehicleSurface::Asphalt, config, 1.0 / 30.0);
+        }
+        for _ in 0..60 {
+            at_60_fps.update(input, VehicleSurface::Asphalt, config, 1.0 / 60.0);
+        }
+
+        assert!((at_30_fps.speed - at_60_fps.speed).abs() < 0.0001);
+        assert!((at_30_fps.position.z - at_60_fps.position.z).abs() < 0.02);
     }
 
     #[test]
