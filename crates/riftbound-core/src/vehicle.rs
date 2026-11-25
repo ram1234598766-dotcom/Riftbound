@@ -269,7 +269,8 @@ impl VehicleState {
         let grip = surface.grip();
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
-            let reduction = config.braking * brake * dt;
+            // Available tire grip limits braking force on loose and slippery terrain.
+            let reduction = config.braking * brake * grip * dt;
             self.speed = if self.speed.abs() <= reduction {
                 0.0
             } else {
@@ -678,6 +679,28 @@ mod tests {
             0.1,
         );
         assert!(vehicle.speed >= 0.0 && vehicle.speed < 8.0);
+    }
+
+    #[test]
+    fn low_grip_terrain_increases_braking_distance() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            brake: 1.0,
+            ..VehicleInput::default()
+        };
+        let mut asphalt = VehicleState {
+            speed: 12.0,
+            ..VehicleState::default()
+        };
+        let mut snow = asphalt;
+
+        for _ in 0..10 {
+            asphalt.update(input, VehicleSurface::Asphalt, config, 0.1);
+            snow.update(input, VehicleSurface::Snow, config, 0.1);
+        }
+
+        assert!(asphalt.speed < snow.speed);
+        assert!(snow.speed > 0.0);
     }
 
     #[test]
