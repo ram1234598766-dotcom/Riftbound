@@ -1658,29 +1658,15 @@ impl ApplicationHandler for RiftboundApp {
                                     (grip.clamp(0.0, 1.0) * 100.0).round() as u8
                                 }),
                                 vehicle_slip: self.driving.then(|| {
-                                    let grip = self.vehicle_surface_tracker.response().0;
-                                    let throttle = if self.input.is_held(Button::MoveForward) {
-                                        1.0
-                                    } else if self.input.is_held(Button::MoveBackward) {
-                                        -1.0
-                                    } else {
-                                        0.0
-                                    };
-                                    let steering = if self.input.is_held(Button::MoveLeft) {
-                                        -1.0
-                                    } else if self.input.is_held(Button::MoveRight) {
-                                        1.0
-                                    } else {
-                                        0.0
-                                    };
-                                    vehicle_slip_percent(
-                                        throttle,
-                                        if self.input.is_held(Button::Jump) { 1.0 } else { 0.0 },
-                                        steering,
-                                        self.vehicle_state.speed,
-                                        VehicleConfig::default().max_forward_speed,
-                                        grip,
-                                    )
+                                    self.vehicle_state
+                                        .wheel_slip
+                                        .slip_ratios()
+                                        .iter()
+                                        .map(|slip| slip.abs())
+                                        .fold(0.0_f32, f32::max)
+                                        .mul_add(100.0, 0.0)
+                                        .round()
+                                        .clamp(0.0, 100.0) as u8
                                 }),
                                 equipment: format!(
                                     "BODY {} FEET {}",
