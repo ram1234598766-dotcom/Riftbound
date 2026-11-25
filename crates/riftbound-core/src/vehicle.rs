@@ -228,13 +228,6 @@ impl VehicleSurface {
         }
     }
 
-    fn grip(self) -> f32 {
-        self.traction()
-    }
-
-    fn speed_factor(self) -> f32 {
-        self.speed_multiplier()
-    }
 }
 
 /// Tunable, unit-agnostic vehicle handling values.
@@ -407,11 +400,12 @@ impl VehicleState {
     ) {
         self.update_with_wheel_surface_response(
             input,
-            surface.traction(),
-            surface.speed_multiplier(),
-            surface.rolling_resistance(),
-            surface.traction(),
-            surface.traction(),
+            (
+                surface.traction(),
+                surface.speed_multiplier(),
+                surface.rolling_resistance(),
+            ),
+            (surface.traction(), surface.traction()),
             config,
             delta_seconds,
         );
@@ -429,11 +423,8 @@ impl VehicleState {
     ) {
         self.update_with_wheel_surface_response(
             input,
-            traction,
-            speed_multiplier,
-            rolling_resistance,
-            traction,
-            traction,
+            (traction, speed_multiplier, rolling_resistance),
+            (traction, traction),
             config,
             delta_seconds,
         );
@@ -443,14 +434,13 @@ impl VehicleState {
     pub fn update_with_wheel_surface_response(
         &mut self,
         input: VehicleInput,
-        traction: f32,
-        speed_multiplier: f32,
-        rolling_resistance: f32,
-        left_traction: f32,
-        right_traction: f32,
+        surface_response: (f32, f32, f32),
+        side_traction: (f32, f32),
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
+        let (traction, speed_multiplier, rolling_resistance) = surface_response;
+        let (left_traction, right_traction) = side_traction;
         if !traction.is_finite()
             || !left_traction.is_finite()
             || !right_traction.is_finite()
@@ -811,11 +801,8 @@ mod tests {
                 brake: 0.8,
                 ..VehicleInput::default()
             },
-            0.69,
-            1.0,
-            1.5,
-            0.69,
-            0.69,
+            (0.69, 1.0, 1.5),
+            (0.69, 0.69),
             config,
             0.05,
         );
@@ -824,11 +811,8 @@ mod tests {
                 brake: 0.8,
                 ..VehicleInput::default()
             },
-            0.69,
-            1.0,
-            1.5,
-            0.38,
-            1.0,
+            (0.69, 1.0, 1.5),
+            (0.38, 1.0),
             config,
             0.05,
         );
