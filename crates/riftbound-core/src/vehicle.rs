@@ -27,6 +27,7 @@ pub struct VehicleSurfaceTracker {
     candidate: Option<VehicleSurface>,
     candidate_frames: u8,
     blend_from: [f32; 3],
+    target_response: [f32; 3],
     blend_frames: u8,
 }
 
@@ -52,6 +53,11 @@ impl VehicleSurfaceTracker {
                 initial.speed_multiplier(),
                 initial.rolling_resistance(),
             ],
+            target_response: [
+                initial.traction(),
+                initial.speed_multiplier(),
+                initial.rolling_resistance(),
+            ],
             blend_frames: Self::TRANSITION_FRAMES,
         }
     }
@@ -62,11 +68,7 @@ impl VehicleSurfaceTracker {
     /// Returns blended traction, speed multiplier, and rolling resistance.
     #[must_use]
     pub fn response(self) -> (f32, f32, f32) {
-        let target = [
-            self.current.traction(),
-            self.current.speed_multiplier(),
-            self.current.rolling_resistance(),
-        ];
+        let target = self.target_response;
         let amount = f32::from(self.blend_frames) / f32::from(Self::TRANSITION_FRAMES);
         (
             self.blend_from[0] + (target[0] - self.blend_from[0]) * amount,
@@ -101,9 +103,44 @@ impl VehicleSurfaceTracker {
             };
             self.blend_frames = 0;
             self.current = sampled;
+            self.target_response = [
+                sampled.traction(),
+                sampled.speed_multiplier(),
+                sampled.rolling_resistance(),
+            ];
             self.candidate = None;
             self.candidate_frames = 0;
         }
+        self.current
+    }
+
+    /// Updates handling from four individual tyre contacts.
+    ///
+    /// The dominant contact still passes through the confirmation filter, while
+    /// the response target is the mean of all four tyre profiles. A short blend
+    /// each fixed update prevents abrupt changes as individual tyres cross edges.
+    pub fn update_wheel_contacts(
+        &mut self,
+        dominant_surface: VehicleSurface,
+        contacts: [VehicleSurface; 4],
+    ) -> VehicleSurface {
+        self.update(dominant_surface);
+        let current = self.response();
+        self.blend_from = [current.0, current.1, current.2];
+        self.target_response = [
+            contacts.iter().map(|surface| surface.traction()).sum::<f32>() * 0.25,
+            contacts
+                .iter()
+                .map(|surface| surface.speed_multiplier())
+                .sum::<f32>()
+                * 0.25,
+            contacts
+                .iter()
+                .map(|surface| surface.rolling_resistance())
+                .sum::<f32>()
+                * 0.25,
+        ];
+        self.blend_frames = 1;
         self.current
     }
 
