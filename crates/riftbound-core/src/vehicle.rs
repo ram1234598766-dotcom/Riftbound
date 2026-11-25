@@ -295,7 +295,35 @@ impl VehicleState {
         config: VehicleConfig,
         delta_seconds: f32,
     ) {
-        if !delta_seconds.is_finite()
+        self.update_with_surface_response(
+            input,
+            surface.traction(),
+            surface.speed_multiplier(),
+            surface.rolling_resistance(),
+            config,
+            delta_seconds,
+        );
+    }
+
+    /// Advances handling with blended terrain coefficients for smooth surface transitions.
+    pub fn update_with_surface_response(
+        &mut self,
+        input: VehicleInput,
+        traction: f32,
+        speed_multiplier: f32,
+        rolling_resistance: f32,
+        config: VehicleConfig,
+        delta_seconds: f32,
+    ) {
+        if !traction.is_finite()
+            || !speed_multiplier.is_finite()
+            || !rolling_resistance.is_finite()
+            || traction <= 0.0
+            || traction > 1.0
+            || speed_multiplier <= 0.0
+            || speed_multiplier > 1.0
+            || rolling_resistance < 0.0
+            || !delta_seconds.is_finite()
             || delta_seconds <= 0.0
             || !input.throttle.is_finite()
             || !input.brake.is_finite()
@@ -325,7 +353,7 @@ impl VehicleState {
         let throttle = input.throttle.clamp(-1.0, 1.0);
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
-        let grip = surface.grip();
+        let grip = traction;
         self.speed += throttle * config.acceleration * grip * dt;
         if brake > 0.0 {
             // Available tire grip limits braking force on loose and slippery terrain.
@@ -336,10 +364,10 @@ impl VehicleState {
                 self.speed - self.speed.signum() * reduction
             };
         }
-        let drag = (config.drag + surface.rolling_resistance() * 0.025) * dt;
+        let drag = (config.drag + rolling_resistance * 0.025) * dt;
         self.speed *= (1.0 - drag).max(0.0);
         self.speed = self.speed.clamp(
-            -config.max_reverse_speed * surface.speed_factor(),
+            -config.max_reverse_speed * speed_multiplier,
             config.max_forward_speed * surface.speed_factor(),
         );
 
