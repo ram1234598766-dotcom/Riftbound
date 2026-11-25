@@ -629,6 +629,8 @@ impl Default for SuspensionConfig {
 /// Chassis response derived from the four suspension corners.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SuspensionPose {
+    /// Per-wheel spring compression in front-left, front-right, rear-left, rear-right order.
+    pub wheel_compressions: [f32; 4],
     /// Mean spring compression across all wheels.
     pub average_compression: f32,
     /// Damped average terrain height followed by the sprung chassis.
@@ -726,6 +728,7 @@ impl SuspensionState {
         let left = f32::midpoint(self.compression[0], self.compression[2]);
         let right = f32::midpoint(self.compression[1], self.compression[3]);
         SuspensionPose {
+            wheel_compressions: self.compression,
             average_compression: self.compression.iter().sum::<f32>() * 0.25,
             average_ground_height: if self.ground_reference_initialized {
                 self.average_ground_height
@@ -741,6 +744,20 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn suspension_pose_exposes_each_corner_compression_in_stable_order() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+        let pose = suspension.update([0.12, 0.24, 0.36, 0.48], 0.58, config, 1.0 / 60.0);
+
+        assert!(pose.wheel_compressions[0] < pose.wheel_compressions[1]);
+        assert!(pose.wheel_compressions[1] < pose.wheel_compressions[2]);
+        assert!(pose.wheel_compressions[2] < pose.wheel_compressions[3]);
+        assert!(pose.wheel_compressions.iter().all(|value| {
+            value.is_finite() && (0.0..=config.max_travel).contains(value)
+        }));
+    }
 
     #[test]
     fn vehicle_surface_tracker_filters_single_frame_boundary_noise() {
