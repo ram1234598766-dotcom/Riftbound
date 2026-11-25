@@ -448,6 +448,12 @@ impl ApplicationHandler for RiftboundApp {
                 }
                 event_loop.exit();
             }
+            WindowEvent::Focused(false) => {
+                // A lost focus can prevent key-release events from reaching the window.
+                // Clear held controls so movement and vehicle throttle cannot stick.
+                self.input = InputState::default();
+                window.request_redraw();
+            }
             WindowEvent::Resized(size) => {
                 if let Some(renderer) = self.renderer.as_mut() {
                     renderer.resize(size.width, size.height);
