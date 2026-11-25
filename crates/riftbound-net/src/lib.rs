@@ -63,6 +63,8 @@ struct HostState {
     shards: Arc<Mutex<[bool; 5]>>,
     extracted: Arc<Mutex<bool>>,
     enemies: Arc<Mutex<Vec<EnemyState>>>,
+    vehicle: Arc<Mutex<SharedVehicleState>>,
+    vehicle_driver: Arc<Mutex<Option<u64>>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -71,6 +73,14 @@ struct PlayerState {
     x: f32,
     y: f32,
     face: f32,
+}
+
+#[derive(Clone, Serialize)]
+struct SharedVehicleState {
+    x: f32,
+    y: f32,
+    heading: f32,
+    speed: f32,
 }
 
 #[derive(Clone, Serialize)]
@@ -90,6 +100,9 @@ struct ClientMessage {
     face: Option<f32>,
     shard: Option<usize>,
     enemy: Option<usize>,
+    throttle: Option<f32>,
+    brake: Option<f32>,
+    steering: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -99,6 +112,8 @@ struct Snapshot<'a> {
     shards: &'a [bool; 5],
     extracted: bool,
     enemies: &'a [EnemyState],
+    vehicle: &'a SharedVehicleState,
+    vehicle_driver: Option<u64>,
 }
 
 /// Starts the LAN web host and multiplayer relay on all local network interfaces.
@@ -133,6 +148,13 @@ pub async fn serve() {
         next_id: Arc::new(AtomicU64::new(1)),
         shards: Arc::new(Mutex::new([false; 5])),
         extracted: Arc::new(Mutex::new(false)),
+        vehicle: Arc::new(Mutex::new(SharedVehicleState {
+            x: WORLD_WIDTH * 0.5 + 90.0,
+            y: WORLD_HEIGHT * 0.5,
+            heading: 0.0,
+            speed: 0.0,
+        })),
+        vehicle_driver: Arc::new(Mutex::new(None)),
         enemies: Arc::new(Mutex::new(vec![
             EnemyState {
                 id: 0,
@@ -332,6 +354,50 @@ async fn handle_client_message(
                 }
             }
         }
+        "enter_vehicle" => {
+            let players = state.players.lock().await;
+            let Some(player) = players.get(&id) else {
+                return false;
+            };
+            let mut vehicle = state.vehicle.lock().await;
+            if (player.x - vehicle.x).hypot(player.y - vehicle.y) > 90.0 {
+                return false;
+            }
+            drop(vehicle);
+            let mut driver = state.vehicle_driver.lock().await;
+            if driver.is_some_and(|current| current != id) {
+                return false;
+            }
+            *driver = Some(id);
+        }
+        "exit_vehicle" => {
+            let mut driver = state.vehicle_driver.lock().await;
+            if *driver != Some(id) {
+                return false;
+            }
+            *driver = None;
+            state.vehicle.lock().await.speed = 0.0;
+        }
+        "drive" => {
+            let (Some(throttle), Some(brake), Some(steering)) =
+                (input.throttle, input.brake, input.steering)
+            else {
+                return false;
+            };
+            if !is_valid_vehicle_input(throttle, brake, steering)
+                || *state.vehicle_driver.lock().await != Some(id)
+            {
+                return false;
+            }
+            let now = Instant::now();
+            let elapsed = now.duration_since(*last_input_at).as_secs_f32().min(MAX_INPUT_DELTA);
+            if elapsed < MIN_MOVE_INTERVAL.as_secs_f32() {
+                return false;
+            }
+            *last_input_at = now;
+            let mut vehicle = state.vehicle.lock().await;
+            update_shared_vehicle(&mut vehicle, throttle, brake, steering, elapsed);
+        }
         "attack" => {
             let Some(index) = input.enemy else {
                 return false;
@@ -391,12 +457,16 @@ async fn publish_snapshot(state: &HostState) {
     let shards = *state.shards.lock().await;
     let extracted = *state.extracted.lock().await;
     let enemies = state.enemies.lock().await.clone();
+    let vehicle = state.vehicle.lock().await.clone();
+    let vehicle_driver = *state.vehicle_driver.lock().await;
     if let Ok(message) = serde_json::to_string(&Snapshot {
         kind: "snapshot",
         players: &players,
         shards: &shards,
         extracted,
         enemies: &enemies,
+        vehicle: &vehicle,
+        vehicle_driver,
     }) {
         let _ = state.updates.send(message);
     }
@@ -446,6 +516,45 @@ fn within_extraction_range(x: f32, y: f32) -> bool {
     (x - EXTRACTION_POSITION.0).hypot(y - EXTRACTION_POSITION.1) <= 90.0
 }
 
+fn is_valid_vehicle_input(throttle: f32, brake: f32, steering: f32) -> bool {
+    throttle.is_finite()
+        && brake.is_finite()
+        && steering.is_finite()
+        && (-1.0..=1.0).contains(&throttle)
+        && (0.0..=1.0).contains(&brake)
+        && (-1.0..=1.0).contains(&steering)
+}
+
+fn update_shared_vehicle(
+    vehicle: &mut SharedVehicleState,
+    throttle: f32,
+    brake: f32,
+    steering: f32,
+    delta_seconds: f32,
+) {
+    if !is_valid_vehicle_input(throttle, brake, steering)
+        || !delta_seconds.is_finite()
+        || delta_seconds <= 0.0
+        || !vehicle.x.is_finite()
+        || !vehicle.y.is_finite()
+        || !vehicle.heading.is_finite()
+        || !vehicle.speed.is_finite()
+    {
+        return;
+    }
+    let dt = delta_seconds.min(MAX_INPUT_DELTA);
+    vehicle.speed += throttle * 170.0 * dt;
+    vehicle.speed *= 1.0 - (0.65 * dt).min(0.95);
+    vehicle.speed *= 1.0 - brake * (5.0 * dt).min(1.0);
+    vehicle.speed = vehicle.speed.clamp(-90.0, 260.0);
+    let steering_factor = (vehicle.speed.abs() / 35.0).clamp(0.0, 1.0);
+    vehicle.heading += steering * steering_factor * 1.9 * dt * vehicle.speed.signum();
+    vehicle.x = (vehicle.x + vehicle.heading.sin() * vehicle.speed * dt)
+        .clamp(50.0, WORLD_WIDTH - 50.0);
+    vehicle.y = (vehicle.y - vehicle.heading.cos() * vehicle.speed * dt)
+        .clamp(50.0, WORLD_HEIGHT - 50.0);
+}
+
 fn is_valid_move_input(dx: f32, dy: f32, face: f32) -> bool {
     dx.is_finite()
         && dy.is_finite()
@@ -464,6 +573,33 @@ fn clamp_world_position(value: f32, maximum: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vehicle_input_is_bounded_and_rejects_non_finite_values() {
+        assert!(is_valid_vehicle_input(1.0, 0.0, -1.0));
+        assert!(is_valid_vehicle_input(-1.0, 1.0, 1.0));
+        assert!(!is_valid_vehicle_input(1.1, 0.0, 0.0));
+        assert!(!is_valid_vehicle_input(0.0, -0.1, 0.0));
+        assert!(!is_valid_vehicle_input(0.0, 0.0, f32::NAN));
+    }
+
+    #[test]
+    fn shared_vehicle_update_keeps_speed_and_position_bounded() {
+        let mut vehicle = SharedVehicleState {
+            x: WORLD_WIDTH * 0.5,
+            y: WORLD_HEIGHT * 0.5,
+            heading: 0.0,
+            speed: 0.0,
+        };
+        for _ in 0..200 {
+            update_shared_vehicle(&mut vehicle, 1.0, 0.0, 1.0, 0.05);
+        }
+        assert!(vehicle.speed <= 260.0);
+        assert!(vehicle.speed >= -90.0);
+        assert!((50.0..=WORLD_WIDTH - 50.0).contains(&vehicle.x));
+        assert!((50.0..=WORLD_HEIGHT - 50.0).contains(&vehicle.y));
+        assert!(vehicle.heading.is_finite());
+    }
 
     #[test]
     fn movement_input_rejects_non_finite_and_excessive_values() {
