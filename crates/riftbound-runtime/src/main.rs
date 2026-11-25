@@ -81,6 +81,26 @@ struct RiftboundApp {
     world_obstacle_entities: Vec<EntityId>,
 }
 
+impl RiftboundApp {
+    fn saved_profile(&self) -> save::SavedProfile {
+        let player_position = self.renderer.as_ref().and_then(|renderer| {
+            self.player
+                .and_then(|player| renderer.scene().get(player))
+                .map(|transform| transform.translation)
+        });
+        save::SavedProfile {
+            upgrades: self.vehicle_upgrades,
+            inventory: self.inventory.clone(),
+            equipment: self.equipment,
+            progression: self.progression,
+            checkpoint_active: self.checkpoint_progress.is_some_and(
+                CheckpointProgress::has_active_checkpoint,
+            ),
+            player_position,
+        }
+    }
+}
+
 impl ApplicationHandler for RiftboundApp {
     #[allow(clippy::too_many_lines)]
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -92,6 +112,7 @@ impl ApplicationHandler for RiftboundApp {
         }
         let saved_profile = save::load_profile();
         let checkpoint_active = saved_profile.checkpoint_active;
+        let saved_position = saved_profile.player_position;
         self.vehicle_upgrades = saved_profile.upgrades;
         self.inventory = saved_profile.inventory;
         self.equipment = saved_profile.equipment;
@@ -117,8 +138,18 @@ impl ApplicationHandler for RiftboundApp {
             Ok(mut renderer) => {
                 let mut scene = renderer.scene().clone();
                 build_arena(&mut scene);
-                let player_transform = Transform3::new(
+                let spawn_position = saved_position.map_or(
                     Vec3::new(0.0, PLAYER_RADIUS + 0.01, -4.0),
+                    |saved| {
+                        Vec3::new(
+                            saved.x,
+                            world_terrain_sample(saved.x, saved.z).height + PLAYER_RADIUS + 0.01,
+                            saved.z,
+                        )
+                    },
+                );
+                let player_transform = Transform3::new(
+                    spawn_position,
                     Vec3::new(0.0, 0.0, 0.0),
                     Vec3::new(0.38, 0.38, 0.38),
                 );
@@ -246,13 +277,7 @@ impl ApplicationHandler for RiftboundApp {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Err(error) = save::save_profile(&save::SavedProfile {
-            upgrades: self.vehicle_upgrades,
-            inventory: self.inventory.clone(),
-            equipment: self.equipment,
-            progression: self.progression,
-            checkpoint_active: self.checkpoint_progress.is_some_and(CheckpointProgress::has_active_checkpoint),
-        }) {
+        if let Err(error) = save::save_profile(&self.saved_profile()) {
             log::warn!("Could not save player profile while suspending: {error}");
         }
         self.renderer = None;
@@ -308,15 +333,7 @@ impl ApplicationHandler for RiftboundApp {
         }
         match event {
             WindowEvent::CloseRequested => {
-                if let Err(error) = save::save_profile(&save::SavedProfile {
-                    upgrades: self.vehicle_upgrades,
-                    inventory: self.inventory.clone(),
-                    equipment: self.equipment,
-                    progression: self.progression,
-                    checkpoint_active: self.checkpoint_progress.is_some_and(
-                        CheckpointProgress::has_active_checkpoint,
-                    ),
-                }) {
+                if let Err(error) = save::save_profile(&self.saved_profile()) {
                     log::warn!("Could not save vehicle upgrades: {error}");
                 }
                 event_loop.exit();
@@ -333,15 +350,7 @@ impl ApplicationHandler for RiftboundApp {
                 if event.state == ElementState::Pressed
                     && event.physical_key == PhysicalKey::Code(KeyCode::Escape)
                 {
-                    if let Err(error) = save::save_profile(&save::SavedProfile {
-                        upgrades: self.vehicle_upgrades,
-                        inventory: self.inventory.clone(),
-                        equipment: self.equipment,
-                        progression: self.progression,
-                        checkpoint_active: self.checkpoint_progress.is_some_and(
-                            CheckpointProgress::has_active_checkpoint,
-                        ),
-                    }) {
+                    if let Err(error) = save::save_profile(&self.saved_profile()) {
                         log::warn!("Could not save player profile: {error}");
                     }
                     event_loop.exit();
@@ -385,15 +394,7 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyU => {
                                 if self.vehicle_upgrades.purchase_engine_upgrade(&mut self.inventory) {
                                     log::info!("Engine upgraded to tier {}", self.vehicle_upgrades.engine_level());
-                                    if let Err(error) = save::save_profile(&save::SavedProfile {
-                    upgrades: self.vehicle_upgrades,
-                    inventory: self.inventory.clone(),
-                    equipment: self.equipment,
-                    progression: self.progression,
-                    checkpoint_active: self.checkpoint_progress.is_some_and(
-                        CheckpointProgress::has_active_checkpoint,
-                    ),
-                }) {
+                                    if let Err(error) = save::save_profile(&self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
@@ -405,15 +406,7 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyH => {
                                 if self.vehicle_upgrades.purchase_handling_upgrade(&mut self.inventory) {
                                     log::info!("Handling and tires upgraded to tier {}", self.vehicle_upgrades.handling_level());
-                                    if let Err(error) = save::save_profile(&save::SavedProfile {
-                    upgrades: self.vehicle_upgrades,
-                    inventory: self.inventory.clone(),
-                    equipment: self.equipment,
-                    progression: self.progression,
-                    checkpoint_active: self.checkpoint_progress.is_some_and(
-                        CheckpointProgress::has_active_checkpoint,
-                    ),
-                }) {
+                                    if let Err(error) = save::save_profile(&self.saved_profile()) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_handling_cost() {
@@ -1095,13 +1088,7 @@ impl ApplicationHandler for RiftboundApp {
                                 log::info!(
                                     "Checkpoint activated; falling will return the player here"
                                 );
-                                if let Err(error) = save::save_profile(&save::SavedProfile {
-                                    upgrades: self.vehicle_upgrades,
-                                    inventory: self.inventory.clone(),
-                                    equipment: self.equipment,
-                                    progression: self.progression,
-                                    checkpoint_active: true,
-                                }) {
+                                if let Err(error) = save::save_profile(&self.saved_profile()) {
                                     log::warn!("Could not save activated checkpoint: {error}");
                                 }
                             }
