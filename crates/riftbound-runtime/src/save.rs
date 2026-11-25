@@ -5,7 +5,7 @@ use std::io;
 use std::path::PathBuf;
 
 use riftbound_core::{
-    Equipment, EquipmentSlot, Inventory, ItemKind, PlayerProgression, VehicleUpgrades,
+    Equipment, EquipmentSlot, Inventory, ItemKind, PlayerProgression, Vec3, VehicleUpgrades,
 };
 
 const SAVE_FILE: &str = "riftbound-save-v1.txt";
@@ -17,6 +17,7 @@ pub struct SavedProfile {
     pub equipment: Equipment,
     pub progression: PlayerProgression,
     pub checkpoint_active: bool,
+    pub player_position: Option<Vec3>,
 }
 
 impl Default for SavedProfile {
@@ -31,6 +32,7 @@ impl Default for SavedProfile {
             equipment: Equipment::default(),
             progression: PlayerProgression::default(),
             checkpoint_active: false,
+            player_position: None,
         }
     }
 }
@@ -59,7 +61,7 @@ fn decode_equipped(code: u8, expected: EquipmentSlot) -> Option<Option<ItemKind>
 
 fn encode(profile: &SavedProfile) -> String {
     format!(
-        "{HEADER}\nengine={}\nhandling={}\nxp={}\nshards={}\nsalvage={}\nmedkits={}\nvests={}\nboots={}\nvehicle_parts={}\nbody={}\nfeet={}\ncheckpoint={}\n",
+        "{HEADER}\nengine={}\nhandling={}\nxp={}\nshards={}\nsalvage={}\nmedkits={}\nvests={}\nboots={}\nvehicle_parts={}\nbody={}\nfeet={}\ncheckpoint={}\nplayer_x={}\nplayer_y={}\nplayer_z={}\n",
         profile.upgrades.engine_level(),
         profile.upgrades.handling_level(),
         profile.progression.total_xp(),
@@ -72,6 +74,9 @@ fn encode(profile: &SavedProfile) -> String {
         item_code(profile.equipment.item(EquipmentSlot::Body)),
         item_code(profile.equipment.item(EquipmentSlot::Feet)),
         u8::from(profile.checkpoint_active),
+        profile.player_position.map_or_else(|| String::from(""), |position| position.x.to_string()),
+        profile.player_position.map_or_else(|| String::from(""), |position| position.y.to_string()),
+        profile.player_position.map_or_else(|| String::from(""), |position| position.z.to_string()),
     )
 }
 
@@ -87,7 +92,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
             return None;
         }
     }
-    if values.len() != 11 && values.len() != 12 {
+    if values.len() != 11 && values.len() != 12 && values.len() != 15 {
         return None;
     }
     let number = |key: &str| values.get(key)?.parse::<u32>().ok();
@@ -95,6 +100,17 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     let handling = u8::try_from(number("handling")?).ok()?;
     let upgrades = VehicleUpgrades::from_levels(engine, handling)?;
     let xp = values.get("xp")?.parse::<u64>().ok()?;
+    let player_position = match (values.get("player_x"), values.get("player_y"), values.get("player_z")) {
+        (None, None, None) => None,
+        (Some(x), Some(y), Some(z)) => {
+            let position = Vec3::new(x.parse::<f32>().ok()?, y.parse::<f32>().ok()?, z.parse::<f32>().ok()?);
+            let valid = position.x.is_finite() && position.y.is_finite() && position.z.is_finite()
+                && position.x.abs() <= 100_000.0 && position.y.abs() <= 100_000.0 && position.z.abs() <= 100_000.0;
+            if !valid { return None; }
+            Some(position)
+        }
+        _ => return None,
+    };
     let checkpoint_active = match values.get("checkpoint") {
         Some("0") | None => false,
         Some("1") => true,
@@ -127,6 +143,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
         equipment,
         progression: PlayerProgression::from_total_xp(xp),
         checkpoint_active,
+        player_position,
     })
 }
 
@@ -162,6 +179,7 @@ mod tests {
         profile.equipment.equip(ItemKind::ExplorerVest);
         profile.progression.award_xp(375);
         profile.checkpoint_active = true;
+        profile.player_position = Some(Vec3::new(12.5, 0.2, -8.0));
         let restored = decode(&encode(&profile)).unwrap();
         assert_eq!(restored.upgrades.engine_level(), 2);
         assert_eq!(restored.upgrades.handling_level(), 3);
@@ -170,6 +188,7 @@ mod tests {
         assert_eq!(restored.equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
         assert_eq!(restored.progression.total_xp(), 375);
         assert!(restored.checkpoint_active);
+        assert_eq!(restored.player_position, profile.player_position);
     }
 
     #[test]
