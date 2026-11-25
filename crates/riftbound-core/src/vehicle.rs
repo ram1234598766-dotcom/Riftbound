@@ -487,6 +487,7 @@ impl VehicleState {
         }
 
         let dt = delta_seconds.min(0.1);
+        let speed_before_step = self.speed;
         let throttle = input.throttle.clamp(-1.0, 1.0);
         let brake = input.brake.clamp(0.0, 1.0);
         let steering = input.steering.clamp(-1.0, 1.0);
@@ -528,8 +529,11 @@ impl VehicleState {
         // Unequal braking grip creates a small, physically motivated pull toward
         // the side with more grip; blending the side values softens road-edge transitions.
         self.heading += grip_imbalance * brake * speed_fraction * 0.25 * dt;
-        self.position.x += self.heading.sin() * self.speed * dt;
-        self.position.z -= self.heading.cos() * self.speed * dt;
+        // Trapezoidal displacement integrates the changing speed over this
+        // step instead of moving the entire step at its final speed.
+        let average_speed = (speed_before_step + self.speed) * 0.5;
+        self.position.x += self.heading.sin() * average_speed * dt;
+        self.position.z -= self.heading.cos() * average_speed * dt;
     }
 }
 
@@ -1256,6 +1260,24 @@ mod tests {
 
         assert!((at_30_fps.speed - at_60_fps.speed).abs() < 0.0001);
         assert!((at_30_fps.position.z - at_60_fps.position.z).abs() < 0.1);
+    }
+
+    #[test]
+    fn coasting_distance_uses_average_speed_during_drag() {
+        let config = VehicleConfig::default();
+        let mut vehicle = VehicleState {
+            speed: 18.0,
+            ..VehicleState::default()
+        };
+        let start_speed = vehicle.speed;
+        vehicle.update(
+            VehicleInput::default(),
+            VehicleSurface::Asphalt,
+            config,
+            0.1,
+        );
+        let expected_average = (start_speed + vehicle.speed) * 0.5;
+        assert!((vehicle.position.z + expected_average * 0.1).abs() < 0.0001);
     }
 
     #[test]
