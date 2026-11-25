@@ -540,6 +540,29 @@ mod tests {
     }
 
     #[test]
+    fn slot_map_keeps_renderer_slot_when_chunk_changes_lod() {
+        let mut streamer = WorldChunkStreamer::standard();
+        let mut slots = WorldChunkSlotMap::for_config(WorldChunkConfig::default());
+        let origin = WorldChunkCoord { x: 0, z: 0 };
+
+        assert!(streamer.update_focus(0.0, 0.0));
+        assert!(slots.apply_changes(streamer.changes()));
+        let original = slots.slot_for(origin).expect("origin chunk is assigned");
+        assert_eq!(original.request.lod, WorldChunkLod::Detailed);
+
+        assert!(streamer.update_focus(WORLD_CHUNK_SIZE * 2.0, 0.0));
+        assert!(streamer.changes().updated().iter().any(|request| {
+            request.coord == origin && request.lod == WorldChunkLod::Distant
+        }));
+        assert!(slots.apply_changes(streamer.changes()));
+
+        let updated = slots.slot_for(origin).expect("origin remains in active window");
+        assert_eq!(updated.slot_index, original.slot_index);
+        assert_eq!(updated.request.lod, WorldChunkLod::Distant);
+        assert_eq!(slots.occupied(), 25);
+    }
+
+    #[test]
     fn slot_map_rejects_inconsistent_changes_without_partial_mutation() {
         let mut slots = WorldChunkSlotMap::new(1);
         let request = WorldChunkRequest {
