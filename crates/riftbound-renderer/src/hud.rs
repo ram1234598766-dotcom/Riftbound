@@ -23,6 +23,8 @@ pub struct HudData {
     pub vehicle_info: Option<String>,
     /// Blended vehicle tyre grip, as a percentage.
     pub vehicle_grip: Option<u8>,
+    /// Estimated tyre slip under current driving input, as a percentage.
+    pub vehicle_slip: Option<u8>,
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
@@ -163,9 +165,9 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
     }
     if let Some(vehicle_info) = &data.vehicle_info {
         let panel_y = if width < 680.0 { 350.0 } else { 194.0 };
-        rect(out, 22.0, panel_y, 270.0, 54.0, panel, width, height);
-        rect(out, 22.0, panel_y, 3.0, 54.0, [1.0, 0.62, 0.28, 1.0], width, height);
-        text(out, vehicle_info, 38.0, panel_y + 10.0, 1.5, white, width, height);
+        rect(out, 22.0, panel_y, 270.0, 70.0, panel, width, height);
+        rect(out, 22.0, panel_y, 3.0, 70.0, [1.0, 0.62, 0.28, 1.0], width, height);
+        text(out, vehicle_info, 38.0, panel_y + 8.0, 1.5, white, width, height);
         if let Some(grip) = data.vehicle_grip {
             let ratio = f32::from(grip.min(100)) / 100.0;
             let grip_color = if ratio < 0.45 {
@@ -175,9 +177,22 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
             } else {
                 [0.25, 0.88, 1.0, 1.0]
             };
-            text(out, &format!("TYRE GRIP {grip}%"), 38.0, panel_y + 30.0, 1.25, grip_color, width, height);
-            rect(out, 170.0, panel_y + 34.0, 102.0, 5.0, muted, width, height);
-            rect(out, 170.0, panel_y + 34.0, 102.0 * ratio, 5.0, grip_color, width, height);
+            text(out, &format!("GRIP {grip}%"), 38.0, panel_y + 27.0, 1.25, grip_color, width, height);
+            rect(out, 112.0, panel_y + 31.0, 160.0, 5.0, muted, width, height);
+            rect(out, 112.0, panel_y + 31.0, 160.0 * ratio, 5.0, grip_color, width, height);
+        }
+        if let Some(slip) = data.vehicle_slip {
+            let ratio = f32::from(slip.min(100)) / 100.0;
+            let slip_color = if ratio >= 0.55 {
+                [1.0, 0.36, 0.24, 1.0]
+            } else if ratio >= 0.25 {
+                [1.0, 0.72, 0.28, 1.0]
+            } else {
+                white
+            };
+            text(out, &format!("SLIP {slip}%"), 38.0, panel_y + 48.0, 1.25, slip_color, width, height);
+            rect(out, 112.0, panel_y + 52.0, 160.0, 5.0, muted, width, height);
+            rect(out, 112.0, panel_y + 52.0, 160.0 * ratio, 5.0, slip_color, width, height);
         }
     }
     if let Some(prompt) = &data.prompt {
@@ -319,6 +334,7 @@ mod tests {
             equipment: "BODY VEST FEET BOOTS".into(),
             vehicle_info: Some("SPEED 48 KM/H • GRAVEL".into()),
             vehicle_grip: Some(78),
+            vehicle_slip: Some(22),
         };
         let mut reused = Vec::with_capacity(4_096);
         build_vertices_into(&data, 1280, 720, &mut reused);
@@ -330,6 +346,17 @@ mod tests {
 
         assert_eq!(reused, expected);
         assert_eq!(reused.capacity(), warmed_capacity);
+    }
+
+    #[test]
+    fn vehicle_slip_panel_clamps_values_and_renders_warning_color() {
+        let data = HudData {
+            vehicle_info: Some("SPEED 24 KM/H • SNOW".into()),
+            vehicle_slip: Some(80),
+            ..HudData::default()
+        };
+        let vertices = build_vertices(&data, 1280, 720);
+        assert!(vertices.iter().any(|vertex| vertex.color == [1.0, 0.36, 0.24, 1.0]));
     }
 
     #[test]
@@ -364,6 +391,7 @@ mod tests {
             equipment: String::new(),
             vehicle_info: None,
             vehicle_grip: None,
+            vehicle_slip: None,
         };
         let vertices = build_vertices(&data, 1280, 720);
         assert_ne!(vertices.len(), 0);
