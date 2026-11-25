@@ -34,6 +34,8 @@ impl MeshId {
     pub const VEHICLE_BODY: Self = Self(15);
     /// Faceted rubber tire and inset hub mesh for vehicle wheels.
     pub const VEHICLE_WHEEL: Self = Self(16);
+    /// Small faceted particle mesh for vehicle surface effects.
+    pub const VEHICLE_PARTICLE: Self = Self(17);
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
