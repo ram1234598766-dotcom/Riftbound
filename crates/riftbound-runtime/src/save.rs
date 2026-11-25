@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn legacy_profile_without_checkpoint_field_remains_loadable() {
         let profile = SavedProfile::default();
-        let legacy = encode(&profile).replace("checkpoint=0\n", "");
+        let legacy = encode(&profile).replace("checkpoint=0\nplayer_x=-\nplayer_y=-\nplayer_z=-\n", "");
         let restored = decode(&legacy).unwrap();
         assert!(!restored.checkpoint_active);
     }
