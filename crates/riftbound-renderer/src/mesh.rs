@@ -512,6 +512,7 @@ fn vehicle_body_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_vehicle_wheel_arch(
     vertices: &mut Vec<MeshVertex>,
     indices: &mut Vec<u16>,
@@ -540,7 +541,7 @@ fn append_vehicle_wheel_arch(
         }
     }
 
-    let row = u16::from(segments + 1) * 2;
+    let row = (segments + 1) * 2;
     for side_base in [base, base + row] {
         for segment in 0..segments {
             let start = side_base + segment * 2;
