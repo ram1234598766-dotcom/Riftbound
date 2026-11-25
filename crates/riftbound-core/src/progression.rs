@@ -39,10 +39,9 @@ impl PlayerProgression {
     /// Adds experience and returns the number of levels gained.
     pub fn award_xp(&mut self, amount: u64) -> u32 {
         let previous_level = self.level;
-        self.total_xp = self.total_xp.saturating_add(amount);
-        while self.level < u32::MAX && self.total_xp >= Self::xp_for_level(self.level + 1) {
-            self.level += 1;
-        }
+        let updated = Self::from_total_xp(self.total_xp.saturating_add(amount));
+        self.total_xp = updated.total_xp;
+        self.level = updated.level;
         self.level - previous_level
     }
 
