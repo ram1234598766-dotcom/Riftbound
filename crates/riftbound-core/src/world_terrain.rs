@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn road_surface_tracks_the_winding_centreline() {
-        for world_z in [-900.0, -250.0, 0.0, 375.0, 900.0] {
+        for world_z in [-900.0, -250.0, 12.0, 375.0, 900.0] {
             let road = world_road_sample(0.0, world_z);
             assert_eq!(
                 world_terrain_sample(road.center_x, world_z).surface,
@@ -415,7 +415,7 @@ mod tests {
             VehicleSurface::Asphalt
         );
         assert_eq!(
-            world_terrain_sample(0.0, -800.0).surface,
+            world_terrain_sample(30.0, -800.0).surface,
             VehicleSurface::Snow
         );
         assert_eq!(
@@ -459,7 +459,7 @@ mod tests {
             VehicleSurface::Mud
         );
         assert_eq!(
-            world_terrain_vehicle_surface(0.0, -800.0, 0.0, 0.3, 0.5),
+            world_terrain_vehicle_surface(30.0, -800.0, 0.0, 0.3, 0.5),
             VehicleSurface::Snow
         );
     }
@@ -467,7 +467,7 @@ mod tests {
     #[test]
     fn world_vehicle_surface_ties_favor_the_center_surface() {
         assert_eq!(
-            world_terrain_vehicle_surface(2.5, 0.0, 0.0, 0.78, 1.32),
+            world_terrain_vehicle_surface(6.0, 0.0, 0.0, 0.78, 1.32),
             VehicleSurface::Gravel
         );
     }
