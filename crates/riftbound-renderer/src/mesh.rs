@@ -136,6 +136,13 @@ impl Mesh {
         )
     }
 
+    /// Creates a tiny faceted particle for wheel-surface effects.
+    #[must_use]
+    pub fn vehicle_particle(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = vehicle_particle_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-vehicle-particle-mesh")
+    }
+
     /// Creates a joined low-poly vehicle body with cabin, bumpers and lights.
     #[must_use]
     pub fn vehicle_body(device: &wgpu::Device) -> Option<Self> {
@@ -437,6 +444,27 @@ fn environment_shrub_data() -> (Vec<MeshVertex>, Vec<u16>) {
         [0.0, 0.18, -0.28],
         [0.56, 0.48, 0.22],
     );
+    (vertices, indices)
+}
+
+fn vehicle_particle_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let color = [0.58, 0.52, 0.43];
+    let positions = [
+        [0.0, 0.55, 0.0],
+        [0.0, -0.45, 0.0],
+        [-0.48, 0.0, 0.0],
+        [0.48, 0.0, 0.0],
+        [0.0, 0.0, -0.48],
+        [0.0, 0.0, 0.48],
+    ];
+    let vertices = positions
+        .into_iter()
+        .map(|position| MeshVertex { position, color })
+        .collect();
+    let indices = vec![
+        0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2,
+        1, 4, 2, 1, 3, 4, 1, 5, 3, 1, 2, 5,
+    ];
     (vertices, indices)
 }
 
