@@ -620,11 +620,11 @@ fn world_terrain_chunk_data(
                 ]);
                 indices.extend_from_slice(&[
                     line_start,
-                    line_start + 2,
-                    line_start + 1,
                     line_start + 1,
                     line_start + 2,
+                    line_start + 1,
                     line_start + 3,
+                    line_start + 2,
                 ]);
             }
         }
@@ -956,11 +956,22 @@ mod tests {
 
                 for dash in 0..dash_count {
                     let segment = &markings[dash * 4..dash * 4 + 4];
-                    let world_start = first_dash + f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
-                    assert!((segment[0].position[0] + f32::from(i16::try_from(chunk_x).expect("chunk fits i16")) * 64.0 - world_start).abs() < 1.0e-4);
-                    assert!((segment[2].position[0] - segment[0].position[0] - 4.0).abs() < 1.0e-4);
-                    assert!((segment[1].position[2] - segment[0].position[2] - 0.24).abs() < 1.0e-4);
-                    assert!(segment.iter().all(|vertex| vertex.color == [0.95, 0.78, 0.28]));
+                    let world_start =
+                        first_dash + f32::from(u8::try_from(dash).expect("dash fits u8")) * 8.0;
+                    let origin_x =
+                        f32::from(i16::try_from(chunk_x).expect("chunk fits i16")) * 64.0;
+                    assert!((segment[0].position[0] + origin_x - world_start).abs() < 1.0e-4);
+                    assert!(
+                        (segment[2].position[0] - segment[0].position[0] - 4.0).abs() < 1.0e-4
+                    );
+                    assert!(
+                        (segment[1].position[2] - segment[0].position[2] - 0.24).abs() < 1.0e-4
+                    );
+                    assert!(
+                        segment
+                            .iter()
+                            .all(|vertex| vertex.color == [0.95, 0.78, 0.28])
+                    );
                 }
                 assert!(valid_index_data(vertices.len(), &indices));
             }
