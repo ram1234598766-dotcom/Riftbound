@@ -1523,20 +1523,27 @@ fn spawn_world_obstacle_props(
     for id in entity_ids.drain(..) {
         scene.despawn(id);
     }
-    for footprint in world_obstacle_footprints(chunks) {
+    for (index, footprint) in world_obstacle_footprints(chunks).into_iter().enumerate() {
         let x = f32::midpoint(footprint.min_x, footprint.max_x);
         let z = f32::midpoint(footprint.min_z, footprint.max_z);
         let half_x = (footprint.max_x - footprint.min_x) * 0.5;
         let half_z = (footprint.max_z - footprint.min_z) * 0.5;
         let ground = world_terrain_sample(x, z).height;
-        let height = 1.4;
+
+        // Use the engine's existing low-cost meshes to give the blockout field
+        // a varied silhouette until dedicated environment assets are available.
+        let (mesh, height, material, yaw) = match index % 3 {
+            0 => (MeshId::PYRAMID, 1.8, MaterialId::AMBER, 0.23),
+            1 => (MeshId::CRYSTAL, 2.1, MaterialId::RIFT, -0.31),
+            _ => (MeshId::CUBE, 1.25, MaterialId::AMBER, 0.0),
+        };
         let transform = Transform3::new(
             Vec3::new(x, ground + height * 0.5, z),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, yaw, 0.0),
             Vec3::new(half_x * 2.0, height, half_z * 2.0),
         );
-        if let Some(id) = scene.spawn(transform) {
-            scene.set_material(id, MaterialId::AMBER);
+        if let Some(id) = scene.spawn_with_mesh(transform, mesh) {
+            scene.set_material(id, material);
             entity_ids.push(id);
         }
     }
