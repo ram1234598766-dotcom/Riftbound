@@ -52,7 +52,7 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
 
 const MAX_VEHICLE_STEP: f32 = 1.0 / 30.0;
 
-fn bounded_vehicle_delta(delta: f32) -> f32 {
+fn bounded_simulation_delta(delta: f32) -> f32 {
     if delta.is_finite() {
         delta.clamp(0.0, MAX_VEHICLE_STEP)
     } else {
@@ -665,8 +665,9 @@ impl ApplicationHandler for RiftboundApp {
                     .last_frame
                     .replace(now)
                     .map_or(0.0, |previous| now.duration_since(previous).as_secs_f32());
+                let simulation_delta = bounded_simulation_delta(delta);
                 self.animation_time += delta.min(0.1);
-                self.player_health.update(delta);
+                self.player_health.update(simulation_delta);
                 if let (Some(renderer), Some(player), Some(collision)) =
                     (self.renderer.as_mut(), self.player, self.collision.as_ref())
                 {
@@ -682,7 +683,7 @@ impl ApplicationHandler for RiftboundApp {
                         self.controller.update_camera_relative(
                             &mut transform,
                             &self.input,
-                            delta,
+                            simulation_delta,
                             renderer.camera_yaw(),
                         );
                     }
@@ -716,7 +717,7 @@ impl ApplicationHandler for RiftboundApp {
                         self.controller.update_vertical(
                             &mut transform,
                             &self.input,
-                            delta,
+                            simulation_delta,
                             floor_height,
                         );
                         self.controller
@@ -733,7 +734,7 @@ impl ApplicationHandler for RiftboundApp {
                     self.animated_transforms.push((player, transform));
                     if self.driving {
                         // Keep vehicle simulation stable after a stalled or backgrounded frame.
-                        let vehicle_delta = bounded_vehicle_delta(delta);
+                        let vehicle_delta = simulation_delta;
                         let throttle = if self.input.is_held(Button::MoveForward) {
                             1.0
                         } else if self.input.is_held(Button::MoveBackward) {
@@ -2431,12 +2432,12 @@ mod world_prop_tests {
     }
 
     #[test]
-    fn vehicle_delta_is_bounded_and_rejects_invalid_values() {
-        assert_eq!(bounded_vehicle_delta(0.0), 0.0);
-        assert_eq!(bounded_vehicle_delta(1.0), MAX_VEHICLE_STEP);
-        assert_eq!(bounded_vehicle_delta(-1.0), 0.0);
-        assert_eq!(bounded_vehicle_delta(f32::NAN), 0.0);
-        assert_eq!(bounded_vehicle_delta(f32::INFINITY), 0.0);
+    fn simulation_delta_is_bounded_and_rejects_invalid_values() {
+        assert_eq!(bounded_simulation_delta(0.0), 0.0);
+        assert_eq!(bounded_simulation_delta(1.0), MAX_VEHICLE_STEP);
+        assert_eq!(bounded_simulation_delta(-1.0), 0.0);
+        assert_eq!(bounded_simulation_delta(f32::NAN), 0.0);
+        assert_eq!(bounded_simulation_delta(f32::INFINITY), 0.0);
     }
 
     #[test]
