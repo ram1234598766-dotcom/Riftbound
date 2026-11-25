@@ -900,8 +900,10 @@ mod tests {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
         assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
-        assert_eq!(distant_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4);
-        assert_eq!(distant_chunk.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6);
+        // This X-neighbour owns the eastbound spur, not the primary road ribbon
+        // or its centre markings. Its remaining extra vertices are the terrain skirts.
+        assert_eq!(distant_chunk.0.len(), 81 + 9 * 4 + 4 * 8 * 4);
+        assert_eq!(distant_chunk.1.len(), 384 + 8 * 3 * 6 + 4 * 8 * 6);
     }
 
     #[test]
