@@ -164,7 +164,7 @@ impl ApplicationHandler for RiftboundApp {
                 let mut scene_with_props = renderer.scene().clone();
                 spawn_world_obstacle_props(
                     &mut scene_with_props,
-                    &world_streamer.active_chunks(),
+                    world_streamer.active_chunks(),
                     &mut world_obstacle_entities,
                 );
                 if let Err(error) = renderer.set_scene(scene_with_props) {
@@ -1536,6 +1536,39 @@ fn spawn_world_obstacle_props(
             scene.set_material(id, MaterialId::AMBER);
             entity_ids.push(id);
         }
+    }
+}
+
+
+#[cfg(test)]
+mod world_prop_tests {
+    use super::*;
+
+    #[test]
+    fn obstacle_footprints_are_deterministic_and_chunk_local() {
+        let chunks = [
+            WorldChunkRequest {
+                coord: riftbound_core::WorldChunkCoord { x: 2, z: -3 },
+                lod: riftbound_core::WorldChunkLod::Detailed,
+                distance_squared: 0,
+            },
+            WorldChunkRequest {
+                coord: riftbound_core::WorldChunkCoord { x: 3, z: -3 },
+                lod: riftbound_core::WorldChunkLod::Distant,
+                distance_squared: 1,
+            },
+        ];
+        let first = world_obstacle_footprints(&chunks);
+        assert_eq!(first, world_obstacle_footprints(&chunks));
+        assert!(first.iter().all(|footprint| {
+            footprint.min_x.is_finite()
+                && footprint.max_x.is_finite()
+                && footprint.min_z.is_finite()
+                && footprint.max_z.is_finite()
+                && footprint.min_x < footprint.max_x
+                && footprint.min_z < footprint.max_z
+        }));
+        assert!(first.len() <= chunks.len() * 2);
     }
 }
 
