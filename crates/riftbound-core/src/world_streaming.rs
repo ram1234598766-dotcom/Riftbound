@@ -231,14 +231,6 @@ impl WorldChunkSlotMap {
             return false;
         }
 
-        // Validate the final change set before mutating slots. This keeps the
-        // operation atomic even when a caller supplies a malformed update.
-        for updated in &changes.updated {
-            if changes.added.iter().any(|added| added.coord == updated.coord) {
-                return false;
-            }
-        }
-
         for removed in &changes.removed {
             let Some(slot) = self
                 .slots
@@ -606,6 +598,40 @@ mod tests {
         };
         assert!(!slots.apply_changes(&malformed));
         assert_eq!(slots.occupied(), 0);
+    }
+
+    #[test]
+    fn slot_map_rejects_over_capacity_delta_without_releasing_existing_slots() {
+        let mut slots = WorldChunkSlotMap::new(1);
+        let original = WorldChunkRequest {
+            coord: WorldChunkCoord { x: 0, z: 0 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 0,
+        };
+        let replacement = WorldChunkRequest {
+            coord: WorldChunkCoord { x: 1, z: 0 },
+            lod: WorldChunkLod::Detailed,
+            distance_squared: 1,
+        };
+        let initial = WorldChunkChanges {
+            added: vec![original],
+            removed: Vec::new(),
+            updated: Vec::new(),
+        };
+        assert!(slots.apply_changes(&initial));
+
+        let oversized = WorldChunkChanges {
+            added: vec![replacement],
+            removed: Vec::new(),
+            updated: Vec::new(),
+        };
+        assert!(!slots.apply_changes(&oversized));
+        assert_eq!(slots.occupied(), 1);
+        assert_eq!(
+            slots.slot_for(original.coord).expect("original slot is retained").request,
+            original
+        );
+        assert!(slots.slot_for(replacement.coord).is_none());
     }
 
     #[test]
