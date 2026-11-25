@@ -1538,6 +1538,16 @@ fn world_prop_variant(x: f32, z: f32) -> (u32, f32) {
     (hash % 3, yaw)
 }
 
+/// Biases prop silhouettes toward vegetation suited to the sampled terrain biome.
+fn world_prop_variant_for_surface(surface: VehicleSurface, variant: u32) -> u32 {
+    match surface {
+        VehicleSurface::Snow if variant == 0 => 1,
+        VehicleSurface::Sand | VehicleSurface::Mud if variant == 0 => 2,
+        VehicleSurface::Rock if variant == 2 => 1,
+        _ => variant,
+    }
+}
+
 /// Keeps visible blockout props and collision footprints aligned to active chunks.
 fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
     let obstacles = world_obstacle_footprints(chunks);
@@ -1558,8 +1568,10 @@ fn spawn_world_obstacle_props(
         let z = f32::midpoint(footprint.min_z, footprint.max_z);
         let half_x = (footprint.max_x - footprint.min_x) * 0.5;
         let half_z = (footprint.max_z - footprint.min_z) * 0.5;
-        let ground = world_terrain_sample(x, z).height;
-        let (variant, yaw) = world_prop_variant(x, z);
+        let terrain = world_terrain_sample(x, z);
+        let ground = terrain.height;
+        let (base_variant, yaw) = world_prop_variant(x, z);
+        let variant = world_prop_variant_for_surface(terrain.surface, base_variant);
 
         match variant {
             // A two-part tree silhouette: narrow trunk and broad faceted crown.
@@ -1670,6 +1682,34 @@ mod world_prop_tests {
         assert_eq!(first, world_prop_variant(17.5, -42.0));
         assert_eq!(second, world_prop_variant(-91.0, 128.0));
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn prop_silhouettes_follow_terrain_surface() {
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Snow, 0),
+            1
+        );
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Sand, 0),
+            2
+        );
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Mud, 0),
+            2
+        );
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Rock, 2),
+            1
+        );
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Gravel, 0),
+            0
+        );
+        assert_eq!(
+            world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
+            2
+        );
     }
 
     #[test]
