@@ -752,15 +752,18 @@ impl ApplicationHandler for RiftboundApp {
                             self.vehicle_suspension = SuspensionState::default();
                             log::info!("Vehicle recovered at its latest safe terrain position");
                         }
+                        let suspension_config = SuspensionConfig::default();
                         // Sample the same deterministic terrain function used by the arena.
+                        // Derive contact offsets from the spring geometry so sampling and
+                        // chassis pitch/roll use one shared wheelbase and track width.
                         // Corner order matches SuspensionState: front-left, front-right,
                         // rear-left, rear-right.
                         let ground_heights = world_terrain_vehicle_ground_heights(
                             self.vehicle_state.position.x,
                             self.vehicle_state.position.z,
                             self.vehicle_state.heading,
-                            0.78,
-                            1.32,
+                            suspension_config.track_width * 0.5,
+                            suspension_config.wheelbase * 0.5,
                         )
                         .unwrap_or_else(|| {
                             [world_terrain_sample(
@@ -769,7 +772,6 @@ impl ApplicationHandler for RiftboundApp {
                             )
                             .height; 4]
                         });
-                        let suspension_config = SuspensionConfig::default();
                         let suspension_pose = self.vehicle_suspension.update(
                             ground_heights,
                             self.vehicle_state.position.y,
