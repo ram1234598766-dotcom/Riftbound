@@ -19,7 +19,7 @@ const CONTROL_COUNT: usize = 6;
 /// Owns the native output stream and a continuously generated vehicle sound.
 pub struct VehicleAudioOutput {
     _stream: OutputStream,
-    sink: Sink,
+    _sink: Sink,
     controls: Arc<[AtomicU32; CONTROL_COUNT]>,
 }
 
@@ -35,7 +35,7 @@ impl VehicleAudioOutput {
         sink.play();
         Ok(Self {
             _stream: stream,
-            sink,
+            _sink: sink,
             controls,
         })
     }
@@ -60,11 +60,6 @@ impl VehicleAudioOutput {
         }
     }
 
-    /// Returns whether the audio sink is still active.
-    #[must_use]
-    pub fn is_playing(&self) -> bool {
-        !self.sink.empty()
-    }
 }
 
 struct VehicleSource {
