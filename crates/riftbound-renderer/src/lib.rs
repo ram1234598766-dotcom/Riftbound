@@ -520,7 +520,10 @@ impl Renderer {
             let Some(slot) = next_slot_map.slot_for(request.coord) else {
                 return false;
             };
-            if self.world_terrain_slots[slot.slot_index]
+            let Some(current_slot) = self.world_terrain_slots.get(slot.slot_index) else {
+                return false;
+            };
+            if current_slot
                 .as_ref()
                 .is_some_and(|current| current.coord == request.coord && current.lod == request.lod)
             {
