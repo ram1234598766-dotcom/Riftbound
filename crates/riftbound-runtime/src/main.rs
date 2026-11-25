@@ -2412,6 +2412,22 @@ mod world_prop_tests {
     }
 
     #[test]
+    fn wheel_steering_smoothing_is_consistent_across_frame_rates() {
+        let mut at_30_fps = 0.0;
+        let mut at_60_fps = 0.0;
+
+        for _ in 0..30 {
+            at_30_fps = smooth_wheel_steering(at_30_fps, 0.3, 1.0 / 30.0);
+        }
+        for _ in 0..60 {
+            at_60_fps = smooth_wheel_steering(at_60_fps, 0.3, 1.0 / 60.0);
+        }
+
+        assert!((at_30_fps - at_60_fps).abs() < 0.0001);
+        assert!(at_30_fps > 0.29);
+    }
+
+    #[test]
     fn wheel_rotation_accumulates_forward_and_reverse_travel() {
         let forward = wheel_rotation_delta(8.0, 0.25, 0.5);
         let reverse = wheel_rotation_delta(-8.0, 0.25, 0.5);
