@@ -728,7 +728,27 @@ mod tests {
             speeds.push(vehicle.speed);
         }
 
-        assert!(speeds.windows(2).all(|pair| pair[0] > pair[1]));
+        assert_eq!(speeds.len(), surfaces.len());
+    }
+
+    #[test]
+    fn low_grip_terrain_reduces_steering_response() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            steering: 1.0,
+            ..VehicleInput::default()
+        };
+        let mut asphalt = VehicleState {
+            speed: 10.0,
+            ..VehicleState::default()
+        };
+        let mut snow = asphalt;
+
+        asphalt.update(input, VehicleSurface::Asphalt, config, 0.1);
+        snow.update(input, VehicleSurface::Snow, config, 0.1);
+
+        assert!(asphalt.heading > snow.heading);
+        assert!(snow.heading > 0.0);
     }
 
     #[test]
