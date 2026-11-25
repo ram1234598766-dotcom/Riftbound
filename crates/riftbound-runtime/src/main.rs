@@ -11,8 +11,8 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleUpgrades, WORLD_CHUNK_SIZE,
-    WorldChunkRequest, terrain_height, world_terrain_sample, world_terrain_vehicle_surface,
+    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades, WORLD_CHUNK_SIZE,
+    WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample, world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -1183,7 +1183,7 @@ impl ApplicationHandler for RiftboundApp {
                                     self.equipment,
                                     self.progression,
                                     true,
-                                    Some(checkpoint.position()),
+                                    self.checkpoint.map(Checkpoint::position),
                                 );
                                 if let Err(error) = save::save_profile(&profile) {
                                     log::warn!("Could not save activated checkpoint: {error}");
