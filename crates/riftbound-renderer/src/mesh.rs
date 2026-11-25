@@ -1086,7 +1086,8 @@ mod tests {
             ] {
                 let (vertices, indices) =
                     world_terrain_chunk_data(1, chunk_z, side).expect("northbound branch chunk");
-                let branch_start = side * side;
+                let spur_vertices = if chunk_z == 0 { 9 * 4 + 8 * 4 } else { 0 };
+                let branch_start = side * side + spur_vertices;
                 let markings_start = branch_start + station_count * 4;
                 let markings = &vertices[markings_start..markings_start + dash_count * 4];
                 for dash in 0..dash_count {
