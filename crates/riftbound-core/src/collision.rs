@@ -448,7 +448,7 @@ mod tests {
         collision.replace_obstacles(&[Aabb2::new(10.0, 11.0, 10.0, 11.0)]);
         assert_eq!(collision.obstacles(), &[Aabb2::new(10.0, 11.0, 10.0, 11.0)]);
         collision.replace_obstacles(&[]);
-        assert!(collision.obstacles().is_empty());
+        assert_eq!(collision.obstacles(), &[]);
     }
 
     #[test]
