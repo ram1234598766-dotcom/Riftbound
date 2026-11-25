@@ -49,6 +49,17 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
     }
 }
 
+fn vehicle_surface_label(surface: VehicleSurface) -> &'static str {
+    match surface {
+        VehicleSurface::Asphalt => "ASPHALT",
+        VehicleSurface::Gravel => "GRAVEL",
+        VehicleSurface::Mud => "MUD",
+        VehicleSurface::Sand => "SAND",
+        VehicleSurface::Snow => "SNOW",
+        VehicleSurface::Rock => "ROCK",
+    }
+}
+
 const MAX_SIMULATION_STEP: f32 = 1.0 / 30.0;
 
 fn clear_held_controls_on_focus_loss(input: &mut InputState) {
@@ -1512,6 +1523,13 @@ impl ApplicationHandler for RiftboundApp {
                                         self.inventory.count(ItemKind::Salvage),
                                         self.vehicle_upgrades.engine_level(),
                                         self.vehicle_upgrades.handling_level(),
+                                    )
+                                }),
+                                vehicle_info: self.driving.then(|| {
+                                    format!(
+                                        "SPEED {:.0} KM/H • {}",
+                                        self.vehicle_state.speed.abs() * 3.6,
+                                        vehicle_surface_label(self.vehicle_surface_tracker.current()),
                                     )
                                 }),
                                 equipment: format!(
