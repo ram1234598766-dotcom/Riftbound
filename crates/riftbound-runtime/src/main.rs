@@ -2280,6 +2280,10 @@ mod world_prop_tests {
         ];
         let first = world_obstacle_footprints(&chunks);
         assert_eq!(first, world_obstacle_footprints(&chunks));
+        let reversed_chunks = [chunks[1], chunks[0]];
+        let mut reversed_footprints = world_obstacle_footprints(&reversed_chunks);
+        reversed_footprints.reverse();
+        assert_eq!(first, reversed_footprints);
         assert!(first.iter().all(|footprint| {
             footprint.min_x.is_finite()
                 && footprint.max_x.is_finite()
