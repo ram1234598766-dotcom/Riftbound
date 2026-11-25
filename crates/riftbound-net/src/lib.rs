@@ -669,7 +669,7 @@ mod tests {
     #[test]
     fn vehicle_collision_substeps_prevent_tunneling_through_thin_walls() {
         let mut vehicle = SharedVehicleState {
-            x: 600.0,
+            x: 610.0,
             y: 250.0,
             heading: std::f32::consts::FRAC_PI_2,
             speed: 260.0,
