@@ -1130,4 +1130,34 @@ mod tests {
             assert!((vehicle.speed + surface_limit).abs() < 0.001);
         }
     }
+
+    #[test]
+    fn reverse_steering_response_scales_with_terrain_traction() {
+        let config = VehicleConfig::default();
+        let input = VehicleInput {
+            steering: 1.0,
+            ..VehicleInput::default()
+        };
+        let surfaces = [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Rock,
+            VehicleSurface::Sand,
+            VehicleSurface::Mud,
+            VehicleSurface::Snow,
+        ];
+        let mut heading_changes = Vec::with_capacity(surfaces.len());
+
+        for surface in surfaces {
+            let mut vehicle = VehicleState {
+                speed: -10.0,
+                ..VehicleState::default()
+            };
+            vehicle.update(input, surface, config, 0.1);
+            heading_changes.push(vehicle.heading);
+        }
+
+        assert!(heading_changes.iter().all(|heading| *heading < 0.0));
+        assert!(heading_changes.windows(2).all(|pair| pair[0] < pair[1]));
+    }
 }
