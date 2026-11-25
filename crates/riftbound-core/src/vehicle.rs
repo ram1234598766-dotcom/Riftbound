@@ -570,10 +570,8 @@ mod tests {
         let mut roll_pose = SuspensionPose::default();
 
         for _ in 0..20 {
-            pitch_pose =
-                pitch_suspension.update([0.2, 0.2, 0.0, 0.0], 0.58, config, 0.05);
-            roll_pose =
-                roll_suspension.update([0.2, 0.0, 0.2, 0.0], 0.58, config, 0.05);
+            pitch_pose = pitch_suspension.update([0.2, 0.2, 0.0, 0.0], 0.58, config, 0.05);
+            roll_pose = roll_suspension.update([0.2, 0.0, 0.2, 0.0], 0.58, config, 0.05);
         }
 
         assert!(pitch_pose.pitch.abs() > 0.001);
