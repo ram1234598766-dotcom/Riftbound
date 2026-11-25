@@ -33,6 +33,15 @@ impl Aabb2 {
             && z > self.min_z - radius
             && z < self.max_z + radius
     }
+
+    fn is_valid(self) -> bool {
+        self.min_x.is_finite()
+            && self.max_x.is_finite()
+            && self.min_z.is_finite()
+            && self.max_z.is_finite()
+            && self.min_x < self.max_x
+            && self.min_z < self.max_z
+    }
 }
 
 /// Collision result after moving a circular character footprint.
@@ -76,7 +85,9 @@ impl CollisionWorld {
 
     /// Adds a solid obstacle footprint.
     pub fn add_obstacle(&mut self, obstacle: Aabb2) {
-        self.obstacles.push(obstacle);
+        if obstacle.is_valid() {
+            self.obstacles.push(obstacle);
+        }
     }
 
     /// Returns the configured obstacle footprints.
@@ -89,7 +100,8 @@ impl CollisionWorld {
     /// Callers use this to keep streamed-world collision bounded to active chunks.
     pub fn replace_obstacles(&mut self, obstacles: &[Aabb2]) {
         self.obstacles.clear();
-        self.obstacles.extend_from_slice(obstacles);
+        self.obstacles
+            .extend(obstacles.iter().copied().filter(|obstacle| obstacle.is_valid()));
     }
 
     /// Moves a character, resolving X and Z independently to allow wall sliding.
@@ -449,6 +461,27 @@ mod tests {
         assert_eq!(collision.obstacles(), &[Aabb2::new(10.0, 11.0, 10.0, 11.0)]);
         collision.replace_obstacles(&[]);
         assert_eq!(collision.obstacles(), &[]);
+    }
+
+    #[test]
+    fn invalid_obstacle_bounds_are_ignored() {
+        let mut collision = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
+        collision.add_obstacle(Aabb2::new(2.0, 1.0, -1.0, 1.0));
+        collision.add_obstacle(Aabb2::new(f32::NAN, 2.0, -1.0, 1.0));
+        collision.replace_obstacles(&[
+            Aabb2::new(-1.0, 1.0, -1.0, 1.0),
+            Aabb2::new(3.0, 2.0, -1.0, 1.0),
+            Aabb2::new(-2.0, 2.0, f32::INFINITY, 3.0),
+        ]);
+
+        assert_eq!(collision.obstacles(), &[Aabb2::new(-1.0, 1.0, -1.0, 1.0)]);
+        let result = collision.move_character(
+            Vec3::new(-2.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            0.25,
+        );
+        assert!(result.blocked_x);
+        assert!(result.position.x <= -1.25);
     }
 
     #[test]
