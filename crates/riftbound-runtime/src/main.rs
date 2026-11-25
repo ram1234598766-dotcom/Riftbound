@@ -26,8 +26,6 @@ use winit::{
 };
 
 const PLAYER_RADIUS: f32 = 0.19;
-const VEHICLE_WHEEL_OFFSETS: [(f32, f32); 4] =
-    [(-0.78, -1.32), (0.78, -1.32), (-0.78, 1.32), (0.78, 1.32)];
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -806,7 +804,16 @@ impl ApplicationHandler for RiftboundApp {
                                 let steer = if front { steering * 0.35 } else { 0.0 };
                                 let local_y =
                                     ground_heights[index] + 0.34 - self.vehicle_state.position.y;
-                                let (local_x, local_z) = VEHICLE_WHEEL_OFFSETS[index];
+                                let local_x = if index % 2 == 0 {
+                                    -suspension_config.track_width * 0.5
+                                } else {
+                                    suspension_config.track_width * 0.5
+                                };
+                                let local_z = if front {
+                                    -suspension_config.wheelbase * 0.5
+                                } else {
+                                    suspension_config.wheelbase * 0.5
+                                };
                                 self.animated_transforms.push((
                                     *wheel,
                                     Transform3::new(
