@@ -9,7 +9,8 @@ use riftbound_core::{
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
     ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
-    terrain_height, world_terrain_sample, world_terrain_vehicle_surface,
+    terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
+    WORLD_CHUNK_SIZE,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -174,7 +175,9 @@ impl ApplicationHandler for RiftboundApp {
                 self.vehicle_suspension = vehicle_suspension;
                 self.vehicle_recovery = vehicle_recovery;
                 self.driving = false;
-                self.collision = Some(world_collision_world());
+                let mut collision = world_collision_world();
+                sync_world_collision(&mut collision, world_streamer.active_chunks());
+                self.collision = Some(collision);
                 self.pickups = pickups;
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
@@ -952,10 +955,13 @@ impl ApplicationHandler for RiftboundApp {
                     if let (Some(streamer), Some(slot_map)) =
                         (self.world_streamer.as_mut(), self.world_slot_map.as_mut())
                     {
-                        if streamer.update_focus(world_focus.x, world_focus.z)
-                            && !renderer.sync_world_terrain(streamer.changes(), slot_map)
-                        {
-                            log::error!("World terrain chunk synchronization failed");
+                        if streamer.update_focus(world_focus.x, world_focus.z) {
+                            if !renderer.sync_world_terrain(streamer.changes(), slot_map) {
+                                log::error!("World terrain chunk synchronization failed");
+                            }
+                            if let Some(collision) = self.collision.as_mut() {
+                                sync_world_collision(collision, streamer.active_chunks());
+                            }
                         }
                     }
                     renderer.render();
@@ -1435,15 +1441,48 @@ fn build_crystal_markers(scene: &mut Scene) {
     }
 }
 
-/// Broad world bounds for the current streamed-world collision prototype.
-/// The starter obstacles remain as temporary blockout props until chunk-based
-/// obstacle data is introduced; the arena-sized outer boundary is removed.
+/// Broad world bounds for the streamed-world collision prototype.
 fn world_collision_world() -> CollisionWorld {
-    let mut world = CollisionWorld::new(Aabb2::new(-1_000_000.0, 1_000_000.0, -1_000_000.0, 1_000_000.0));
-    world.add_obstacle(Aabb2::new(-2.75, -1.25, -1.75, -0.25));
-    world.add_obstacle(Aabb2::new(1.75, 3.25, 0.75, 2.25));
-    world.add_obstacle(Aabb2::new(-1.0, 1.0, 3.25, 4.75));
-    world
+    CollisionWorld::new(Aabb2::new(
+        -1_000_000.0,
+        1_000_000.0,
+        -1_000_000.0,
+        1_000_000.0,
+    ))
+}
+
+/// Rebuilds collision footprints from the same bounded chunk window as terrain streaming.
+fn sync_world_collision(world: &mut CollisionWorld, chunks: &[WorldChunkRequest]) {
+    let mut obstacles = Vec::with_capacity(chunks.len() * 2);
+    for request in chunks {
+        let chunk_x = request.coord.x;
+        let chunk_z = request.coord.z;
+        let mut hash = (chunk_x as u32).wrapping_mul(0x9E37_79B9)
+            ^ (chunk_z as u32).wrapping_mul(0x85EB_CA6B);
+        hash ^= hash >> 16;
+        hash = hash.wrapping_mul(0x7FEB_352D);
+        hash ^= hash >> 15;
+
+        let origin_x = chunk_x as f32 * WORLD_CHUNK_SIZE;
+        let origin_z = chunk_z as f32 * WORLD_CHUNK_SIZE;
+        for index in 0..2_u32 {
+            let selector = hash.rotate_left(index * 11).wrapping_add(index * 0x9E37_79B9);
+            // Keep generated props away from the central road corridor.
+            let side = if selector & 1 == 0 { -1.0 } else { 1.0 };
+            let center_x = origin_x + side * (13.0 + (selector % 9) as f32);
+            let center_z = origin_z + 10.0 + ((selector >> 8) % 40) as f32;
+            let half_size = 0.65 + ((selector >> 16) % 8) as f32 * 0.12;
+            if selector % 5 != 0 {
+                obstacles.push(Aabb2::new(
+                    center_x - half_size,
+                    center_x + half_size,
+                    center_z - half_size,
+                    center_z + half_size,
+                ));
+            }
+        }
+    }
+    world.replace_obstacles(&obstacles);
 }
 
 fn update_camera_controls(renderer: Option<&mut Renderer>, key: KeyCode) {
