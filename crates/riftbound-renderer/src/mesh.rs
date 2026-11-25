@@ -413,49 +413,58 @@ fn world_terrain_chunk_data(
         }
     }
 
-    // A separate raised ribbon guarantees a continuous, clearly defined road even
-    // when the terrain grid does not place a vertex exactly on the road edges.
-    let road_start = u16::try_from(vertices.len()).ok()?;
-    for z in 0..side {
-        let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
-        let world_z = origin_z + local_z;
-        let road = world_road_sample(origin_x, world_z);
-        let edge_offsets = [
-            -road.half_width - road.shoulder_width,
-            -road.half_width,
-            road.half_width,
-            road.half_width + road.shoulder_width,
-        ];
-        for (edge_index, offset) in edge_offsets.into_iter().enumerate() {
-            let world_x = road.center_x + offset;
-            let local_x = world_x - origin_x;
-            let sample = world_terrain_sample(world_x, world_z);
-            let color = if edge_index == 0 || edge_index == 3 {
-                terrain_surface_color(VehicleSurface::Gravel)
-            } else {
-                [0.12, 0.14, 0.17]
-            };
-            vertices.push(MeshVertex {
-                position: [local_x, sample.height + 0.2, local_z],
-                color,
-            });
+    // Add the road ribbon only to chunks that fully contain its corridor.
+    // This avoids drawing duplicate, translated copies in every streamed X column.
+    let road_is_inside_chunk = (0..side).all(|z| {
+        let local_z = -32.0 + f32::from(u8::try_from(z).expect("road row fits u8")) * step;
+        let road = world_road_sample(origin_x, origin_z + local_z);
+        let left = road.center_x - road.half_width - road.shoulder_width;
+        let right = road.center_x + road.half_width + road.shoulder_width;
+        left >= origin_x - 32.0 && right <= origin_x + 32.0
+    });
+    if road_is_inside_chunk {
+        let road_start = u16::try_from(vertices.len()).ok()?;
+        for z in 0..side {
+            let local_z = -32.0 + f32::from(u8::try_from(z).ok()?) * step;
+            let world_z = origin_z + local_z;
+            let road = world_road_sample(origin_x, world_z);
+            let edge_offsets = [
+                -road.half_width - road.shoulder_width,
+                -road.half_width,
+                road.half_width,
+                road.half_width + road.shoulder_width,
+            ];
+            for (edge_index, offset) in edge_offsets.into_iter().enumerate() {
+                let world_x = road.center_x + offset;
+                let local_x = world_x - origin_x;
+                let sample = world_terrain_sample(world_x, world_z);
+                let color = if edge_index == 0 || edge_index == 3 {
+                    terrain_surface_color(VehicleSurface::Gravel)
+                } else {
+                    [0.12, 0.14, 0.17]
+                };
+                vertices.push(MeshVertex {
+                    position: [local_x, sample.height + 0.2, local_z],
+                    color,
+                });
+            }
         }
-    }
-    for z in 0..cells {
-        for band in 0..3 {
-            let top_left = road_start
-                + u16::try_from(z * 4 + band).expect("road vertex index fits u16");
-            let top_right = top_left + 1;
-            let bottom_left = top_left + 4;
-            let bottom_right = bottom_left + 1;
-            indices.extend_from_slice(&[
-                top_left,
-                bottom_left,
-                top_right,
-                top_right,
-                bottom_left,
-                bottom_right,
-            ]);
+        for z in 0..cells {
+            for band in 0..3 {
+                let top_left = road_start
+                    + u16::try_from(z * 4 + band).expect("road vertex index fits u16");
+                let top_right = top_left + 1;
+                let bottom_left = top_left + 4;
+                let bottom_right = bottom_left + 1;
+                indices.extend_from_slice(&[
+                    top_left,
+                    bottom_left,
+                    top_right,
+                    top_right,
+                    bottom_left,
+                    bottom_right,
+                ]);
+            }
         }
     }
 
@@ -705,6 +714,15 @@ mod tests {
             }
             assert!(valid_index_data(vertices.len(), &indices));
         }
+    }
+
+    #[test]
+    fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
+        let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
+        let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
+        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4);
+        assert_eq!(distant_chunk.0.len(), 81 + 4 * 8 * 4);
+        assert_eq!(distant_chunk.1.len(), 384 + 4 * 8 * 6);
     }
 
     #[test]
