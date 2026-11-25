@@ -56,8 +56,13 @@ impl FixedClock {
             // fractional remainder and report bounded work instead of poisoning
             // interpolation with infinity or NaN.
             let elapsed_remainder = elapsed % self.step_seconds;
-            let combined_remainder = self.accumulator + elapsed_remainder;
-            self.accumulator = combined_remainder % self.step_seconds;
+            let accumulator_remainder = self.accumulator % self.step_seconds;
+            let distance_to_wrap = self.step_seconds - elapsed_remainder;
+            self.accumulator = if accumulator_remainder >= distance_to_wrap {
+                accumulator_remainder - distance_to_wrap
+            } else {
+                accumulator_remainder + elapsed_remainder
+            };
             return TickBatch {
                 steps: self.max_steps_per_advance,
                 alpha: self.accumulator / self.step_seconds,
