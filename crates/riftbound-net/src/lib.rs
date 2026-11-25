@@ -164,6 +164,14 @@ pub async fn serve() {
             },
         ])),
     };
+    let snapshot_state = state.clone();
+    tokio::spawn(async move {
+        let mut cadence = tokio::time::interval(Duration::from_millis(50));
+        loop {
+            cadence.tick().await;
+            publish_snapshot(&snapshot_state).await;
+        }
+    });
     let app = Router::new()
         .route("/", get(index))
         .route("/health", get(health))
@@ -232,7 +240,12 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     let mut updates = state.updates.subscribe();
     publish_snapshot(&state).await;
     let writer = tokio::spawn(async move {
-        while let Ok(message) = updates.recv().await {
+        loop {
+            let message = match updates.recv().await {
+                Ok(message) => message,
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            };
             if sender.send(Message::Text(message.into())).await.is_err() {
                 break;
             }
@@ -248,9 +261,7 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
         let Ok(input) = serde_json::from_str::<ClientMessage>(text.as_str()) else {
             continue;
         };
-        if handle_client_message(&state, id, input, &mut last_input_at).await {
-            publish_snapshot(&state).await;
-        }
+        let _ = handle_client_message(&state, id, input, &mut last_input_at).await;
     }
 
     state.players.lock().await.remove(&id);
