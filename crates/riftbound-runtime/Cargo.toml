@@ -13,6 +13,7 @@ log = "0.4"
 pollster = "0.4"
 riftbound-renderer = { path = "../riftbound-renderer" }
 winit = "0.30.13"
+rodio = "0.20.1"
 
 [lints]
 workspace = true
