@@ -85,6 +85,13 @@ impl CollisionWorld {
         &self.obstacles
     }
 
+    /// Replaces all obstacle footprints, retaining the allocation when capacity permits.
+    /// Callers use this to keep streamed-world collision bounded to active chunks.
+    pub fn replace_obstacles(&mut self, obstacles: &[Aabb2]) {
+        self.obstacles.clear();
+        self.obstacles.extend_from_slice(obstacles);
+    }
+
     /// Moves a character, resolving X and Z independently to allow wall sliding.
     ///
     /// Small substeps prevent a fast frame from tunneling through thin obstacles.
@@ -433,6 +440,15 @@ mod tests {
         let mut world = CollisionWorld::new(Aabb2::new(-5.0, 5.0, -5.0, 5.0));
         world.add_obstacle(Aabb2::new(-1.0, 1.0, -1.0, 1.0));
         world
+    }
+
+    #[test]
+    fn replacing_obstacles_discards_evicted_chunk_footprints() {
+        let mut collision = world();
+        collision.replace_obstacles(&[Aabb2::new(10.0, 11.0, 10.0, 11.0)]);
+        assert_eq!(collision.obstacles(), &[Aabb2::new(10.0, 11.0, 10.0, 11.0)]);
+        collision.replace_obstacles(&[]);
+        assert!(collision.obstacles().is_empty());
     }
 
     #[test]
