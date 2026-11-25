@@ -235,6 +235,9 @@ impl ApplicationHandler for RiftboundApp {
         self.vehicle_recovery = VehicleRecovery::default();
         self.driving = false;
         self.collision = None;
+        self.world_streamer = None;
+        self.world_slot_map = None;
+        self.world_obstacle_entities.clear();
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
         self.animated_transforms.clear();
