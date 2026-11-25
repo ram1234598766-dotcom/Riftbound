@@ -72,6 +72,14 @@ impl FixedClock {
         }
     }
 
+    /// Clears accumulated time, for example when simulation is paused or resumed.
+    ///
+    /// This prevents elapsed wall time during a pause from being simulated on the
+    /// next advance. The clock keeps its configured step size and catch-up budget.
+    pub fn reset(&mut self) {
+        self.accumulator = 0.0;
+    }
+
     /// The fixed simulation step in seconds.
     #[must_use]
     pub const fn step_seconds(&self) -> f64 {
@@ -94,6 +102,19 @@ mod tests {
         assert_eq!(second.steps, 3);
         assert!(second.dropped_seconds > 0.9);
         assert!((0.0..1.0).contains(&second.alpha));
+    }
+
+    #[test]
+    fn reset_discards_partial_and_pending_simulation_time() {
+        let mut clock = FixedClock::new(0.01, 3);
+        assert_eq!(clock.advance(0.025).steps, 2);
+
+        clock.reset();
+
+        let after_reset = clock.advance(0.005);
+        assert_eq!(after_reset.steps, 0);
+        assert!((after_reset.alpha - 0.5).abs() < 1e-9);
+        assert_eq!(after_reset.dropped_seconds, 0.0);
     }
 
     #[test]
