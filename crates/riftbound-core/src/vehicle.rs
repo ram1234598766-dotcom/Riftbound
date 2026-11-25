@@ -22,6 +22,13 @@ pub enum VehicleSurface {
     Rock,
 }
 
+/// Converts transition progress into a smooth, zero-slope blend fraction.
+fn smooth_transition(frame: u8, total_frames: u8) -> f32 {
+    let progress = f32::from(frame) / f32::from(total_frames.max(1));
+    let progress = progress.clamp(0.0, 1.0);
+    progress * progress * (3.0 - 2.0 * progress)
+}
+
 /// Filters brief surface-sampling changes so a vehicle does not flicker between
 /// terrain profiles when its wheel contacts straddle a biome boundary.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,7 +91,7 @@ impl VehicleSurfaceTracker {
     #[must_use]
     pub fn response(self) -> (f32, f32, f32) {
         let target = self.target_response;
-        let amount = f32::from(self.blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        let amount = smooth_transition(self.blend_frames, Self::TRANSITION_FRAMES);
         (
             self.blend_from[0] + (target[0] - self.blend_from[0]) * amount,
             self.blend_from[1] + (target[1] - self.blend_from[1]) * amount,
@@ -95,7 +102,7 @@ impl VehicleSurfaceTracker {
     /// Returns blended grip for front-left, front-right, rear-left, rear-right.
     #[must_use]
     pub fn wheel_traction(self) -> [f32; 4] {
-        let amount = f32::from(self.wheel_blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        let amount = smooth_transition(self.wheel_blend_frames, Self::TRANSITION_FRAMES);
         std::array::from_fn(|index| {
             self.wheel_blend_from[index]
                 + (self.wheel_target[index] - self.wheel_blend_from[index]) * amount
@@ -105,7 +112,7 @@ impl VehicleSurfaceTracker {
     /// Returns blended left/right tyre grip, in vehicle-local side order.
     #[must_use]
     pub fn side_traction(self) -> (f32, f32) {
-        let amount = f32::from(self.side_blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        let amount = smooth_transition(self.side_blend_frames, Self::TRANSITION_FRAMES);
         (
             self.side_blend_from[0] + (self.side_target[0] - self.side_blend_from[0]) * amount,
             self.side_blend_from[1] + (self.side_target[1] - self.side_blend_from[1]) * amount,
@@ -1705,6 +1712,27 @@ mod tests {
         }
         let settled = tracker.side_traction();
         assert!(settled.1 > settled.0);
+    }
+
+    #[test]
+    fn wheel_contact_blend_eases_in_and_out_without_changing_midpoint() {
+        let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
+        let contacts = [VehicleSurface::Snow; 4];
+        tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+
+        for _ in 0..4 {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        }
+        let early = tracker.wheel_traction()[0];
+        assert!(early > VehicleSurface::Snow.traction());
+        assert!(early < 1.0 - (1.0 - VehicleSurface::Snow.traction()) * 0.2);
+
+        for _ in 4..9 {
+            tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
+        }
+        let midpoint = tracker.wheel_traction()[0];
+        let expected_midpoint = (1.0 + VehicleSurface::Snow.traction()) * 0.5;
+        assert!((midpoint - expected_midpoint).abs() < 0.0001);
     }
 
     #[test]
