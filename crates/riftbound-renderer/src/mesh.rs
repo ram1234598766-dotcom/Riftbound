@@ -100,6 +100,27 @@ impl Mesh {
         Self::from_data(device, &vertices, &indices, "riftbound-pyramid-mesh")
     }
 
+    /// Creates a joined low-poly tree with trunk and layered evergreen crown.
+    #[must_use]
+    pub fn environment_tree(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = environment_tree_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-environment-tree-mesh")
+    }
+
+    /// Creates an irregular faceted boulder from joined low-poly rock forms.
+    #[must_use]
+    pub fn environment_boulder(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = environment_boulder_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-environment-boulder-mesh")
+    }
+
+    /// Creates a compact three-lobed shrub mesh for dry and muddy biomes.
+    #[must_use]
+    pub fn environment_shrub(device: &wgpu::Device) -> Option<Self> {
+        let (vertices, indices) = environment_shrub_data();
+        Self::from_data(device, &vertices, &indices, "riftbound-environment-shrub-mesh")
+    }
+
     /// Creates a faceted octahedral crystal mesh with alternating cyan facets.
     #[must_use]
     pub fn crystal(device: &wgpu::Device) -> Option<Self> {
@@ -283,6 +304,79 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let indices = vec![
         0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2, 1, 3, 2, 1, 4, 3, 1, 5, 4, 1, 2, 5,
     ];
+    (vertices, indices)
+}
+
+
+fn append_environment_part(
+    vertices: &mut Vec<MeshVertex>,
+    indices: &mut Vec<u16>,
+    source: (Vec<MeshVertex>, Vec<u16>),
+    scale: [f32; 3],
+    offset: [f32; 3],
+    color: [f32; 3],
+) {
+    let base = u16::try_from(vertices.len()).expect("environment mesh vertex offset fits u16");
+    for vertex in source.0 {
+        vertices.push(MeshVertex {
+            position: [
+                vertex.position[0] * scale[0] + offset[0],
+                vertex.position[1] * scale[1] + offset[1],
+                vertex.position[2] * scale[2] + offset[2],
+            ],
+            color,
+        });
+    }
+    indices.extend(source.1.into_iter().map(|index| base + index));
+}
+
+fn environment_tree_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let mut vertices = Vec::with_capacity(48);
+    let mut indices = Vec::with_capacity(108);
+    append_environment_part(
+        &mut vertices, &mut indices, cube_data(),
+        [0.16, 0.72, 0.16], [0.0, -0.28, 0.0], [0.34, 0.20, 0.10],
+    );
+    append_environment_part(
+        &mut vertices, &mut indices, pyramid_data(),
+        [0.82, 0.78, 0.82], [0.0, 0.58, 0.0], [0.12, 0.42, 0.22],
+    );
+    append_environment_part(
+        &mut vertices, &mut indices, pyramid_data(),
+        [0.58, 0.62, 0.58], [0.0, 1.12, 0.0], [0.18, 0.58, 0.30],
+    );
+    (vertices, indices)
+}
+
+fn environment_boulder_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let mut vertices = Vec::with_capacity(32);
+    let mut indices = Vec::with_capacity(60);
+    append_environment_part(
+        &mut vertices, &mut indices, pyramid_data(),
+        [0.92, 0.68, 0.78], [0.0, 0.0, 0.0], [0.38, 0.41, 0.45],
+    );
+    append_environment_part(
+        &mut vertices, &mut indices, crystal_data(),
+        [0.52, 0.42, 0.48], [0.32, 0.08, -0.18], [0.49, 0.52, 0.56],
+    );
+    (vertices, indices)
+}
+
+fn environment_shrub_data() -> (Vec<MeshVertex>, Vec<u16>) {
+    let mut vertices = Vec::with_capacity(72);
+    let mut indices = Vec::with_capacity(108);
+    append_environment_part(
+        &mut vertices, &mut indices, cube_data(),
+        [0.62, 0.34, 0.52], [-0.42, 0.0, 0.0], [0.40, 0.34, 0.16],
+    );
+    append_environment_part(
+        &mut vertices, &mut indices, cube_data(),
+        [0.58, 0.42, 0.58], [0.34, 0.08, 0.04], [0.48, 0.40, 0.18],
+    );
+    append_environment_part(
+        &mut vertices, &mut indices, pyramid_data(),
+        [0.42, 0.50, 0.42], [0.0, 0.18, -0.28], [0.56, 0.48, 0.22],
+    );
     (vertices, indices)
 }
 
@@ -1378,5 +1472,34 @@ mod tests {
         assert!(!valid_index_data(3, &[]));
         assert!(!valid_index_data(3, &[0, 1]));
         assert!(!valid_index_data(3, &[0, 1, 3]));
+    }
+}
+
+#[cfg(test)]
+mod environment_mesh_tests {
+    use super::*;
+
+    #[test]
+    fn dedicated_environment_meshes_have_valid_indexed_geometry() {
+        for (vertices, indices) in [
+            environment_tree_data(),
+            environment_boulder_data(),
+            environment_shrub_data(),
+        ] {
+            assert!(!vertices.is_empty());
+            assert!(valid_index_data(vertices.len(), &indices));
+            assert!(vertices.iter().all(|vertex| {
+                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+            }));
+        }
+    }
+
+    #[test]
+    fn environment_meshes_have_distinct_geometry_budgets() {
+        let tree = environment_tree_data();
+        let boulder = environment_boulder_data();
+        let shrub = environment_shrub_data();
+        assert_ne!(tree.0.len(), boulder.0.len());
+        assert_ne!(boulder.0.len(), shrub.0.len());
     }
 }
