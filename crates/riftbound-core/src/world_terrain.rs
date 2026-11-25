@@ -89,7 +89,7 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     let broad = value_noise(world_x * 0.004, world_z * 0.004);
     let detail = value_noise(world_x * 0.018 + 31.7, world_z * 0.018 - 19.3);
     let ridge = 1.0 - value_noise(world_x * 0.0025 - 7.1, world_z * 0.0025 + 13.9).abs();
-    let height = broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0;
+    let ground_height = broad * 15.0 + detail * 2.2 + ridge.max(0.0) * 3.5 - 2.0;
 
     let road = world_road_sample(world_x, world_z);
     // A short eastbound spur branches from the primary road at the origin.
@@ -106,6 +106,16 @@ pub fn world_terrain_sample(world_x: f32, world_z: f32) -> WorldTerrainSample {
     let on_branch_shoulder = (-130.5..=0.0).contains(&world_z)
         && branch_distance <= 8.0
         && !on_branch;
+
+    // The north branch crosses a shallow ravine. A smooth 8-unit approach
+    // raises the bridge deck by four units, and the same sample feeds vehicle
+    // suspension so driving physics meets the rendered road surface.
+    let bridge_corridor = (72.0..=88.0).contains(&world_x)
+        && (-88.0..=-56.0).contains(&world_z);
+    let bridge_distance_to_ramp = (world_z + 88.0).min(-56.0 - world_z);
+    let bridge_blend = smoothstep((bridge_distance_to_ramp / 8.0).clamp(0.0, 1.0));
+    let height = ground_height + if bridge_corridor { 4.0 * bridge_blend } else { 0.0 };
+
     let surface = if road.is_on_road() || on_spur || on_branch {
         VehicleSurface::Asphalt
     } else if road.is_on_road_corridor() || on_spur_shoulder || on_branch_shoulder {
