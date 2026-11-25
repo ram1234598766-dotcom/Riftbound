@@ -13,7 +13,7 @@ use riftbound_core::{
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
     VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface, VehicleUpgrades,
     WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height, world_road_sample, world_terrain_sample,
-    world_terrain_vehicle_surface,
+    world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -744,10 +744,20 @@ impl ApplicationHandler for RiftboundApp {
                         // Sample the same deterministic terrain function used by the arena.
                         // Corner order matches SuspensionState: front-left, front-right,
                         // rear-left, rear-right.
-                        let ground_heights = vehicle_wheel_ground_heights(
-                            self.vehicle_state.position,
+                        let ground_heights = world_terrain_vehicle_ground_heights(
+                            self.vehicle_state.position.x,
+                            self.vehicle_state.position.z,
                             self.vehicle_state.heading,
-                        );
+                            0.78,
+                            1.32,
+                        )
+                        .unwrap_or_else(|| {
+                            [world_terrain_sample(
+                                self.vehicle_state.position.x,
+                                self.vehicle_state.position.z,
+                            )
+                            .height; 4]
+                        });
                         let suspension_config = SuspensionConfig::default();
                         let suspension_pose = self.vehicle_suspension.update(
                             ground_heights,
@@ -2146,19 +2156,6 @@ fn world_prop_variant_for_surface(surface: VehicleSurface, variant: u32) -> u32 
     }
 }
 
-/// Samples terrain elevation beneath the vehicle's four suspension contact points.
-fn vehicle_wheel_ground_heights(position: Vec3, heading: f32) -> [f32; 4] {
-    let wheel_offsets = &VEHICLE_WHEEL_OFFSETS;
-    let (sin_heading, cos_heading) = heading.sin_cos();
-    let mut ground_heights = [0.0_f32; 4];
-    for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
-        let world_x = position.x + cos_heading * local_x + sin_heading * local_z;
-        let world_z = position.z - sin_heading * local_x + cos_heading * local_z;
-        ground_heights[index] = world_terrain_sample(world_x, world_z).height;
-    }
-    ground_heights
-}
-
 /// Keeps visible blockout props and collision footprints aligned to active chunks.
 /// Selects the active terrain-streaming focus from the currently controlled actor.
 fn world_stream_focus(driving: bool, vehicle_position: Vec3, player_position: Vec3) -> Vec3 {
@@ -2238,17 +2235,6 @@ fn spawn_world_obstacle_props(
 #[allow(clippy::items_after_test_module)]
 mod world_prop_tests {
     use super::*;
-
-    #[test]
-    fn vehicle_suspension_samples_four_heading_adjusted_terrain_contacts() {
-        let position = Vec3::new(84.0, 0.0, 116.0);
-        let forward = vehicle_wheel_ground_heights(position, 0.0);
-        let turned = vehicle_wheel_ground_heights(position, std::f32::consts::FRAC_PI_2);
-
-        assert!(forward.iter().all(|height| height.is_finite()));
-        assert!(turned.iter().all(|height| height.is_finite()));
-        assert_ne!(forward, turned);
-    }
 
     #[test]
     fn terrain_streaming_follows_vehicle_while_driving_and_player_on_foot() {
