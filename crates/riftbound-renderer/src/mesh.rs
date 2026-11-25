@@ -1913,6 +1913,32 @@ mod tests {
     }
 
     #[test]
+    fn terrain_lighting_is_identical_on_all_adjacent_chunk_edges() {
+        for side in [5, 9] {
+            for (chunk_x, chunk_z) in [(-12, -12), (-1, -1), (0, 0), (10, 10)] {
+                let current = world_terrain_chunk_data(chunk_x, chunk_z, side)
+                    .expect("current terrain chunk");
+                let east = world_terrain_chunk_data(chunk_x + 1, chunk_z, side)
+                    .expect("east terrain chunk");
+                let south = world_terrain_chunk_data(chunk_x, chunk_z + 1, side)
+                    .expect("south terrain chunk");
+
+                for row in 0..side {
+                    let current_east = current.0[row * side + side - 1];
+                    let east_west = east.0[row * side];
+                    assert_eq!(current_east.position[1], east_west.position[1]);
+                    assert_eq!(current_east.color, east_west.color);
+
+                    let current_south = current.0[(side - 1) * side + row];
+                    let south_north = south.0[row];
+                    assert_eq!(current_south.position[1], south_north.position[1]);
+                    assert_eq!(current_south.color, south_north.color);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn terrain_surface_palette_distinguishes_all_driving_zones() {
         let colors = [
             terrain_surface_color(VehicleSurface::Asphalt),
