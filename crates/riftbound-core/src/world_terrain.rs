@@ -176,6 +176,42 @@ pub fn world_terrain_vehicle_ground_heights(
     Some(heights)
 }
 
+/// Returns the terrain surface under each tyre in suspension corner order.
+///
+/// Invalid vehicle geometry safely maps every contact to rock.
+#[must_use]
+pub fn world_terrain_vehicle_surfaces(
+    world_x: f32,
+    world_z: f32,
+    heading: f32,
+    half_track: f32,
+    half_wheelbase: f32,
+) -> [VehicleSurface; 4] {
+    if !world_x.is_finite()
+        || !world_z.is_finite()
+        || !heading.is_finite()
+        || !half_track.is_finite()
+        || !half_wheelbase.is_finite()
+        || half_track <= 0.0
+        || half_wheelbase <= 0.0
+    {
+        return [VehicleSurface::Rock; 4];
+    }
+
+    let (sin_heading, cos_heading) = heading.sin_cos();
+    let offsets = [
+        (-half_track, -half_wheelbase),
+        (half_track, -half_wheelbase),
+        (-half_track, half_wheelbase),
+        (half_track, half_wheelbase),
+    ];
+    offsets.map(|(local_x, local_z)| {
+        let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
+        let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
+        world_terrain_sample(contact_x, contact_z).surface
+    })
+}
+
 /// Samples the dominant world surface beneath all four tyre contact points.
 ///
 /// The centre surface wins ties, keeping handling stable when a vehicle straddles
@@ -285,6 +321,7 @@ mod tests {
     use super::{
         WorldTerrainSample, value_noise, world_road_sample, world_terrain_sample,
         world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
+        world_terrain_vehicle_surfaces,
     };
     use crate::VehicleSurface;
 
@@ -446,6 +483,15 @@ mod tests {
             world_terrain_vehicle_ground_heights(0.0, 0.0, 0.0, 0.8, 0.0),
             None
         );
+    }
+
+    #[test]
+    fn world_vehicle_surfaces_preserve_each_wheel_contact() {
+        let contacts = world_terrain_vehicle_surfaces(0.0, 0.0, 0.0, 4.0, 1.0);
+        assert_eq!(contacts[0], VehicleSurface::Gravel);
+        assert_eq!(contacts[1], VehicleSurface::Asphalt);
+        assert_eq!(contacts[2], VehicleSurface::Gravel);
+        assert_eq!(contacts[3], VehicleSurface::Asphalt);
     }
 
     #[test]
