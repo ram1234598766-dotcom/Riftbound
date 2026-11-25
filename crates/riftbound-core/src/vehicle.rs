@@ -978,8 +978,19 @@ impl SuspensionState {
                 } else {
                     terrain_damping
                 };
+                // A progressive bump stop engages through the final quarter of
+                // travel, adding resistance before the spring reaches its hard limit.
+                let compression_progress =
+                    ((self.compression[index] / config.max_travel - 0.75) / 0.25)
+                        .clamp(0.0, 1.0);
+                let bump_stop_acceleration = -config.spring_strength
+                    * config.max_travel
+                    * 1.5
+                    * compression_progress
+                    * compression_progress;
                 let acceleration = (target - self.compression[index]) * config.spring_strength
-                    - self.compression_velocity[index] * rebound_damping;
+                    - self.compression_velocity[index] * rebound_damping
+                    + bump_stop_acceleration;
                 self.compression_velocity[index] += acceleration * step_dt;
                 self.compression[index] = (self.compression[index]
                     + self.compression_velocity[index] * step_dt)
@@ -1930,6 +1941,28 @@ mod tests {
         );
         let pose = suspension.pose(config);
         assert!(pose.average_compression.is_finite());
+        assert!(pose.pitch.is_finite() && pose.roll.is_finite());
+    }
+
+    #[test]
+    fn suspension_progressively_resists_near_bottoming_out() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState::default();
+
+        for _ in 0..600 {
+            suspension.update([config.max_travel; 4], 0.58, config, 1.0 / 60.0);
+        }
+
+        assert!(suspension
+            .compression
+            .iter()
+            .all(|compression| *compression < config.max_travel));
+        assert!(suspension
+            .compression_velocity
+            .iter()
+            .all(|velocity| velocity.is_finite()));
+        let pose = suspension.pose(config);
+        assert!(pose.impact_intensity.is_finite());
         assert!(pose.pitch.is_finite() && pose.roll.is_finite());
     }
 
