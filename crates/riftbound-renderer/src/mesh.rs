@@ -1278,14 +1278,30 @@ fn world_terrain_chunk_data(
     // chunk. Each edge is generated from that chunk's own border samples, so
     // the overlap remains valid even when the two edge profiles differ.
     let mut append_skirt = |edge: Vec<usize>| -> Option<()> {
+        let mut minimum_height = f32::INFINITY;
+        let mut maximum_height = f32::NEG_INFINITY;
+        for index in &edge {
+            let height = vertices.get(*index)?.position[1];
+            if !height.is_finite() {
+                return None;
+            }
+            minimum_height = minimum_height.min(height);
+            maximum_height = maximum_height.max(height);
+        }
+        // Scale the skirt to the edge's relief so steep biome transitions and
+        // high ridges remain covered without making every chunk excessively deep.
+        let skirt_depth = WORLD_TERRAIN_SKIRT_DEPTH.max(maximum_height - minimum_height + 4.0);
+        if !skirt_depth.is_finite() {
+            return None;
+        }
         for pair in edge.windows(2) {
             let top_a = *vertices.get(pair[0])?;
             let top_b = *vertices.get(pair[1])?;
             let base = u16::try_from(vertices.len()).ok()?;
             let mut bottom_a = top_a;
-            bottom_a.position[1] -= WORLD_TERRAIN_SKIRT_DEPTH;
+            bottom_a.position[1] -= skirt_depth;
             let mut bottom_b = top_b;
-            bottom_b.position[1] -= WORLD_TERRAIN_SKIRT_DEPTH;
+            bottom_b.position[1] -= skirt_depth;
             vertices.extend_from_slice(&[top_a, bottom_a, top_b, bottom_b]);
             indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 1, base + 3]);
         }
@@ -1502,9 +1518,12 @@ mod tests {
         let skirt_vertex_count = 4 * (5 - 1) * 4;
         let skirt_start = distant.0.len() - skirt_vertex_count;
         assert!(distant.0[skirt_start..].chunks_exact(4).all(|skirt| {
-            (skirt[0].position[1] - skirt[1].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs() < 1.0e-4
-                && (skirt[2].position[1] - skirt[3].position[1] - WORLD_TERRAIN_SKIRT_DEPTH).abs()
-                    < 1.0e-4
+            let first_depth = skirt[0].position[1] - skirt[1].position[1];
+            let second_depth = skirt[2].position[1] - skirt[3].position[1];
+            first_depth.is_finite()
+                && second_depth.is_finite()
+                && (first_depth - second_depth).abs() < 1.0e-4
+                && first_depth >= WORLD_TERRAIN_SKIRT_DEPTH
         }));
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
