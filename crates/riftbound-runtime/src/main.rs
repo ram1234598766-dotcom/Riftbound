@@ -826,7 +826,7 @@ impl ApplicationHandler for RiftboundApp {
                 } else {
                     0.0
                 };
-                let audio_mix = self.vehicle_audio_state.update(
+                let audio_mix = self.vehicle_audio_state.update_with_impact(
                     if self.driving { self.vehicle_state.speed } else { 0.0 },
                     audio_throttle,
                     if self.driving {
@@ -838,6 +838,11 @@ impl ApplicationHandler for RiftboundApp {
                         self.vehicle_surface_tracker.current()
                     } else {
                         VehicleSurface::Asphalt
+                    },
+                    if self.driving {
+                        self.vehicle_suspension.pose(SuspensionConfig::default()).impact_intensity
+                    } else {
+                        0.0
                     },
                     simulation_delta,
                 );
