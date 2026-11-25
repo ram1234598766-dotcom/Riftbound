@@ -2283,7 +2283,7 @@ mod world_prop_tests {
         let reversed_chunks = [chunks[1], chunks[0]];
         let mut ordered_footprints = first.clone();
         let mut reversed_footprints = world_obstacle_footprints(&reversed_chunks);
-        let sort_footprints = |footprints: &mut Vec<Aabb2>| {
+        let sort_footprints = |footprints: &mut [Aabb2]| {
             footprints.sort_by(|left, right| {
                 left.min_x
                     .total_cmp(&right.min_x)
