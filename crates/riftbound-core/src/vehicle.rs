@@ -1051,9 +1051,14 @@ impl SuspensionState {
             let relative_load = (1.0
                 + (self.compression[index] - average) / config.max_travel * 0.8)
                 .clamp(0.65, 1.25);
+            // Compression velocity contributes a brief dynamic load transfer:
+            // a wheel moving into its spring gains grip, while a rebounding wheel
+            // unloads smoothly. The bounded factor avoids runaway tyre forces.
+            let dynamic_load = (1.0 + self.compression_velocity[index] * 0.08)
+                .clamp(0.75, 1.25);
             let contact = (self.compression[index] / (config.max_travel * 0.25))
                 .clamp(0.0, 1.0);
-            relative_load * contact
+            relative_load * dynamic_load * contact
         })
     }
 
@@ -1336,6 +1341,25 @@ mod tests {
             )
             .is_none());
         assert_eq!(vehicle, before);
+    }
+
+    #[test]
+    fn suspension_load_factors_follow_transient_compression_and_rebound() {
+        let config = SuspensionConfig::default();
+        let mut suspension = SuspensionState {
+            compression: [0.2; 4],
+            compression_velocity: [4.0, -4.0, 0.0, 0.0],
+            ground_reference_initialized: true,
+            ..SuspensionState::default()
+        };
+
+        let loads = suspension.wheel_load_factors(config);
+        assert!(loads[0] > loads[2]);
+        assert!(loads[2] > loads[1]);
+        assert!(loads.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
+        suspension.compression_velocity = [-100.0, 100.0, 0.0, 0.0];
+        let bounded = suspension.wheel_load_factors(config);
+        assert!(bounded.iter().all(|load| load.is_finite() && *load <= 1.25));
     }
 
     #[test]
