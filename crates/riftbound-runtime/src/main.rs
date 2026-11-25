@@ -90,7 +90,11 @@ impl ApplicationHandler for RiftboundApp {
                 log::error!("Could not start LAN server thread: {error}");
             }
         }
-        self.vehicle_upgrades = save::load_vehicle_upgrades();
+        let saved_profile = save::load_profile();
+        self.vehicle_upgrades = saved_profile.upgrades;
+        self.inventory = saved_profile.inventory;
+        self.equipment = saved_profile.equipment;
+        self.progression = saved_profile.progression;
         if self.renderer.is_some() {
             return;
         }
@@ -207,11 +211,6 @@ impl ApplicationHandler for RiftboundApp {
                 }
                 self.collision = Some(collision);
                 self.pickups = pickups;
-                self.inventory = Inventory::default();
-                self.inventory.add(ItemKind::ExplorerVest, 1);
-                self.inventory.add(ItemKind::TrailBoots, 1);
-                self.inventory.add(ItemKind::Medkit, 2);
-                self.equipment = Equipment::default();
                 self.inventory_open = false;
                 self.garage_open = false;
                 self.mission = MissionProgress::new(self.pickups.total());
@@ -297,7 +296,12 @@ impl ApplicationHandler for RiftboundApp {
         }
         match event {
             WindowEvent::CloseRequested => {
-                if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                if let Err(error) = save::save_profile(&save::SavedProfile {
+                    upgrades: self.vehicle_upgrades,
+                    inventory: self.inventory.clone(),
+                    equipment: self.equipment,
+                    progression: self.progression,
+                }) {
                     log::warn!("Could not save vehicle upgrades: {error}");
                 }
                 event_loop.exit();
@@ -355,7 +359,12 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyU => {
                                 if self.vehicle_upgrades.purchase_engine_upgrade(&mut self.inventory) {
                                     log::info!("Engine upgraded to tier {}", self.vehicle_upgrades.engine_level());
-                                    if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                                    if let Err(error) = save::save_profile(&save::SavedProfile {
+                    upgrades: self.vehicle_upgrades,
+                    inventory: self.inventory.clone(),
+                    equipment: self.equipment,
+                    progression: self.progression,
+                }) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_engine_cost() {
@@ -367,7 +376,12 @@ impl ApplicationHandler for RiftboundApp {
                             KeyCode::KeyH => {
                                 if self.vehicle_upgrades.purchase_handling_upgrade(&mut self.inventory) {
                                     log::info!("Handling and tires upgraded to tier {}", self.vehicle_upgrades.handling_level());
-                                    if let Err(error) = save::save_vehicle_upgrades(self.vehicle_upgrades) {
+                                    if let Err(error) = save::save_profile(&save::SavedProfile {
+                    upgrades: self.vehicle_upgrades,
+                    inventory: self.inventory.clone(),
+                    equipment: self.equipment,
+                    progression: self.progression,
+                }) {
                                         log::warn!("Could not save vehicle upgrades: {error}");
                                     }
                                 } else if let Some(cost) = self.vehicle_upgrades.next_handling_cost() {
