@@ -859,6 +859,8 @@ pub struct SuspensionPose {
     pub wheel_compression_velocities: [f32; 4],
     /// Peak normalized compression speed, useful for bump and landing feedback.
     pub impact_intensity: f32,
+    /// Positive compression velocity on contact, emphasizing landing impacts.
+    pub landing_intensity: f32,
     /// Mean spring compression across all wheels.
     pub average_compression: f32,
     /// Damped average terrain height followed by the sprung chassis.
@@ -1017,10 +1019,16 @@ impl SuspensionState {
             .iter()
             .map(|velocity| velocity.abs())
             .fold(0.0_f32, f32::max);
+        let peak_landing_speed = self
+            .compression_velocity
+            .iter()
+            .copied()
+            .fold(0.0_f32, f32::max);
         SuspensionPose {
             wheel_compressions: self.compression,
             wheel_compression_velocities: self.compression_velocity,
             impact_intensity: (peak_compression_speed / 4.0).clamp(0.0, 1.0),
+            landing_intensity: (peak_landing_speed / 4.0).clamp(0.0, 1.0),
             average_compression: self.compression.iter().sum::<f32>() * 0.25,
             average_ground_height: if self.ground_reference_initialized {
                 self.average_ground_height
@@ -1235,6 +1243,26 @@ mod tests {
         assert!(loads[1] > 0.0 && loads[1] < loads[2]);
         assert!(loads[2] < loads[3]);
         assert!(loads.iter().all(|load| (0.0..=1.25).contains(load)));
+    }
+
+    #[test]
+    fn suspension_pose_separates_landing_compression_from_rebound() {
+        let config = SuspensionConfig::default();
+        let mut landing = SuspensionState::default();
+        for _ in 0..30 {
+            landing.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        }
+        let landing_pose = landing.update([0.38; 4], 0.58, config, 1.0 / 60.0);
+        assert!(landing_pose.landing_intensity > 0.0);
+        assert!(landing_pose.landing_intensity <= landing_pose.impact_intensity);
+
+        let mut rebound = SuspensionState::default();
+        for _ in 0..30 {
+            rebound.update([0.38; 4], 0.58, config, 1.0 / 60.0);
+        }
+        let rebound_pose = rebound.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        assert_eq!(rebound_pose.landing_intensity, 0.0);
+        assert!(rebound_pose.impact_intensity > 0.0);
     }
 
     #[test]
