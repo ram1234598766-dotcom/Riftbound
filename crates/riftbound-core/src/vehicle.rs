@@ -412,6 +412,80 @@ pub struct VehicleInput {
     pub steering: f32,
 }
 
+/// Compact four-corner wheel rotational state for traction and slip feedback.
+/// Corner order is front-left, front-right, rear-left, rear-right.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct WheelSlipState {
+    angular_velocity: [f32; 4],
+    slip_ratio: [f32; 4],
+}
+
+impl WheelSlipState {
+    /// Returns each wheel's signed slip ratio, clamped to the range -1..=1.
+    #[must_use]
+    pub const fn slip_ratios(self) -> [f32; 4] {
+        self.slip_ratio
+    }
+
+    /// Returns each wheel's rotational speed in radians per second.
+    #[must_use]
+    pub const fn angular_velocities(self) -> [f32; 4] {
+        self.angular_velocity
+    }
+
+    /// Advances a lightweight wheel-spin approximation without allocating.
+    ///
+    /// Drive torque spins the wheel, braking slows its rotation, and surface grip
+    /// couples wheel speed toward ground speed. This is a rotational slip model,
+    /// not a full tire-force or suspension-contact solver.
+    pub fn update(
+        &mut self,
+        input: VehicleInput,
+        ground_speed: f32,
+        wheel_radius: f32,
+        wheel_traction: [f32; 4],
+        delta_seconds: f32,
+    ) {
+        if !ground_speed.is_finite()
+            || !wheel_radius.is_finite()
+            || wheel_radius <= 0.0
+            || !delta_seconds.is_finite()
+            || delta_seconds <= 0.0
+            || !input.throttle.is_finite()
+            || !input.brake.is_finite()
+            || wheel_traction
+                .iter()
+                .any(|grip| !grip.is_finite() || *grip <= 0.0 || *grip > 1.0)
+        {
+            return;
+        }
+
+        let dt = delta_seconds.min(0.1);
+        let throttle = input.throttle.clamp(-1.0, 1.0);
+        let brake = input.brake.clamp(0.0, 1.0);
+        let ground_angular_velocity = ground_speed / wheel_radius;
+        for (index, grip) in wheel_traction.into_iter().enumerate() {
+            let angular_velocity = self.angular_velocity[index];
+            if !angular_velocity.is_finite() {
+                self.angular_velocity[index] = 0.0;
+                self.slip_ratio[index] = 0.0;
+                continue;
+            }
+            let drive_acceleration = throttle * 150.0;
+            let brake_acceleration = brake * 30.0 * angular_velocity.signum();
+            let contact_coupling =
+                (ground_angular_velocity - angular_velocity) * (2.0 + grip * 18.0);
+            let next_angular_velocity = (angular_velocity
+                + (drive_acceleration - brake_acceleration + contact_coupling) * dt)
+                .clamp(-120.0, 120.0);
+            self.angular_velocity[index] = next_angular_velocity;
+            self.slip_ratio[index] = ((next_angular_velocity * wheel_radius - ground_speed)
+                / ground_speed.abs().max(2.0))
+                .clamp(-1.0, 1.0);
+        }
+    }
+}
+
 /// Vehicle state retained between fixed simulation steps.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct VehicleState {
@@ -913,6 +987,52 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wheel_slip_state_tracks_four_independent_grip_values() {
+        let mut state = WheelSlipState::default();
+        state.update(
+            VehicleInput::default(),
+            6.0,
+            0.3,
+            [1.0, 1.0, 0.25, 0.25],
+            1.0 / 60.0,
+        );
+        let slip = state.slip_ratios();
+        assert!(slip.iter().all(|value| value.is_finite() && (-1.0..=1.0).contains(value)));
+        assert!((slip[0] - slip[1]).abs() < f32::EPSILON);
+        assert!((slip[2] - slip[3]).abs() < f32::EPSILON);
+        assert!(slip[2].abs() > slip[0].abs());
+    }
+
+    #[test]
+    fn wheel_slip_state_rejects_invalid_inputs_without_mutation() {
+        let mut state = WheelSlipState::default();
+        state.update(
+            VehicleInput::default(),
+            4.0,
+            0.3,
+            [1.0; 4],
+            1.0 / 60.0,
+        );
+        let before = state;
+        state.update(
+            VehicleInput::default(),
+            f32::NAN,
+            0.3,
+            [1.0; 4],
+            1.0 / 60.0,
+        );
+        assert_eq!(state, before);
+        state.update(
+            VehicleInput::default(),
+            4.0,
+            0.0,
+            [1.0; 4],
+            1.0 / 60.0,
+        );
+        assert_eq!(state, before);
+    }
 
     #[test]
     fn world_terrain_vehicle_update_combines_surface_grip_and_suspension() {
