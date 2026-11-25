@@ -802,7 +802,7 @@ impl ApplicationHandler for RiftboundApp {
                             delta,
                         );
                         let average_ground = ground_heights.iter().sum::<f32>() * 0.25;
-                        self.vehicle_state.position.y = average_ground
+                        self.vehicle_state.position.y = suspension_pose.average_ground_height
                             + suspension_config.rest_length
                             - suspension_pose.average_compression;
                         let _ = self.vehicle_recovery.record_safe_state(
