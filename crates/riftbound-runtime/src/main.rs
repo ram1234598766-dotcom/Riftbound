@@ -7,7 +7,7 @@ use riftbound_core::{
     Aabb2, Button, CharacterController, Checkpoint, CheckpointProgress, CollisionWorld,
     EnemyArchetype, EnemyBrain, EnemyConfig, EnemyDifficulty, EnemyEvent, EnemyState, EntityId,
     ExtractionZone, InputState, MaterialId, MeshId, MissionPhase, MissionProgress, ObjectiveKind,
-    ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, Scene, SuspensionConfig,
+    ObjectiveProgress, Pickup, PickupTracker, PlayerHealth, PlayerProgression, Scene, SuspensionConfig,
     SuspensionState, Transform3, Vec3, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
     terrain_height, world_terrain_sample, world_terrain_vehicle_surface, WorldChunkRequest,
     WORLD_CHUNK_SIZE,
@@ -63,6 +63,7 @@ struct RiftboundApp {
     sentinel_pulse_timer: f32,
     support_enemies: Vec<(EntityId, EntityId, EnemyBrain, f32)>,
     player_health: PlayerHealth,
+    progression: PlayerProgression,
     animation_time: f32,
     mission: MissionProgress,
     lan_server_started: bool,
@@ -800,6 +801,15 @@ impl ApplicationHandler for RiftboundApp {
                                 self.input.was_pressed(Button::Interact),
                             );
                             let collected_count = collected.len();
+                            if collected_count > 0 {
+                                let awarded_xp = (collected_count as u64) * 25;
+                                let levels_gained = self.progression.award_xp(awarded_xp);
+                                log::info!(
+                                    "Collected {collected_count} rift shard(s): +{awarded_xp} XP, level {}{}",
+                                    self.progression.level(),
+                                    if levels_gained > 0 { " (level up!)" } else { "" },
+                                );
+                            }
                             if !collected.is_empty() {
                                 let mut updated_scene = renderer.scene().clone();
                                 for index in collected {
@@ -890,9 +900,15 @@ impl ApplicationHandler for RiftboundApp {
                                 .mission
                                 .try_extract(interact_pressed, inside_extraction)
                             {
-                                window.set_title("RIFTBOUND — Mission complete!");
+                                let levels_gained = self.progression.award_xp(100);
+                                window.set_title(&format!(
+                                    "RIFTBOUND — Mission complete! • Level {}",
+                                    self.progression.level()
+                                ));
                                 log::info!(
-                                    "Shardfall mission completed: all shards recovered and extraction reached"
+                                    "Shardfall mission completed: +100 XP bonus, level {}{}",
+                                    self.progression.level(),
+                                    if levels_gained > 0 { " (level up!)" } else { "" },
                                 );
                             }
 
