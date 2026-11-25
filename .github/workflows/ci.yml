@@ -19,6 +19,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install native audio build dependencies
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y pkg-config libasound2-dev
       - name: Check browser JavaScript syntax
         run: |
           awk '/^<script>$/ { active = 1; next } index($0, "</script>") { active = 0 } active { print }' index.html > "$RUNNER_TEMP/riftbound.js"
