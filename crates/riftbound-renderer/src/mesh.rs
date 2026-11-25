@@ -704,7 +704,7 @@ fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32
     // variation without allocating textures or introducing chunk-edge seams.
     let broad = terrain_detail_noise(world_x, world_z, 18.0);
     let fine = terrain_detail_noise(world_x, world_z, 4.5);
-    let variation = ((broad - 0.5) * 0.042 + (fine - 0.5) * 0.018);
+    let variation = (broad - 0.5) * 0.042 + (fine - 0.5) * 0.018;
 
     // Gameplay surfaces remain discrete for vehicle handling; only their rendered
     // colours blend over 96 world units to avoid hard visual biome borders.
@@ -761,17 +761,21 @@ fn terrain_detail_noise(world_x: f32, world_z: f32, scale: f32) -> f32 {
     let z = cell_z as i32;
     let tx = smooth_terrain_blend(grid_x - cell_x);
     let tz = smooth_terrain_blend(grid_z - cell_z);
-    let near = blend_terrain_color(
-        [terrain_lattice_noise(x, z); 3],
-        [terrain_lattice_noise(x + 1, z); 3],
+    let near = terrain_lerp(
+        terrain_lattice_noise(x, z),
+        terrain_lattice_noise(x + 1, z),
         tx,
-    )[0];
-    let far = blend_terrain_color(
-        [terrain_lattice_noise(x, z + 1); 3],
-        [terrain_lattice_noise(x + 1, z + 1); 3],
+    );
+    let far = terrain_lerp(
+        terrain_lattice_noise(x, z + 1),
+        terrain_lattice_noise(x + 1, z + 1),
         tx,
-    )[0];
-    near + (far - near) * tz
+    );
+    terrain_lerp(near, far, tz)
+}
+
+fn terrain_lerp(start: f32, end: f32, amount: f32) -> f32 {
+    start + (end - start) * amount
 }
 
 fn blend_terrain_color(start: [f32; 3], end: [f32; 3], amount: f32) -> [f32; 3] {
