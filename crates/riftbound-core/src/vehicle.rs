@@ -35,6 +35,9 @@ pub struct VehicleSurfaceTracker {
     side_blend_from: [f32; 2],
     side_target: [f32; 2],
     side_blend_frames: u8,
+    wheel_blend_from: [f32; 4],
+    wheel_target: [f32; 4],
+    wheel_blend_frames: u8,
 }
 
 impl Default for VehicleSurfaceTracker {
@@ -68,6 +71,9 @@ impl VehicleSurfaceTracker {
             side_blend_from: [initial.traction(); 2],
             side_target: [initial.traction(); 2],
             side_blend_frames: Self::TRANSITION_FRAMES,
+            wheel_blend_from: [initial.traction(); 4],
+            wheel_target: [initial.traction(); 4],
+            wheel_blend_frames: Self::TRANSITION_FRAMES,
         }
     }
 
@@ -84,6 +90,16 @@ impl VehicleSurfaceTracker {
             self.blend_from[1] + (target[1] - self.blend_from[1]) * amount,
             self.blend_from[2] + (target[2] - self.blend_from[2]) * amount,
         )
+    }
+
+    /// Returns blended grip for front-left, front-right, rear-left, rear-right.
+    #[must_use]
+    pub fn wheel_traction(self) -> [f32; 4] {
+        let amount = f32::from(self.wheel_blend_frames) / f32::from(Self::TRANSITION_FRAMES);
+        std::array::from_fn(|index| {
+            self.wheel_blend_from[index]
+                + (self.wheel_target[index] - self.wheel_blend_from[index]) * amount
+        })
     }
 
     /// Returns blended left/right tyre grip, in vehicle-local side order.
@@ -147,6 +163,7 @@ impl VehicleSurfaceTracker {
     ) -> VehicleSurface {
         let response_before_update = self.response();
         let side_before_update = self.side_traction();
+        let wheel_before_update = self.wheel_traction();
         self.update(dominant_surface);
         let side_target = [
             (contacts[0].traction() + contacts[2].traction()) * 0.5,
@@ -160,6 +177,16 @@ impl VehicleSurfaceTracker {
             self.side_blend_from = [side_before_update.0, side_before_update.1];
             self.side_target = side_target;
             self.side_blend_frames = 0;
+        }
+        self.wheel_blend_frames = self
+            .wheel_blend_frames
+            .saturating_add(1)
+            .min(Self::TRANSITION_FRAMES);
+        let wheel_target = contacts.map(VehicleSurface::traction);
+        if wheel_target != self.wheel_target {
+            self.wheel_blend_from = wheel_before_update;
+            self.wheel_target = wheel_target;
+            self.wheel_blend_frames = 0;
         }
         let target = [
             contacts
@@ -440,10 +467,10 @@ impl VehicleState {
             half_wheelbase,
         );
         next_surface_tracker.update_wheel_contacts(dominant_surface, wheel_surfaces);
-        next_vehicle.update_with_wheel_surface_response(
+        next_vehicle.update_with_four_wheel_surface_response(
             input,
             next_surface_tracker.response(),
-            next_surface_tracker.side_traction(),
+            next_surface_tracker.wheel_traction(),
             config,
             delta_seconds,
         );
@@ -502,6 +529,32 @@ impl VehicleState {
             input,
             (traction, speed_multiplier, rolling_resistance),
             (traction, traction),
+            config,
+            delta_seconds,
+        );
+    }
+
+    /// Advances handling using independently blended traction at all four corners.
+    /// Front and rear axle averages determine steering and drive grip; left/right
+    /// averages preserve the existing asymmetric-braking response.
+    pub fn update_with_four_wheel_surface_response(
+        &mut self,
+        input: VehicleInput,
+        surface_response: (f32, f32, f32),
+        wheel_traction: [f32; 4],
+        config: VehicleConfig,
+        delta_seconds: f32,
+    ) {
+        if wheel_traction.iter().any(|grip| !grip.is_finite() || *grip <= 0.0 || *grip > 1.0) {
+            return;
+        }
+        let average = wheel_traction.iter().sum::<f32>() * 0.25;
+        let left = (wheel_traction[0] + wheel_traction[2]) * 0.5;
+        let right = (wheel_traction[1] + wheel_traction[3]) * 0.5;
+        self.update_with_wheel_surface_response(
+            input,
+            (average, surface_response.1, surface_response.2),
+            (left, right),
             config,
             delta_seconds,
         );
