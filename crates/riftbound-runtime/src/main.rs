@@ -12,10 +12,9 @@ use riftbound_core::{
     Equipment, EquipmentSlot, ExtractionZone, InputState, Inventory, ItemKind, MaterialId, MeshId,
     MissionPhase, MissionProgress, ObjectiveKind, ObjectiveProgress, Pickup, PickupTracker,
     PlayerHealth, PlayerProgression, Scene, SuspensionConfig, SuspensionState, Transform3, Vec3,
-    VehicleAudioMix, VehicleAudioState,
-    VehicleConfig, VehicleInput, VehicleRecovery, VehicleState, VehicleSurface,
-    VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest, terrain_height,
-    world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+    VehicleAudioMix, VehicleAudioState, VehicleConfig, VehicleInput, VehicleRecovery, VehicleState,
+    VehicleSurface, VehicleSurfaceTracker, VehicleUpgrades, WORLD_CHUNK_SIZE, WorldChunkRequest,
+    terrain_height, world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
 };
 use riftbound_renderer::{HudData, Renderer};
 use winit::{
@@ -69,12 +68,13 @@ fn vehicle_slip_percent(
     }
     let grip_loss = 1.0 - grip.clamp(0.0, 1.0);
     let speed_fraction = (speed.abs() / max_speed).clamp(0.0, 1.0);
-    let longitudinal_demand = throttle.abs().clamp(0.0, 1.0)
+    let longitudinal_demand = throttle
+        .abs()
+        .clamp(0.0, 1.0)
         .max(brake.clamp(0.0, 1.0) * 0.65);
     let lateral_demand = steering.abs().clamp(0.0, 1.0) * speed_fraction;
-    let slip = (longitudinal_demand * grip_loss * 0.8
-        + lateral_demand * grip_loss * 0.25)
-        .clamp(0.0, 1.0);
+    let slip =
+        (longitudinal_demand * grip_loss * 0.8 + lateral_demand * grip_loss * 0.25).clamp(0.0, 1.0);
     (slip * 100.0).round() as u8
 }
 
@@ -171,7 +171,11 @@ fn append_vehicle_dust_transforms(
         transforms.push((
             *entity,
             Transform3::new(
-                Vec3::new(world_x + drift, ground + 0.06 + scale * 0.25 * lift, world_z),
+                Vec3::new(
+                    world_x + drift,
+                    ground + 0.06 + scale * 0.25 * lift,
+                    world_z,
+                ),
                 Vec3::new(phase * 0.12, heading, phase * 0.08),
                 Vec3::new(scale * 0.9, scale * 0.55, scale * 0.9),
             ),
@@ -198,8 +202,7 @@ fn smooth_wheel_steering(current: f32, target: f32, delta: f32) -> f32 {
         return 0.0;
     }
     let blend = 1.0 - (-12.0 * delta.max(0.0)).exp();
-    current.clamp(-0.35, 0.35)
-        + (target.clamp(-0.35, 0.35) - current.clamp(-0.35, 0.35)) * blend
+    current.clamp(-0.35, 0.35) + (target.clamp(-0.35, 0.35) - current.clamp(-0.35, 0.35)) * blend
 }
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
@@ -833,7 +836,11 @@ impl ApplicationHandler for RiftboundApp {
                     0.0
                 };
                 let audio_mix = self.vehicle_audio_state.update_with_impact(
-                    if self.driving { self.vehicle_state.speed } else { 0.0 },
+                    if self.driving {
+                        self.vehicle_state.speed
+                    } else {
+                        0.0
+                    },
                     audio_throttle,
                     if self.driving {
                         self.vehicle_state.wheel_slip.slip_ratios()
@@ -848,7 +855,9 @@ impl ApplicationHandler for RiftboundApp {
                     if self.driving {
                         {
                             let pose = self.vehicle_suspension.pose(SuspensionConfig::default());
-                            pose.impact_intensity.max(pose.landing_intensity * 1.2).min(1.0)
+                            pose.impact_intensity
+                                .max(pose.landing_intensity * 1.2)
+                                .min(1.0)
                         }
                     } else {
                         0.0
@@ -986,19 +995,22 @@ impl ApplicationHandler for RiftboundApp {
                                     self.vehicle_state.speed = 0.0;
                                 }
                                 if collision_adjusted {
-                                    if let Some(ground_heights) = world_terrain_vehicle_ground_heights(
-                                        self.vehicle_state.position.x,
-                                        self.vehicle_state.position.z,
-                                        self.vehicle_state.heading,
-                                        suspension_config.track_width * 0.5,
-                                        suspension_config.wheelbase * 0.5,
-                                    ) {
+                                    if let Some(ground_heights) =
+                                        world_terrain_vehicle_ground_heights(
+                                            self.vehicle_state.position.x,
+                                            self.vehicle_state.position.z,
+                                            self.vehicle_state.heading,
+                                            suspension_config.track_width * 0.5,
+                                            suspension_config.wheelbase * 0.5,
+                                        )
+                                    {
                                         let _ = self.vehicle_suspension.rebase_ground_contacts(
                                             ground_heights,
                                             self.vehicle_state.position.y,
                                             suspension_config,
                                         );
-                                        suspension_pose = self.vehicle_suspension.pose(suspension_config);
+                                        suspension_pose =
+                                            self.vehicle_suspension.pose(suspension_config);
                                     }
                                 }
                             }
@@ -1040,8 +1052,12 @@ impl ApplicationHandler for RiftboundApp {
                             }
                             if let Some(wheels) = self.vehicle_wheels {
                                 self.vehicle_wheel_rotation = (self.vehicle_wheel_rotation
-                                    + wheel_rotation_delta(self.vehicle_state.speed, vehicle_delta, 0.34))
-                                    .rem_euclid(std::f32::consts::TAU);
+                                    + wheel_rotation_delta(
+                                        self.vehicle_state.speed,
+                                        vehicle_delta,
+                                        0.34,
+                                    ))
+                                .rem_euclid(std::f32::consts::TAU);
                                 let wheel_spin = self.vehicle_wheel_rotation;
                                 self.vehicle_wheel_steering = smooth_wheel_steering(
                                     self.vehicle_wheel_steering,
@@ -1063,7 +1079,11 @@ impl ApplicationHandler for RiftboundApp {
                                         *wheel,
                                         Transform3::new(
                                             Vec3::new(local_x, local_y, local_z),
-                                            Vec3::new(wheel_spin, steer, std::f32::consts::FRAC_PI_2),
+                                            Vec3::new(
+                                                wheel_spin,
+                                                steer,
+                                                std::f32::consts::FRAC_PI_2,
+                                            ),
                                             Vec3::new(0.34, 0.68, 0.68),
                                         ),
                                     ));
@@ -1076,7 +1096,9 @@ impl ApplicationHandler for RiftboundApp {
                                 self.vehicle_state.speed,
                                 self.vehicle_surface_tracker.current(),
                                 self.animation_time,
-                                self.vehicle_suspension.pose(SuspensionConfig::default()).landing_intensity,
+                                self.vehicle_suspension
+                                    .pose(SuspensionConfig::default())
+                                    .landing_intensity,
                                 &mut self.animated_transforms,
                             );
                         }
@@ -1093,18 +1115,13 @@ impl ApplicationHandler for RiftboundApp {
                             &mut self.animated_transforms,
                         );
                         // Return the front wheels to center after the player exits the vehicle.
-                        self.vehicle_wheel_steering = smooth_wheel_steering(
-                            self.vehicle_wheel_steering,
-                            0.0,
-                            delta,
-                        );
+                        self.vehicle_wheel_steering =
+                            smooth_wheel_steering(self.vehicle_wheel_steering, 0.0, delta);
                         if let (Some(renderer), Some(wheels)) =
                             (self.renderer.as_ref(), self.vehicle_wheels)
                         {
                             for wheel in wheels.iter().take(2) {
-                                if let Some(mut transform) =
-                                    renderer.scene().get(*wheel).copied()
-                                {
+                                if let Some(mut transform) = renderer.scene().get(*wheel).copied() {
                                     transform.rotation_radians.y = self.vehicle_wheel_steering;
                                     self.animated_transforms.push((*wheel, transform));
                                 }
@@ -1718,7 +1735,9 @@ impl ApplicationHandler for RiftboundApp {
                                     format!(
                                         "SPEED {:.0} KM/H • {}",
                                         self.vehicle_state.speed.abs() * 3.6,
-                                        vehicle_surface_label(self.vehicle_surface_tracker.current()),
+                                        vehicle_surface_label(
+                                            self.vehicle_surface_tracker.current()
+                                        ),
                                     )
                                 }),
                                 vehicle_grip: self.driving.then(|| {
@@ -2580,7 +2599,12 @@ mod world_prop_tests {
         assert_eq!(vehicle_dust_scale(12.0, VehicleSurface::Asphalt, 0.5), 0.0);
         assert!(vehicle_dust_scale(12.0, VehicleSurface::Snow, 0.5) > 0.0);
         assert_eq!(vehicle_dust_scale(0.2, VehicleSurface::Gravel, 0.5), 0.0);
-        for surface in [VehicleSurface::Gravel, VehicleSurface::Mud, VehicleSurface::Sand, VehicleSurface::Snow] {
+        for surface in [
+            VehicleSurface::Gravel,
+            VehicleSurface::Mud,
+            VehicleSurface::Sand,
+            VehicleSurface::Snow,
+        ] {
             let scale = vehicle_dust_scale(12.0, surface, 0.5);
             assert!(scale > 0.0 && scale <= 0.30);
         }
@@ -2592,7 +2616,10 @@ mod world_prop_tests {
         let mud = vehicle_surface_effect_profile(VehicleSurface::Mud);
         let sand = vehicle_surface_effect_profile(VehicleSurface::Sand);
         let snow = vehicle_surface_effect_profile(VehicleSurface::Snow);
-        assert_eq!(vehicle_surface_effect_profile(VehicleSurface::Asphalt).0, 0.0);
+        assert_eq!(
+            vehicle_surface_effect_profile(VehicleSurface::Asphalt).0,
+            0.0
+        );
         assert_eq!(vehicle_surface_effect_profile(VehicleSurface::Rock).0, 0.0);
         assert!(mud.0 < gravel.0 && sand.0 > gravel.0);
         assert!(snow.0 > 0.0 && snow.1 > 0.0);
@@ -2615,7 +2642,11 @@ mod world_prop_tests {
             &mut transforms,
         );
         assert_eq!(transforms.len(), 4);
-        assert!(transforms.iter().all(|(_, transform)| transform.scale == Vec3::new(0.0, 0.0, 0.0)));
+        assert!(
+            transforms
+                .iter()
+                .all(|(_, transform)| transform.scale == Vec3::new(0.0, 0.0, 0.0))
+        );
     }
 
     #[test]
@@ -2787,14 +2818,15 @@ mod world_prop_tests {
         let rest_length = SuspensionConfig::default().rest_length;
         let radius = 0.34;
 
-        assert!((wheel_local_vertical_offset(0.0, rest_length, radius)
-            - (radius - rest_length))
-            .abs()
-            < f32::EPSILON);
-        assert!((wheel_local_vertical_offset(0.2, rest_length, radius)
-            - (radius - rest_length + 0.2))
-            .abs()
-            < f32::EPSILON);
+        assert!(
+            (wheel_local_vertical_offset(0.0, rest_length, radius) - (radius - rest_length)).abs()
+                < f32::EPSILON
+        );
+        assert!(
+            (wheel_local_vertical_offset(0.2, rest_length, radius) - (radius - rest_length + 0.2))
+                .abs()
+                < f32::EPSILON
+        );
     }
 
     #[test]
