@@ -525,13 +525,13 @@ impl ApplicationHandler for RiftboundApp {
                                     log::info!("Body equipment returned to inventory");
                                 }
                             }
-                            KeyCode::Digit4 => {
-                                if self
-                                    .inventory
-                                    .unequip_to_inventory(&mut self.equipment, EquipmentSlot::Feet)
-                                {
-                                    log::info!("Foot equipment returned to inventory");
-                                }
+                            KeyCode::Digit4
+                                if self.inventory.unequip_to_inventory(
+                                    &mut self.equipment,
+                                    EquipmentSlot::Feet,
+                                ) =>
+                            {
+                                log::info!("Foot equipment returned to inventory");
                             }
                             _ => {}
                         }
@@ -2153,6 +2153,7 @@ fn spawn_world_obstacle_props(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod world_prop_tests {
     use super::*;
 
