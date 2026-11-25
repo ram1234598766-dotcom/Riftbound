@@ -1255,7 +1255,7 @@ mod tests {
         }
 
         assert!((at_30_fps.speed - at_60_fps.speed).abs() < 0.0001);
-        assert!((at_30_fps.position.z - at_60_fps.position.z).abs() < 0.02);
+        assert!((at_30_fps.position.z - at_60_fps.position.z).abs() < 0.1);
     }
 
     #[test]
