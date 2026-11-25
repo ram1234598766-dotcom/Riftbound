@@ -1626,6 +1626,10 @@ impl ApplicationHandler for RiftboundApp {
                                         vehicle_surface_label(self.vehicle_surface_tracker.current()),
                                     )
                                 }),
+                                vehicle_grip: self.driving.then(|| {
+                                    let grip = self.vehicle_surface_tracker.response().0;
+                                    (grip.clamp(0.0, 1.0) * 100.0).round() as u8
+                                }),
                                 equipment: format!(
                                     "BODY {} FEET {}",
                                     if self.equipment.item(EquipmentSlot::Body).is_some() {
