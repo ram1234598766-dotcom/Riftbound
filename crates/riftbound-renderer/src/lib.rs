@@ -504,15 +504,24 @@ impl Renderer {
         changes: &riftbound_core::WorldChunkChanges,
         slot_map: &mut riftbound_core::WorldChunkSlotMap,
     ) -> bool {
-        let removed_slots: Vec<usize> = changes
-            .removed()
-            .iter()
-            .filter_map(|coord| slot_map.slot_for(*coord).map(|slot| slot.slot_index))
-            .collect();
+        // The renderer's world window is fixed at 25 slots. Keep the small
+        // removal batch on the stack instead of allocating a Vec every time
+        // the player crosses a chunk boundary.
+        let mut removed_slots = [0_usize; 25];
+        let mut removed_count = 0;
+        for coord in changes.removed() {
+            if let Some(slot) = slot_map.slot_for(*coord) {
+                if removed_count == removed_slots.len() {
+                    return false;
+                }
+                removed_slots[removed_count] = slot.slot_index;
+                removed_count += 1;
+            }
+        }
         if !slot_map.apply_changes(changes) {
             return false;
         }
-        for slot_index in removed_slots {
+        for slot_index in removed_slots[..removed_count].iter().copied() {
             let _ = self.clear_world_terrain_chunk(slot_index);
         }
         for request in changes.added().iter().chain(changes.updated()) {
