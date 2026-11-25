@@ -1237,7 +1237,10 @@ mod tests {
         snow.update(input, VehicleSurface::Snow, config, 0.1);
         transition.update_with_surface_response(
             input,
-            f32::midpoint(VehicleSurface::Asphalt.traction(), VehicleSurface::Snow.traction()),
+            f32::midpoint(
+                VehicleSurface::Asphalt.traction(),
+                VehicleSurface::Snow.traction(),
+            ),
             f32::midpoint(
                 VehicleSurface::Asphalt.speed_multiplier(),
                 VehicleSurface::Snow.speed_multiplier(),
