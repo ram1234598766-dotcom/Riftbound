@@ -416,7 +416,8 @@ fn world_terrain_chunk_data(
     // Add the road ribbon only to chunks that fully contain its corridor.
     // This avoids drawing duplicate, translated copies in every streamed X column.
     let road_is_inside_chunk = (0..side).all(|z| {
-        let local_z = -32.0 + f32::from(u8::try_from(z).expect("road row fits u8")) * step;
+        let local_z =
+            -32.0 + f32::from(u8::try_from(z).expect("road row fits u8")) * step;
         let road = world_road_sample(origin_x, origin_z + local_z);
         let left = road.center_x - road.half_width - road.shoulder_width;
         let right = road.center_x + road.half_width + road.shoulder_width;
@@ -699,11 +700,16 @@ mod tests {
             let road_vertices = &vertices[road_start..road_start + side * 4];
             assert_eq!(road_vertices.len(), side * 4);
             assert!(road_vertices.iter().all(|vertex| {
-                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+                vertex
+                    .position
+                    .iter()
+                    .chain(vertex.color.iter())
+                    .all(|value| value.is_finite())
             }));
             for row in 0..side {
-                let world_z = -32.0 + f32::from(u8::try_from(row).expect("road row fits u8"))
-                    * (64.0 / f32::from(u8::try_from(side - 1).expect("road side fits u8")));
+                let world_z = -32.0
+                    + f32::from(u8::try_from(row).expect("road row fits u8"))
+                        * (64.0 / f32::from(u8::try_from(side - 1).expect("road side fits u8")));
                 let center = world_road_sample(0.0, world_z).center_x;
                 let left = road_vertices[row * 4 + 1];
                 let right = road_vertices[row * 4 + 2];
