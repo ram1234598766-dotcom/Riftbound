@@ -532,6 +532,45 @@ fn world_terrain_chunk_data(
         }
     }
 
+    // Render the eastbound spur only in its owning chunk. The spur is sampled
+    // at fixed world-space stations so detailed and distant LODs share its shape.
+    if chunk_x == 0 && chunk_z == 0 {
+        let spur_start = u16::try_from(vertices.len()).ok()?;
+        for station in 0..5 {
+            let world_x = f32::from(u8::try_from(station).ok()?) * 8.0;
+            for (band, offset) in [-8.0_f32, -5.5, 5.5, 8.0].into_iter().enumerate() {
+                let world_z = offset;
+                let sample = world_terrain_sample(world_x, world_z);
+                let color = if band == 0 || band == 3 {
+                    terrain_surface_color(VehicleSurface::Gravel)
+                } else {
+                    [0.12, 0.14, 0.17]
+                };
+                vertices.push(MeshVertex {
+                    position: [world_x - origin_x, sample.height + 0.23, world_z - origin_z],
+                    color,
+                });
+            }
+        }
+        for station in 0..4 {
+            for band in 0..3 {
+                let top_left = spur_start
+                    + u16::try_from(station * 4 + band).expect("spur vertex index fits u16");
+                let top_right = top_left + 1;
+                let bottom_left = top_left + 4;
+                let bottom_right = bottom_left + 1;
+                indices.extend_from_slice(&[
+                    top_left,
+                    top_right,
+                    bottom_left,
+                    top_right,
+                    bottom_right,
+                    bottom_left,
+                ]);
+            }
+        }
+    }
+
     // A short vertical skirt hides cracks where a 9x9 chunk meets a 5x5 LOD
     // chunk. Each edge is generated from that chunk's own border samples, so
     // the overlap remains valid even when the two edge profiles differ.
@@ -730,10 +769,10 @@ mod tests {
     fn world_chunk_lod_uses_expected_grid_and_rejects_invalid_inputs() {
         let detailed = world_terrain_chunk_data(0, 0, 9).expect("detailed chunk");
         let distant = world_terrain_chunk_data(0, 0, 5).expect("distant chunk");
-        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4);
-        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4);
-        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6);
-        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6);
+        assert_eq!(detailed.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
+        assert_eq!(distant.0.len(), 25 + 4 * 4 * 4 + 5 * 4 + 8 * 4 + 5 * 4);
+        assert_eq!(detailed.1.len(), 384 + 4 * 8 * 6 + 8 * 3 * 6 + 8 * 6 + 4 * 3 * 6);
+        assert_eq!(distant.1.len(), 96 + 4 * 4 * 6 + 4 * 3 * 6 + 8 * 6 + 4 * 3 * 6);
         assert!(valid_index_data(detailed.0.len(), &detailed.1));
         assert!(valid_index_data(distant.0.len(), &distant.1));
         for (vertices, _) in [&detailed, &distant] {
@@ -814,10 +853,30 @@ mod tests {
     }
 
     #[test]
+    fn eastbound_spur_mesh_is_raised_and_owned_by_its_junction_chunk() {
+        for side in [5, 9] {
+            let (vertices, indices) = world_terrain_chunk_data(0, 0, side).expect("junction chunk");
+            let spur_start = side * side + side * 4 + 8 * 4;
+            let spur = &vertices[spur_start..spur_start + 5 * 4];
+            assert_eq!(spur.len(), 20);
+            for station in 0..5 {
+                let row = &spur[station * 4..station * 4 + 4];
+                let world_x = f32::from(u8::try_from(station).expect("station fits u8")) * 8.0;
+                assert!(row.iter().all(|vertex| (vertex.position[0] + 32.0 - world_x).abs() < 1.0e-4));
+                assert!(row.iter().all(|vertex| vertex.position[1] > -30.0));
+                assert!((row[1].position[2] - row[0].position[2] - 2.5).abs() < 1.0e-4);
+            }
+            assert!(valid_index_data(vertices.len(), &indices));
+        }
+        let unrelated = world_terrain_chunk_data(0, 1, 9).expect("adjacent chunk");
+        assert_eq!(unrelated.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4);
+    }
+
+    #[test]
     fn road_ribbon_is_not_duplicated_into_distant_x_chunks() {
         let road_chunk = world_terrain_chunk_data(0, 0, 9).expect("road chunk");
         let distant_chunk = world_terrain_chunk_data(1, 0, 9).expect("distant chunk");
-        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4);
+        assert_eq!(road_chunk.0.len(), 81 + 4 * 8 * 4 + 9 * 4 + 8 * 4 + 5 * 4);
         assert_eq!(distant_chunk.0.len(), 81 + 4 * 8 * 4);
         assert_eq!(distant_chunk.1.len(), 384 + 4 * 8 * 6);
     }
