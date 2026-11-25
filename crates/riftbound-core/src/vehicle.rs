@@ -543,17 +543,40 @@ mod tests {
     #[test]
     fn vehicle_surface_tracker_filters_single_frame_boundary_noise() {
         let mut tracker = VehicleSurfaceTracker::new(VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Asphalt), VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Asphalt);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Gravel);
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Asphalt),
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Asphalt
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Gravel
+        );
         assert_eq!(tracker.current(), VehicleSurface::Gravel);
-        assert_eq!(tracker.update(VehicleSurface::Asphalt), VehicleSurface::Gravel);
-        assert_eq!(tracker.update(VehicleSurface::Gravel), VehicleSurface::Gravel);
+        assert_eq!(
+            tracker.update(VehicleSurface::Asphalt),
+            VehicleSurface::Gravel
+        );
+        assert_eq!(
+            tracker.update(VehicleSurface::Gravel),
+            VehicleSurface::Gravel
+        );
     }
-
     #[test]
     fn terrain_surface_profiles_expose_distinct_driving_characteristics() {
         assert_eq!(VehicleSurface::Asphalt.traction(), 1.0);
