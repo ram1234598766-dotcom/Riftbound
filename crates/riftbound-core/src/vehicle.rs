@@ -637,13 +637,15 @@ impl VehicleState {
     ) {
         if wheel_traction
             .iter()
-            .any(|grip| !grip.is_finite() || *grip <= 0.0 || *grip > 1.0)
+            .any(|grip| !grip.is_finite() || *grip < 0.0 || *grip > 1.0)
         {
             return;
         }
-        let average = wheel_traction.iter().sum::<f32>() * 0.25;
-        let left = (wheel_traction[0] + wheel_traction[2]) * 0.5;
-        let right = (wheel_traction[1] + wheel_traction[3]) * 0.5;
+        // A fully unloaded axle still permits a small amount of air-control
+        // authority, while zero-load wheels contribute no drive grip.
+        let average = (wheel_traction.iter().sum::<f32>() * 0.25).max(0.05);
+        let left = ((wheel_traction[0] + wheel_traction[2]) * 0.5).max(0.05);
+        let right = ((wheel_traction[1] + wheel_traction[3]) * 0.5).max(0.05);
         self.update_with_wheel_surface_response(
             input,
             (average, surface_response.1, surface_response.2),
@@ -673,7 +675,7 @@ impl VehicleState {
             || right_traction > 1.0
             || !speed_multiplier.is_finite()
             || !rolling_resistance.is_finite()
-            || traction <= 0.0
+            || traction < 0.05
             || traction > 1.0
             || speed_multiplier <= 0.0
             || speed_multiplier > 1.0
@@ -1105,6 +1107,29 @@ mod tests {
             1.0 / 60.0,
         );
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn fully_unloaded_wheels_keep_vehicle_momentum_and_limited_air_control() {
+        let mut vehicle = VehicleState {
+            speed: 8.0,
+            ..VehicleState::default()
+        };
+        let heading_before = vehicle.heading;
+        vehicle.update_with_four_wheel_surface_response(
+            VehicleInput {
+                throttle: 0.0,
+                brake: 0.0,
+                steering: 1.0,
+            },
+            (1.0, 1.0, 0.8),
+            [0.0; 4],
+            VehicleConfig::default(),
+            1.0 / 60.0,
+        );
+        assert!(vehicle.speed > 0.0);
+        assert!(vehicle.heading > heading_before);
+        assert!(vehicle.heading < 0.05);
     }
 
     #[test]
