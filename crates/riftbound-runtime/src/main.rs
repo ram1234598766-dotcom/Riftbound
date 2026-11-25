@@ -87,17 +87,28 @@ fn vehicle_surface_label(surface: VehicleSurface) -> &'static str {
     }
 }
 
+fn vehicle_surface_effect_profile(surface: VehicleSurface) -> (f32, f32, f32) {
+    match surface {
+        VehicleSurface::Asphalt => (0.0, 0.0, 0.0),
+        VehicleSurface::Gravel => (1.0, 1.0, 1.0),
+        VehicleSurface::Mud => (0.62, 0.35, 0.45),
+        VehicleSurface::Sand => (1.15, 0.8, 1.25),
+        VehicleSurface::Snow => (0.72, 0.65, 0.8),
+        VehicleSurface::Rock => (0.0, 0.0, 0.0),
+    }
+}
+
 fn vehicle_dust_scale(speed: f32, surface: VehicleSurface, pulse: f32) -> f32 {
-    if !speed.is_finite()
-        || !pulse.is_finite()
-        || speed.abs() < 1.0
-        || matches!(surface, VehicleSurface::Asphalt | VehicleSurface::Snow)
-    {
+    if !speed.is_finite() || !pulse.is_finite() || speed.abs() < 1.0 {
+        return 0.0;
+    }
+    let (intensity, _, _) = vehicle_surface_effect_profile(surface);
+    if intensity <= 0.0 {
         return 0.0;
     }
     let speed_factor = (speed.abs() / 18.0).clamp(0.0, 1.0);
     let pulse_factor = (0.65 + 0.35 * pulse.sin()).clamp(0.0, 1.0);
-    (0.08 + speed_factor * 0.22) * pulse_factor
+    (0.08 + speed_factor * 0.22) * pulse_factor * intensity
 }
 
 fn build_vehicle_dust_particles(scene: &mut Scene) -> Vec<EntityId> {
@@ -147,11 +158,12 @@ fn append_vehicle_dust_transforms(
         let world_x = position.x + cosine * side + sine * rear;
         let world_z = position.z - sine * side + cosine * rear;
         let ground = world_terrain_sample(world_x, world_z).height;
-        let drift = (phase * 0.7).sin() * 0.12;
+        let (_, lift, drift_factor) = vehicle_surface_effect_profile(surface);
+        let drift = (phase * 0.7).sin() * 0.12 * drift_factor;
         transforms.push((
             *entity,
             Transform3::new(
-                Vec3::new(world_x + drift, ground + 0.10 + scale * 0.25, world_z),
+                Vec3::new(world_x + drift, ground + 0.06 + scale * 0.25 * lift, world_z),
                 Vec3::new(phase * 0.12, heading, phase * 0.08),
                 Vec3::new(scale * 0.9, scale * 0.55, scale * 0.9),
             ),
@@ -2510,12 +2522,24 @@ mod world_prop_tests {
     #[test]
     fn vehicle_dust_is_limited_to_moving_loose_terrain() {
         assert_eq!(vehicle_dust_scale(12.0, VehicleSurface::Asphalt, 0.5), 0.0);
-        assert_eq!(vehicle_dust_scale(12.0, VehicleSurface::Snow, 0.5), 0.0);
+        assert!(vehicle_dust_scale(12.0, VehicleSurface::Snow, 0.5) > 0.0);
         assert_eq!(vehicle_dust_scale(0.2, VehicleSurface::Gravel, 0.5), 0.0);
-        for surface in [VehicleSurface::Gravel, VehicleSurface::Mud, VehicleSurface::Sand] {
+        for surface in [VehicleSurface::Gravel, VehicleSurface::Mud, VehicleSurface::Sand, VehicleSurface::Snow] {
             let scale = vehicle_dust_scale(12.0, surface, 0.5);
             assert!(scale > 0.0 && scale <= 0.30);
         }
+    }
+
+    #[test]
+    fn vehicle_surface_effect_profiles_distinguish_loose_terrain() {
+        let gravel = vehicle_surface_effect_profile(VehicleSurface::Gravel);
+        let mud = vehicle_surface_effect_profile(VehicleSurface::Mud);
+        let sand = vehicle_surface_effect_profile(VehicleSurface::Sand);
+        let snow = vehicle_surface_effect_profile(VehicleSurface::Snow);
+        assert_eq!(vehicle_surface_effect_profile(VehicleSurface::Asphalt).0, 0.0);
+        assert_eq!(vehicle_surface_effect_profile(VehicleSurface::Rock).0, 0.0);
+        assert!(mud.0 < gravel.0 && sand.0 > gravel.0);
+        assert!(snow.0 > 0.0 && snow.1 > 0.0);
     }
 
     #[test]
