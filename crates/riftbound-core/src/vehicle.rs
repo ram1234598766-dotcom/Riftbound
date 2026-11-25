@@ -692,7 +692,7 @@ mod tests {
             VehicleSurface::Snow,
             VehicleSurface::Snow,
         ];
-        for _ in 0..72 {
+        for _ in 0..144 {
             tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
         }
         let (traction, speed, resistance) = tracker.response();
