@@ -74,7 +74,7 @@ fn encode(profile: &SavedProfile) -> String {
         item_code(profile.equipment.item(EquipmentSlot::Body)),
         item_code(profile.equipment.item(EquipmentSlot::Feet)),
         u8::from(profile.checkpoint_active),
-        profile.player_position.map_or_else(|| String::from(""), |position| position.x.to_string()),
+        profile.player_position.map_or_else(|| String::from("-"), |position| position.x.to_string()),
         profile.player_position.map_or_else(|| String::from(""), |position| position.y.to_string()),
         profile.player_position.map_or_else(|| String::from(""), |position| position.z.to_string()),
     )
@@ -101,7 +101,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
     let upgrades = VehicleUpgrades::from_levels(engine, handling)?;
     let xp = values.get("xp")?.parse::<u64>().ok()?;
     let player_position = match (values.get("player_x"), values.get("player_y"), values.get("player_z")) {
-        (None, None, None) => None,
+        (None, None, None) | (Some("-"), Some("-"), Some("-")) => None,
         (Some(x), Some(y), Some(z)) => {
             let position = Vec3::new(x.parse::<f32>().ok()?, y.parse::<f32>().ok()?, z.parse::<f32>().ok()?);
             let valid = position.x.is_finite() && position.y.is_finite() && position.z.is_finite()
@@ -197,6 +197,15 @@ mod tests {
         let legacy = encode(&profile).replace("checkpoint=0\n", "");
         let restored = decode(&legacy).unwrap();
         assert!(!restored.checkpoint_active);
+    }
+
+    #[test]
+    fn rejects_non_finite_saved_player_positions() {
+        let profile = SavedProfile {
+            player_position: Some(Vec3::new(f32::NAN, 0.0, 0.0)),
+            ..SavedProfile::default()
+        };
+        assert!(decode(&encode(&profile)).is_none());
     }
 
     #[test]
