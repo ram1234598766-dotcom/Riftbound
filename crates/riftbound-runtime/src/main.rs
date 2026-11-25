@@ -81,6 +81,24 @@ struct RiftboundApp {
     world_obstacle_entities: Vec<EntityId>,
 }
 
+fn make_saved_profile(
+    upgrades: VehicleUpgrades,
+    inventory: Inventory,
+    equipment: Equipment,
+    progression: PlayerProgression,
+    checkpoint_active: bool,
+    player_position: Option<Vec3>,
+) -> save::SavedProfile {
+    save::SavedProfile {
+        upgrades,
+        inventory,
+        equipment,
+        progression,
+        checkpoint_active,
+        player_position,
+    }
+}
+
 impl RiftboundApp {
     fn saved_profile(&self) -> save::SavedProfile {
         let player_position = self.renderer.as_ref().and_then(|renderer| {
@@ -91,18 +109,6 @@ impl RiftboundApp {
         self.saved_profile_at(player_position)
     }
 
-    fn saved_profile_at(&self, player_position: Option<Vec3>) -> save::SavedProfile {
-        save::SavedProfile {
-            upgrades: self.vehicle_upgrades,
-            inventory: self.inventory.clone(),
-            equipment: self.equipment,
-            progression: self.progression,
-            checkpoint_active: self.checkpoint_progress.is_some_and(
-                CheckpointProgress::has_active_checkpoint,
-            ),
-            player_position,
-        }
-    }
 }
 
 impl ApplicationHandler for RiftboundApp {
@@ -1010,7 +1016,16 @@ impl ApplicationHandler for RiftboundApp {
                                 let awarded_xp = (collected_count as u64) * 25;
                                 let levels_gained = self.progression.award_xp(awarded_xp);
                                 if let Err(error) = save::save_profile(
-                                    &self.saved_profile_at(Some(transform.translation)),
+                                    &make_saved_profile(
+                                        self.vehicle_upgrades,
+                                        self.inventory.clone(),
+                                        self.equipment,
+                                        self.progression,
+                                        self.checkpoint_progress.is_some_and(
+                                            CheckpointProgress::has_active_checkpoint,
+                                        ),
+                                        Some(transform.translation),
+                                    ),
                                 ) {
                                     log::warn!("Could not save shard rewards: {error}");
                                 }
@@ -1076,7 +1091,16 @@ impl ApplicationHandler for RiftboundApp {
                                         }
                                         self.loot_entities.remove(index);
                                         if let Err(error) = save::save_profile(
-                                            &self.saved_profile_at(Some(transform.translation)),
+                                            &make_saved_profile(
+                                        self.vehicle_upgrades,
+                                        self.inventory.clone(),
+                                        self.equipment,
+                                        self.progression,
+                                        self.checkpoint_progress.is_some_and(
+                                            CheckpointProgress::has_active_checkpoint,
+                                        ),
+                                        Some(transform.translation),
+                                    ),
                                         ) {
                                             log::warn!("Could not save collected loot: {error}");
                                         }
@@ -1105,7 +1129,14 @@ impl ApplicationHandler for RiftboundApp {
                                 log::info!(
                                     "Checkpoint activated; falling will return the player here"
                                 );
-                                let profile = self.saved_profile_at(Some(checkpoint.position()));
+                                let profile = make_saved_profile(
+                                    self.vehicle_upgrades,
+                                    self.inventory.clone(),
+                                    self.equipment,
+                                    self.progression,
+                                    true,
+                                    Some(checkpoint.position()),
+                                );
                                 if let Err(error) = save::save_profile(&profile) {
                                     log::warn!("Could not save activated checkpoint: {error}");
                                 }
@@ -1152,7 +1183,16 @@ impl ApplicationHandler for RiftboundApp {
                             {
                                 let levels_gained = self.progression.award_xp(100);
                                 if let Err(error) = save::save_profile(
-                                    &self.saved_profile_at(Some(transform.translation)),
+                                    &make_saved_profile(
+                                        self.vehicle_upgrades,
+                                        self.inventory.clone(),
+                                        self.equipment,
+                                        self.progression,
+                                        self.checkpoint_progress.is_some_and(
+                                            CheckpointProgress::has_active_checkpoint,
+                                        ),
+                                        Some(transform.translation),
+                                    ),
                                 ) {
                                     log::warn!("Could not save mission rewards: {error}");
                                 }
