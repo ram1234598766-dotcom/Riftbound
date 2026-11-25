@@ -30,6 +30,10 @@ impl MeshId {
     pub const ENV_BOULDER: Self = Self(13);
     /// Clustered low shrub mesh for sand and mud regions.
     pub const ENV_SHRUB: Self = Self(14);
+    /// Joined multi-part player vehicle body with cabin, bumpers and lights.
+    pub const VEHICLE_BODY: Self = Self(15);
+    /// Faceted rubber tire and inset hub mesh for vehicle wheels.
+    pub const VEHICLE_WHEEL: Self = Self(16);
 
     /// Creates an ID for an entry in the renderer's mesh registry.
     #[must_use]
