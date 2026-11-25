@@ -248,8 +248,8 @@ impl Equipment {
     /// Equips a compatible item, returning the item previously in that slot.
     pub fn equip(&mut self, item: ItemKind) -> Option<ItemKind> {
         match item.equipment_slot()? {
-            EquipmentSlot::Body => Some(core::mem::replace(&mut self.body, Some(item))).flatten(),
-            EquipmentSlot::Feet => Some(core::mem::replace(&mut self.feet, Some(item))).flatten(),
+            EquipmentSlot::Body => self.body.replace(item),
+            EquipmentSlot::Feet => self.feet.replace(item),
         }
     }
 
