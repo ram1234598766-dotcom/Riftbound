@@ -485,8 +485,12 @@ mod tests {
         assert_eq!(VehicleSurface::Asphalt.traction(), 1.0);
         assert!(VehicleSurface::Asphalt.traction() > VehicleSurface::Gravel.traction());
         assert!(VehicleSurface::Gravel.traction() > VehicleSurface::Mud.traction());
-        assert!(VehicleSurface::Mud.rolling_resistance() > VehicleSurface::Sand.rolling_resistance());
-        assert!(VehicleSurface::Snow.speed_multiplier() < VehicleSurface::Asphalt.speed_multiplier());
+        assert!(
+            VehicleSurface::Mud.rolling_resistance() > VehicleSurface::Sand.rolling_resistance()
+        );
+        assert!(
+            VehicleSurface::Snow.speed_multiplier() < VehicleSurface::Asphalt.speed_multiplier()
+        );
 
         for surface in [
             VehicleSurface::Asphalt,
