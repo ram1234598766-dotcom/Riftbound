@@ -186,29 +186,10 @@ pub fn world_terrain_vehicle_ground_heights(
         return None;
     }
 
-    let (sin_heading, cos_heading) = heading.sin_cos();
-    let mut heights = [0.0_f32; 4];
-    let wheel_offsets = [
-        (-half_track, -half_wheelbase),
-        (half_track, -half_wheelbase),
-        (-half_track, half_wheelbase),
-        (half_track, half_wheelbase),
-    ];
-    for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
-        let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
-        let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
-        // Do not mix valid terrain heights with the zero-height fallback used
-        // outside the world's supported precision range.
-        if !contact_x.is_finite()
-            || !contact_z.is_finite()
-            || contact_x.abs() > 1_000_000.0
-            || contact_z.abs() > 1_000_000.0
-        {
-            return None;
-        }
-        heights[index] = world_terrain_sample(contact_x, contact_z).height;
-    }
-    Some(heights)
+    let contacts = vehicle_contact_positions(world_x, world_z, heading, half_track, half_wheelbase)?;
+    Some(contacts.map(|(contact_x, contact_z)| {
+        world_terrain_sample(contact_x, contact_z).height
+    }))
 }
 
 /// Returns the terrain surface under each tyre in suspension corner order.
@@ -233,29 +214,12 @@ pub fn world_terrain_vehicle_surfaces(
         return [VehicleSurface::Rock; 4];
     }
 
-    let (sin_heading, cos_heading) = heading.sin_cos();
-    let offsets = [
-        (-half_track, -half_wheelbase),
-        (half_track, -half_wheelbase),
-        (-half_track, half_wheelbase),
-        (half_track, half_wheelbase),
-    ];
-    let mut surfaces = [VehicleSurface::Rock; 4];
-    for (index, (local_x, local_z)) in offsets.into_iter().enumerate() {
-        let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
-        let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
-        // Keep the four-corner sample atomic: never mix valid biome contacts
-        // with fallback rock when one wheel leaves the supported world range.
-        if !contact_x.is_finite()
-            || !contact_z.is_finite()
-            || contact_x.abs() > 1_000_000.0
-            || contact_z.abs() > 1_000_000.0
-        {
-            return [VehicleSurface::Rock; 4];
-        }
-        surfaces[index] = world_terrain_sample(contact_x, contact_z).surface;
-    }
-    surfaces
+    let Some(contacts) =
+        vehicle_contact_positions(world_x, world_z, heading, half_track, half_wheelbase)
+    else {
+        return [VehicleSurface::Rock; 4];
+    };
+    contacts.map(|(contact_x, contact_z)| world_terrain_sample(contact_x, contact_z).surface)
 }
 
 /// Samples the dominant world surface beneath all four tyre contact points.
@@ -281,15 +245,15 @@ pub fn world_terrain_vehicle_surface(
         return VehicleSurface::Rock;
     }
 
-    let (sin_heading, cos_heading) = heading.sin_cos();
+    let Some(contacts) =
+        vehicle_contact_positions(world_x, world_z, heading, half_track, half_wheelbase)
+    else {
+        return VehicleSurface::Rock;
+    };
     let mut counts = [0_u8; 6];
-    for local_x in [-half_track, half_track] {
-        for local_z in [-half_wheelbase, half_wheelbase] {
-            let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
-            let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
-            let surface = world_terrain_sample(contact_x, contact_z).surface;
-            counts[surface_index(surface)] += 1;
-        }
+    for (contact_x, contact_z) in contacts {
+        let surface = world_terrain_sample(contact_x, contact_z).surface;
+        counts[surface_index(surface)] += 1;
     }
 
     let center_surface = world_terrain_sample(world_x, world_z).surface;
@@ -305,6 +269,47 @@ pub fn world_terrain_vehicle_surface(
         Some(4) => VehicleSurface::Snow,
         Some(_) | None => VehicleSurface::Rock,
     }
+}
+
+fn vehicle_contact_positions(
+    world_x: f32,
+    world_z: f32,
+    heading: f32,
+    half_track: f32,
+    half_wheelbase: f32,
+) -> Option<[(f32, f32); 4]> {
+    if !world_x.is_finite()
+        || !world_z.is_finite()
+        || !heading.is_finite()
+        || !half_track.is_finite()
+        || !half_wheelbase.is_finite()
+        || half_track <= 0.0
+        || half_wheelbase <= 0.0
+    {
+        return None;
+    }
+
+    let (sin_heading, cos_heading) = heading.sin_cos();
+    let offsets = [
+        (-half_track, -half_wheelbase),
+        (half_track, -half_wheelbase),
+        (-half_track, half_wheelbase),
+        (half_track, half_wheelbase),
+    ];
+    let mut contacts = [(0.0, 0.0); 4];
+    for (index, (local_x, local_z)) in offsets.into_iter().enumerate() {
+        let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
+        let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
+        if !contact_x.is_finite()
+            || !contact_z.is_finite()
+            || contact_x.abs() > 1_000_000.0
+            || contact_z.abs() > 1_000_000.0
+        {
+            return None;
+        }
+        contacts[index] = (contact_x, contact_z);
+    }
+    Some(contacts)
 }
 
 const fn surface_index(surface: VehicleSurface) -> usize {
@@ -654,6 +659,46 @@ mod tests {
         let branch_right = world_terrain_sample(83.0, -40.0).height;
         assert!((branch_left - branch_center).abs() < 1.0e-5);
         assert!((branch_right - branch_center).abs() < 1.0e-5);
+    }
+
+    #[test]
+    fn vehicle_queries_share_identical_validated_wheel_contacts() {
+        let position = (24.0, -18.0, 0.73, 0.82, 1.31);
+        let heights = world_terrain_vehicle_ground_heights(
+            position.0, position.1, position.2, position.3, position.4,
+        )
+        .expect("valid wheel contacts");
+        let surfaces = world_terrain_vehicle_surfaces(
+            position.0, position.1, position.2, position.3, position.4,
+        );
+        let direct = vehicle_contact_positions(
+            position.0, position.1, position.2, position.3, position.4,
+        )
+        .expect("same validated contacts");
+        for index in 0..4 {
+            let sample = world_terrain_sample(direct[index].0, direct[index].1);
+            assert_eq!(heights[index], sample.height);
+            assert_eq!(surfaces[index], sample.surface);
+        }
+        assert_eq!(
+            world_terrain_vehicle_surface(
+                position.0, position.1, position.2, position.3, position.4,
+            ),
+            {
+                let center = world_terrain_sample(position.0, position.1).surface;
+                let center_count = surfaces.iter().filter(|surface| **surface == center).count();
+                let max_count = surfaces.iter().map(|surface| {
+                    surfaces.iter().filter(|other| *other == surface).count()
+                }).max().unwrap_or(0);
+                if center_count == max_count {
+                    center
+                } else {
+                    surfaces.iter().copied().find(|surface| {
+                        surfaces.iter().filter(|other| *other == surface).count() == max_count
+                    }).unwrap_or(VehicleSurface::Rock)
+                }
+            }
+        );
     }
 
     #[test]
