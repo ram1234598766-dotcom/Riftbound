@@ -140,7 +140,7 @@ fn decode(contents: &str) -> Option<SavedProfile> {
         }
         _ => return None,
     };
-    let checkpoint_active = match values.get("checkpoint") {
+    let checkpoint_active = match values.get("checkpoint").copied() {
         Some("0") | None => false,
         Some("1") => true,
         _ => return None,
