@@ -307,7 +307,6 @@ fn crystal_data() -> (Vec<MeshVertex>, Vec<u16>) {
     (vertices, indices)
 }
 
-
 fn append_environment_part(
     vertices: &mut Vec<MeshVertex>,
     indices: &mut Vec<u16>,
@@ -334,16 +333,28 @@ fn environment_tree_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut vertices = Vec::with_capacity(48);
     let mut indices = Vec::with_capacity(108);
     append_environment_part(
-        &mut vertices, &mut indices, cube_data(),
-        [0.16, 0.72, 0.16], [0.0, -0.28, 0.0], [0.34, 0.20, 0.10],
+        &mut vertices,
+        &mut indices,
+        cube_data(),
+        [0.16, 0.72, 0.16],
+        [0.0, -0.28, 0.0],
+        [0.34, 0.20, 0.10],
     );
     append_environment_part(
-        &mut vertices, &mut indices, pyramid_data(),
-        [0.82, 0.78, 0.82], [0.0, 0.58, 0.0], [0.12, 0.42, 0.22],
+        &mut vertices,
+        &mut indices,
+        pyramid_data(),
+        [0.82, 0.78, 0.82],
+        [0.0, 0.58, 0.0],
+        [0.12, 0.42, 0.22],
     );
     append_environment_part(
-        &mut vertices, &mut indices, pyramid_data(),
-        [0.58, 0.62, 0.58], [0.0, 1.12, 0.0], [0.18, 0.58, 0.30],
+        &mut vertices,
+        &mut indices,
+        pyramid_data(),
+        [0.58, 0.62, 0.58],
+        [0.0, 1.12, 0.0],
+        [0.18, 0.58, 0.30],
     );
     (vertices, indices)
 }
@@ -352,12 +363,20 @@ fn environment_boulder_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut vertices = Vec::with_capacity(32);
     let mut indices = Vec::with_capacity(60);
     append_environment_part(
-        &mut vertices, &mut indices, pyramid_data(),
-        [0.92, 0.68, 0.78], [0.0, 0.0, 0.0], [0.38, 0.41, 0.45],
+        &mut vertices,
+        &mut indices,
+        pyramid_data(),
+        [0.92, 0.68, 0.78],
+        [0.0, 0.0, 0.0],
+        [0.38, 0.41, 0.45],
     );
     append_environment_part(
-        &mut vertices, &mut indices, crystal_data(),
-        [0.52, 0.42, 0.48], [0.32, 0.08, -0.18], [0.49, 0.52, 0.56],
+        &mut vertices,
+        &mut indices,
+        crystal_data(),
+        [0.52, 0.42, 0.48],
+        [0.32, 0.08, -0.18],
+        [0.49, 0.52, 0.56],
     );
     (vertices, indices)
 }
@@ -366,16 +385,28 @@ fn environment_shrub_data() -> (Vec<MeshVertex>, Vec<u16>) {
     let mut vertices = Vec::with_capacity(72);
     let mut indices = Vec::with_capacity(108);
     append_environment_part(
-        &mut vertices, &mut indices, cube_data(),
-        [0.62, 0.34, 0.52], [-0.42, 0.0, 0.0], [0.40, 0.34, 0.16],
+        &mut vertices,
+        &mut indices,
+        cube_data(),
+        [0.62, 0.34, 0.52],
+        [-0.42, 0.0, 0.0],
+        [0.40, 0.34, 0.16],
     );
     append_environment_part(
-        &mut vertices, &mut indices, cube_data(),
-        [0.58, 0.42, 0.58], [0.34, 0.08, 0.04], [0.48, 0.40, 0.18],
+        &mut vertices,
+        &mut indices,
+        cube_data(),
+        [0.58, 0.42, 0.58],
+        [0.34, 0.08, 0.04],
+        [0.48, 0.40, 0.18],
     );
     append_environment_part(
-        &mut vertices, &mut indices, pyramid_data(),
-        [0.42, 0.50, 0.42], [0.0, 0.18, -0.28], [0.56, 0.48, 0.22],
+        &mut vertices,
+        &mut indices,
+        pyramid_data(),
+        [0.42, 0.50, 0.42],
+        [0.0, 0.18, -0.28],
+        [0.56, 0.48, 0.22],
     );
     (vertices, indices)
 }
@@ -1489,7 +1520,11 @@ mod environment_mesh_tests {
             assert!(!vertices.is_empty());
             assert!(valid_index_data(vertices.len(), &indices));
             assert!(vertices.iter().all(|vertex| {
-                vertex.position.iter().chain(vertex.color.iter()).all(|value| value.is_finite())
+                vertex
+                    .position
+                    .iter()
+                    .chain(vertex.color.iter())
+                    .all(|value| value.is_finite())
             }));
         }
     }
