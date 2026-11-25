@@ -19,6 +19,8 @@ pub struct HudData {
     pub inventory: Option<String>,
     /// Compact equipped-gear summary.
     pub equipment: String,
+    /// Optional vehicle speed and terrain readout while driving.
+    pub vehicle_info: Option<String>,
 }
 
 /// One colored vertex in the immediate-mode HUD mesh.
@@ -157,6 +159,12 @@ pub fn build_vertices_into(data: &HudData, width: u32, height: u32, out: &mut Ve
             height,
         );
     }
+    if let Some(vehicle_info) = &data.vehicle_info {
+        let panel_y = if width < 680.0 { 350.0 } else { 194.0 };
+        rect(out, 22.0, panel_y, 250.0, 38.0, panel, width, height);
+        rect(out, 22.0, panel_y, 3.0, 38.0, [1.0, 0.62, 0.28, 1.0], width, height);
+        text(out, vehicle_info, 38.0, panel_y + 13.0, 1.5, white, width, height);
+    }
     if let Some(prompt) = &data.prompt {
         let panel_y = height - 72.0;
         rect(out, 22.0, panel_y, 300.0, 48.0, panel, width, height);
@@ -294,6 +302,7 @@ mod tests {
             max_health: 100,
             inventory: Some("SHARDS 3 SALV 2 MED 1".into()),
             equipment: "BODY VEST FEET BOOTS".into(),
+            vehicle_info: Some("SPEED 48 KM/H • GRAVEL".into()),
         };
         let mut reused = Vec::with_capacity(4_096);
         build_vertices_into(&data, 1280, 720, &mut reused);
@@ -318,6 +327,7 @@ mod tests {
             max_health: 100,
             inventory: None,
             equipment: String::new(),
+            vehicle_info: None,
         };
         let vertices = build_vertices(&data, 1280, 720);
         assert_ne!(vertices.len(), 0);
