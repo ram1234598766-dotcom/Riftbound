@@ -753,8 +753,11 @@ mod tests {
 
     #[test]
     fn slot_map_keeps_renderer_slot_when_chunk_changes_lod() {
-        let mut streamer = WorldChunkStreamer::standard();
-        let mut slots = WorldChunkSlotMap::for_config(WorldChunkConfig::default());
+        // A zero-radius detailed core makes the one-ring exit transition
+        // observable before the chunk leaves this bounded active window.
+        let config = WorldChunkConfig::new(0, 2).unwrap();
+        let mut streamer = WorldChunkStreamer::new(config);
+        let mut slots = WorldChunkSlotMap::for_config(config);
         let origin = WorldChunkCoord { x: 0, z: 0 };
 
         assert!(streamer.update_focus(0.0, 0.0));
