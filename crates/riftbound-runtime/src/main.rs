@@ -714,7 +714,18 @@ impl ApplicationHandler for RiftboundApp {
                             0.0
                         };
                         let vehicle_previous_position = self.vehicle_state.position;
-                        self.vehicle_state.update(
+                        let sampled_surface = world_terrain_vehicle_surface(
+                            self.vehicle_state.position.x,
+                            self.vehicle_state.position.z,
+                            self.vehicle_state.heading,
+                            0.78,
+                            1.32,
+                        );
+                        self.vehicle_surface_tracker.update(sampled_surface);
+                        let (traction, speed_multiplier, rolling_resistance) =
+                            self.vehicle_surface_tracker.response();
+                        let vehicle_previous_position = self.vehicle_state.position;
+                        self.vehicle_state.update_with_surface_response(
                             VehicleInput {
                                 throttle,
                                 brake: if self.input.is_held(Button::Jump) {
@@ -724,14 +735,9 @@ impl ApplicationHandler for RiftboundApp {
                                 },
                                 steering,
                             },
-                            self.vehicle_surface_tracker
-                                .update(world_terrain_vehicle_surface(
-                                    self.vehicle_state.position.x,
-                                    self.vehicle_state.position.z,
-                                    self.vehicle_state.heading,
-                                    0.78,
-                                    1.32,
-                                )),
+                            traction,
+                            speed_multiplier,
+                            rolling_resistance,
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
