@@ -549,6 +549,15 @@ impl Renderer {
         if slot_index >= self.world_terrain_slots.len() {
             return false;
         }
+        // Streamer deltas can mention a chunk whose GPU slot already has the
+        // requested coordinate and LOD. Keep its mesh and instance buffer;
+        // rebuilding them would repeat CPU sampling and GPU allocation.
+        if self.world_terrain_slots[slot_index]
+            .as_ref()
+            .is_some_and(|slot| slot.coord == coord && slot.lod == lod)
+        {
+            return true;
+        }
         let mesh = match lod {
             WorldChunkLod::Detailed => Mesh::world_terrain_chunk(&self.device, coord.x, coord.z),
             WorldChunkLod::Distant => Mesh::world_terrain_chunk_lod(&self.device, coord.x, coord.z),
