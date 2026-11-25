@@ -385,8 +385,9 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        WorldTerrainSample, procedural_ground_height, value_noise, vehicle_contact_positions,
-        world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+        WorldTerrainSample, corridor_blend, lerp, procedural_ground_height, value_noise,
+        vehicle_contact_positions, world_road_sample, world_terrain_sample,
+        world_terrain_vehicle_ground_heights,
         world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
     };
     use crate::VehicleSurface;
@@ -490,7 +491,12 @@ mod tests {
             assert!((edge.height - ground_height(world_x, -72.0)).abs() < 1.0e-4);
         }
         let side_approach = world_terrain_sample(73.0, -72.0);
-        assert!((side_approach.height - ground_height(73.0, -72.0) - 2.0).abs() < 1.0e-4);
+        let side_approach_base = lerp(
+            ground_height(73.0, -72.0),
+            ground_height(80.0, -72.0),
+            corridor_blend(7.0, 5.5, 2.5),
+        );
+        assert!((side_approach.height - side_approach_base - 2.0).abs() < 1.0e-4);
 
         assert_eq!(
             world_terrain_sample(96.0, -72.0).height,
@@ -648,9 +654,9 @@ mod tests {
 
     #[test]
     fn eastbound_spur_and_northbound_branch_have_continuous_road_beds() {
-        let spur_center = world_terrain_sample(80.0, 0.0).height;
-        let spur_left = world_terrain_sample(80.0, -3.0).height;
-        let spur_right = world_terrain_sample(80.0, 3.0).height;
+        let spur_center = world_terrain_sample(40.0, 0.0).height;
+        let spur_left = world_terrain_sample(40.0, -3.0).height;
+        let spur_right = world_terrain_sample(40.0, 3.0).height;
         assert!((spur_left - spur_center).abs() < 1.0e-5);
         assert!((spur_right - spur_center).abs() < 1.0e-5);
 
