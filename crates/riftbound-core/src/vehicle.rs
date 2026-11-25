@@ -20,7 +20,9 @@ pub enum VehicleSurface {
 }
 
 impl VehicleSurface {
-    fn grip(self) -> f32 {
+    /// Returns the normalized tire-grip multiplier used for acceleration and steering.
+    #[must_use]
+    pub const fn traction(self) -> f32 {
         match self {
             Self::Asphalt => 1.0,
             Self::Gravel => 0.78,
@@ -31,7 +33,9 @@ impl VehicleSurface {
         }
     }
 
-    fn speed_factor(self) -> f32 {
+    /// Returns the normalized maximum-speed multiplier for this surface.
+    #[must_use]
+    pub const fn speed_multiplier(self) -> f32 {
         match self {
             Self::Asphalt => 1.0,
             Self::Gravel => 0.88,
@@ -42,7 +46,9 @@ impl VehicleSurface {
         }
     }
 
-    fn rolling_resistance(self) -> f32 {
+    /// Returns the rolling-resistance coefficient used by passive vehicle drag.
+    #[must_use]
+    pub const fn rolling_resistance(self) -> f32 {
         match self {
             Self::Asphalt => 0.8,
             Self::Gravel => 1.5,
@@ -51,6 +57,18 @@ impl VehicleSurface {
             Self::Snow => 2.2,
             Self::Rock => 1.8,
         }
+    }
+
+    fn grip(self) -> f32 {
+        self.traction()
+    }
+
+    fn speed_factor(self) -> f32 {
+        self.speed_multiplier()
+    }
+
+    fn rolling_resistance(self) -> f32 {
+        VehicleSurface::rolling_resistance(self)
     }
 }
 
@@ -465,6 +483,31 @@ impl SuspensionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn terrain_surface_profiles_expose_distinct_driving_characteristics() {
+        assert_eq!(VehicleSurface::Asphalt.traction(), 1.0);
+        assert!(VehicleSurface::Asphalt.traction() > VehicleSurface::Gravel.traction());
+        assert!(VehicleSurface::Gravel.traction() > VehicleSurface::Mud.traction());
+        assert!(VehicleSurface::Mud.rolling_resistance() > VehicleSurface::Sand.rolling_resistance());
+        assert!(VehicleSurface::Snow.speed_multiplier() < VehicleSurface::Asphalt.speed_multiplier());
+
+        for surface in [
+            VehicleSurface::Asphalt,
+            VehicleSurface::Gravel,
+            VehicleSurface::Mud,
+            VehicleSurface::Sand,
+            VehicleSurface::Snow,
+            VehicleSurface::Rock,
+        ] {
+            assert!(surface.traction().is_finite());
+            assert!(surface.speed_multiplier().is_finite());
+            assert!(surface.rolling_resistance().is_finite());
+            assert!(surface.traction() > 0.0 && surface.traction() <= 1.0);
+            assert!(surface.speed_multiplier() > 0.0 && surface.speed_multiplier() <= 1.0);
+            assert!(surface.rolling_resistance() >= 0.0);
+        }
+    }
 
     #[test]
     fn engine_upgrades_spend_salvage_and_improve_handling_with_a_level_cap() {
