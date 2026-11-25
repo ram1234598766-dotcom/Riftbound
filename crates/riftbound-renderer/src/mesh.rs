@@ -140,7 +140,12 @@ impl Mesh {
     #[must_use]
     pub fn vehicle_particle(device: &wgpu::Device) -> Option<Self> {
         let (vertices, indices) = vehicle_particle_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-vehicle-particle-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-vehicle-particle-mesh",
+        )
     }
 
     /// Creates a joined low-poly vehicle body with cabin, bumpers and lights.
@@ -462,8 +467,7 @@ fn vehicle_particle_data() -> (Vec<MeshVertex>, Vec<u16>) {
         .map(|position| MeshVertex { position, color })
         .collect();
     let indices = vec![
-        0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2,
-        1, 4, 2, 1, 3, 4, 1, 5, 3, 1, 2, 5,
+        0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2, 1, 4, 2, 1, 3, 4, 1, 5, 3, 1, 2, 5,
     ];
     (vertices, indices)
 }
@@ -680,21 +684,19 @@ fn terrain_light_factor_with_center(world_x: f32, world_z: f32, center_height: f
     let right = world_terrain_sample(world_x + SAMPLE_STEP, world_z).height;
     let back = world_terrain_sample(world_x, world_z - SAMPLE_STEP).height;
     let front = world_terrain_sample(world_x, world_z + SAMPLE_STEP).height;
-    if ![left, right, back, front].iter().all(|height| height.is_finite()) {
+    if ![left, right, back, front]
+        .iter()
+        .all(|height| height.is_finite())
+    {
         return 0.82;
     }
-    let normal = [
-        left - right,
-        SAMPLE_STEP * 2.0,
-        back - front,
-    ];
+    let normal = [left - right, SAMPLE_STEP * 2.0, back - front];
     let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
     if !length.is_finite() || length <= f32::EPSILON {
         return 0.82;
     }
-    let diffuse = ((normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2])
-        / length)
-        .max(0.0);
+    let diffuse =
+        ((normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2]) / length).max(0.0);
     (0.72 + diffuse * 0.28).clamp(0.72, 1.0)
 }
 
@@ -735,8 +737,7 @@ fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32
 }
 
 fn terrain_lattice_noise(x: i32, z: i32) -> f32 {
-    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9)
-        ^ (z as u32).wrapping_mul(0x85EB_CA6B);
+    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9) ^ (z as u32).wrapping_mul(0x85EB_CA6B);
     hash ^= hash >> 16;
     hash = hash.wrapping_mul(0x7FEB_352D);
     hash ^= hash >> 15;
@@ -752,8 +753,10 @@ fn terrain_detail_noise(world_x: f32, world_z: f32, scale: f32) -> f32 {
     let grid_z = world_z / scale;
     let cell_x = grid_x.floor();
     let cell_z = grid_z.floor();
-    if cell_x < i32::MIN as f32 || cell_x >= i32::MAX as f32
-        || cell_z < i32::MIN as f32 || cell_z >= i32::MAX as f32
+    if cell_x < i32::MIN as f32
+        || cell_x >= i32::MAX as f32
+        || cell_z < i32::MIN as f32
+        || cell_z >= i32::MAX as f32
     {
         return 0.5;
     }
@@ -931,8 +934,7 @@ fn world_terrain_chunk_data(
                 let before_vertex = *vertices.get(before)?;
                 let after_vertex = *vertices.get(after)?;
                 let midpoint = vertices.get_mut(edge_index)?;
-                midpoint.position[1] =
-                    (before_vertex.position[1] + after_vertex.position[1]) * 0.5;
+                midpoint.position[1] = (before_vertex.position[1] + after_vertex.position[1]) * 0.5;
                 for channel in 0..3 {
                     midpoint.color[channel] =
                         (before_vertex.color[channel] + after_vertex.color[channel]) * 0.5;
@@ -1768,8 +1770,8 @@ mod tests {
                         .iter()
                         .map(|index| vertices[*index].position[1])
                         .fold(f32::INFINITY, f32::min);
-                    let edge_skirts = &vertices
-                        [skirt_offset..skirt_offset + skirt_vertices_per_edge];
+                    let edge_skirts =
+                        &vertices[skirt_offset..skirt_offset + skirt_vertices_per_edge];
                     for quad in edge_skirts.chunks_exact(4) {
                         assert!(quad[1].position[1] <= edge_min - 4.0);
                         assert!(quad[3].position[1] <= edge_min - 4.0);
