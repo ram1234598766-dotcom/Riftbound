@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(restored.upgrades.engine_level(), 2);
         assert_eq!(restored.upgrades.handling_level(), 3);
         assert_eq!(restored.inventory.count(ItemKind::Salvage), 17);
-        assert_eq!(restored.inventory.count(ItemKind::Medkit), 2);
+        assert_eq!(restored.inventory.count(ItemKind::Medkit), 4);
         assert_eq!(
             restored.equipment.item(EquipmentSlot::Body),
             Some(ItemKind::ExplorerVest)
