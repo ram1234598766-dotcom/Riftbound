@@ -1058,7 +1058,7 @@ impl SuspensionState {
                 .clamp(0.75, 1.25);
             let contact = (self.compression[index] / (config.max_travel * 0.25))
                 .clamp(0.0, 1.0);
-            relative_load * dynamic_load * contact
+            (relative_load * dynamic_load * contact).clamp(0.0, 1.25)
         })
     }
 
@@ -1357,9 +1357,10 @@ mod tests {
         assert!(loads[0] > loads[2]);
         assert!(loads[2] > loads[1]);
         assert!(loads.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
-        suspension.compression_velocity = [-100.0, 100.0, 0.0, 0.0];
+        suspension.compression = [config.max_travel; 2].into_iter().chain([0.0; 2]).collect::<Vec<_>>().try_into().expect("four corners");
+        suspension.compression_velocity = [100.0, 100.0, 0.0, 0.0];
         let bounded = suspension.wheel_load_factors(config);
-        assert!(bounded.iter().all(|load| load.is_finite() && *load <= 1.25));
+        assert!(bounded.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
     }
 
     #[test]
