@@ -49,6 +49,33 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
     }
 }
 
+/// Estimates visible tyre slip from throttle/braking demand and available grip.
+fn vehicle_slip_percent(
+    throttle: f32,
+    brake: f32,
+    steering: f32,
+    speed: f32,
+    max_speed: f32,
+    grip: f32,
+) -> u8 {
+    if ![throttle, brake, steering, speed, max_speed, grip]
+        .iter()
+        .all(|value| value.is_finite())
+        || max_speed <= 0.0
+    {
+        return 0;
+    }
+    let grip_loss = 1.0 - grip.clamp(0.0, 1.0);
+    let speed_fraction = (speed.abs() / max_speed).clamp(0.0, 1.0);
+    let longitudinal_demand = throttle.abs().clamp(0.0, 1.0)
+        .max(brake.clamp(0.0, 1.0) * 0.65);
+    let lateral_demand = steering.abs().clamp(0.0, 1.0) * speed_fraction;
+    let slip = (longitudinal_demand * grip_loss * 0.8
+        + lateral_demand * grip_loss * 0.25)
+        .clamp(0.0, 1.0);
+    (slip * 100.0).round() as u8
+}
+
 fn vehicle_surface_label(surface: VehicleSurface) -> &'static str {
     match surface {
         VehicleSurface::Asphalt => "ASPHALT",
@@ -1630,6 +1657,31 @@ impl ApplicationHandler for RiftboundApp {
                                     let grip = self.vehicle_surface_tracker.response().0;
                                     (grip.clamp(0.0, 1.0) * 100.0).round() as u8
                                 }),
+                                vehicle_slip: self.driving.then(|| {
+                                    let grip = self.vehicle_surface_tracker.response().0;
+                                    let throttle = if self.input.is_held(Button::MoveForward) {
+                                        1.0
+                                    } else if self.input.is_held(Button::MoveBackward) {
+                                        -1.0
+                                    } else {
+                                        0.0
+                                    };
+                                    let steering = if self.input.is_held(Button::MoveLeft) {
+                                        -1.0
+                                    } else if self.input.is_held(Button::MoveRight) {
+                                        1.0
+                                    } else {
+                                        0.0
+                                    };
+                                    vehicle_slip_percent(
+                                        throttle,
+                                        if self.input.is_held(Button::Jump) { 1.0 } else { 0.0 },
+                                        steering,
+                                        self.vehicle_state.speed,
+                                        VehicleConfig::default().max_forward_speed,
+                                        grip,
+                                    )
+                                }),
                                 equipment: format!(
                                     "BODY {} FEET {}",
                                     if self.equipment.item(EquipmentSlot::Body).is_some() {
@@ -2457,6 +2509,17 @@ fn spawn_world_obstacle_props(
 #[allow(clippy::items_after_test_module)]
 mod world_prop_tests {
     use super::*;
+
+    #[test]
+    fn vehicle_slip_feedback_is_grip_sensitive_and_bounded() {
+        let asphalt = vehicle_slip_percent(1.0, 0.0, 0.0, 12.0, 30.0, 1.0);
+        let snow = vehicle_slip_percent(1.0, 0.0, 0.0, 12.0, 30.0, 0.22);
+        assert_eq!(asphalt, 0);
+        assert!(snow > asphalt);
+        assert!(snow <= 100);
+        assert_eq!(vehicle_slip_percent(1.0, 0.0, 0.0, 12.0, 0.0, 0.2), 0);
+        assert_eq!(vehicle_slip_percent(f32::NAN, 0.0, 0.0, 12.0, 30.0, 0.2), 0);
+    }
 
     #[test]
     fn vehicle_dust_is_limited_to_moving_loose_terrain() {
