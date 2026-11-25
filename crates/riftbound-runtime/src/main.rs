@@ -783,7 +783,7 @@ impl ApplicationHandler for RiftboundApp {
                             &mut self.vehicle_surface_tracker,
                             vehicle_delta,
                         );
-                        if let Some(suspension_pose) = suspension_pose {
+                        if let Some(mut suspension_pose) = suspension_pose {
                             if let Some(collision) = self.collision.as_ref() {
                                 let movement = Vec3::new(
                                     self.vehicle_state.position.x - vehicle_previous_position.x,
@@ -797,10 +797,29 @@ impl ApplicationHandler for RiftboundApp {
                                     0.82,
                                     1.38,
                                 );
+                                let collision_adjusted = resolved.position.x
+                                    != self.vehicle_state.position.x
+                                    || resolved.position.z != self.vehicle_state.position.z;
                                 self.vehicle_state.position.x = resolved.position.x;
                                 self.vehicle_state.position.z = resolved.position.z;
                                 if resolved.blocked_x || resolved.blocked_z {
                                     self.vehicle_state.speed = 0.0;
+                                }
+                                if collision_adjusted {
+                                    if let Some(ground_heights) = world_terrain_vehicle_ground_heights(
+                                        self.vehicle_state.position.x,
+                                        self.vehicle_state.position.z,
+                                        self.vehicle_state.heading,
+                                        suspension_config.track_width * 0.5,
+                                        suspension_config.wheelbase * 0.5,
+                                    ) {
+                                        let _ = self.vehicle_suspension.rebase_ground_contacts(
+                                            ground_heights,
+                                            self.vehicle_state.position.y,
+                                            suspension_config,
+                                        );
+                                        suspension_pose = self.vehicle_suspension.pose(suspension_config);
+                                    }
                                 }
                             }
                             if self
