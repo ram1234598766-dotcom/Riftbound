@@ -1014,6 +1014,14 @@ impl SuspensionState {
         let rear = f32::midpoint(self.compression[2], self.compression[3]);
         let left = f32::midpoint(self.compression[0], self.compression[2]);
         let right = f32::midpoint(self.compression[1], self.compression[3]);
+        let front_velocity =
+            f32::midpoint(self.compression_velocity[0], self.compression_velocity[1]);
+        let rear_velocity =
+            f32::midpoint(self.compression_velocity[2], self.compression_velocity[3]);
+        let left_velocity =
+            f32::midpoint(self.compression_velocity[0], self.compression_velocity[2]);
+        let right_velocity =
+            f32::midpoint(self.compression_velocity[1], self.compression_velocity[3]);
         let peak_compression_speed = self
             .compression_velocity
             .iter()
@@ -1024,6 +1032,10 @@ impl SuspensionState {
             .iter()
             .copied()
             .fold(0.0_f32, f32::max);
+        // Differential spring velocity adds a short-lived chassis response as
+        // one axle or side meets a bump before the rest of the vehicle.
+        let dynamic_pitch = ((front_velocity - rear_velocity) * 0.025).atan();
+        let dynamic_roll = ((left_velocity - right_velocity) * 0.025).atan();
         SuspensionPose {
             wheel_compressions: self.compression,
             wheel_compression_velocities: self.compression_velocity,
@@ -1035,8 +1047,12 @@ impl SuspensionState {
             } else {
                 0.0
             },
-            pitch: ((front - rear) / config.wheelbase.max(f32::EPSILON)).atan(),
-            roll: ((left - right) / config.track_width.max(f32::EPSILON)).atan(),
+            pitch: (((front - rear) / config.wheelbase.max(f32::EPSILON)).atan()
+                + dynamic_pitch)
+                .clamp(-0.35, 0.35),
+            roll: (((left - right) / config.track_width.max(f32::EPSILON)).atan()
+                + dynamic_roll)
+                .clamp(-0.35, 0.35),
         }
     }
 }
@@ -1243,6 +1259,24 @@ mod tests {
         assert!(loads[1] > 0.0 && loads[1] < loads[2]);
         assert!(loads[2] < loads[3]);
         assert!(loads.iter().all(|load| (0.0..=1.25).contains(load)));
+    }
+
+    #[test]
+    fn suspension_pose_adds_bounded_dynamic_pitch_and_roll_on_asymmetric_impacts() {
+        let config = SuspensionConfig::default();
+        let mut state = SuspensionState::default();
+        state.update([0.0; 4], 0.58, config, 1.0 / 60.0);
+        state.compression_velocity = [5.0, 5.0, -5.0, -5.0];
+        let pose = state.pose(config);
+        assert!(pose.pitch > 0.0);
+        assert!(pose.pitch <= 0.35);
+        assert!(pose.roll.abs() < f32::EPSILON);
+
+        state.compression_velocity = [5.0, -5.0, 5.0, -5.0];
+        let roll_pose = state.pose(config);
+        assert!(roll_pose.roll > 0.0);
+        assert!(roll_pose.roll <= 0.35);
+        assert!(roll_pose.pitch.abs() < f32::EPSILON);
     }
 
     #[test]
