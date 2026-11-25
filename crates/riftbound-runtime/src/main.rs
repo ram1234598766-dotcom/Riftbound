@@ -106,7 +106,16 @@ impl RiftboundApp {
                 .and_then(|player| renderer.scene().get(player))
                 .map(|transform| transform.translation)
         });
-        self.saved_profile_at(player_position)
+        make_saved_profile(
+            self.vehicle_upgrades,
+            self.inventory.clone(),
+            self.equipment,
+            self.progression,
+            self.checkpoint_progress.is_some_and(
+                CheckpointProgress::has_active_checkpoint,
+            ),
+            player_position,
+        )
     }
 
 }
