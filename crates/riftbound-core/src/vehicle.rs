@@ -1473,8 +1473,10 @@ mod tests {
 
     #[test]
     fn suspension_load_factors_transfer_grip_between_wheel_corners() {
-        let mut suspension = SuspensionState::default();
-        suspension.compression = [0.4, 0.2, 0.1, 0.1];
+        let suspension = SuspensionState {
+            compression: [0.4, 0.2, 0.1, 0.1],
+            ..SuspensionState::default()
+        };
         let loads = suspension.wheel_load_factors(SuspensionConfig::default());
         assert!(loads[0] > loads[1]);
         assert!(loads[1] > loads[2]);
