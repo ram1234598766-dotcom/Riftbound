@@ -50,6 +50,7 @@ struct RiftboundApp {
     camera_target: Vec3,
     pickups: PickupTracker,
     pickup_entities: Vec<EntityId>,
+    loot_entities: Vec<(EntityId, Vec3, ItemKind)>,
     animated_transforms: Vec<(EntityId, Transform3)>,
     extraction: Option<ExtractionZone>,
     beacon_entity: Option<EntityId>,
@@ -126,6 +127,7 @@ impl ApplicationHandler for RiftboundApp {
                     transform.translation = vehicle_state.position;
                 }
                 let (pickups, pickup_entities) = build_pickups(&mut scene);
+                let loot_entities = build_loot_pickups(&mut scene);
                 let (beacon_entity, extraction) = build_extraction_beacon(&mut scene);
                 let (checkpoint_entity, checkpoint) = build_checkpoint(&mut scene);
                 let (sentinel_entity, sentinel_effect_entity, sentinel_brain) =
@@ -207,6 +209,7 @@ impl ApplicationHandler for RiftboundApp {
                 self.inventory_open = false;
                 self.mission = MissionProgress::new(self.pickups.total());
                 self.pickup_entities = pickup_entities;
+                self.loot_entities = loot_entities;
                 self.animated_transforms = Vec::with_capacity(8 + self.pickup_entities.len());
                 self.extraction = Some(extraction);
                 self.beacon_entity = Some(beacon_entity);
@@ -250,6 +253,7 @@ impl ApplicationHandler for RiftboundApp {
         self.world_obstacle_entities.clear();
         self.pickups = PickupTracker::new();
         self.pickup_entities.clear();
+        self.loot_entities.clear();
         self.animated_transforms.clear();
         self.extraction = None;
         self.beacon_entity = None;
@@ -681,6 +685,20 @@ impl ApplicationHandler for RiftboundApp {
                         );
                         self.animated_transforms.push((*entity, animated));
                     }
+                    for (index, (entity, base, _kind)) in self.loot_entities.iter().enumerate() {
+                        if renderer.scene().get(*entity).is_none() {
+                            continue;
+                        }
+                        let phase = self.animation_time * 1.8 + index as f32 * 1.7;
+                        self.animated_transforms.push((
+                            *entity,
+                            Transform3::new(
+                                Vec3::new(base.x, base.y + phase.sin() * 0.09, base.z),
+                                Vec3::new(0.0, self.animation_time * 0.8 + index as f32, 0.0),
+                                Vec3::new(0.22, 0.28, 0.22),
+                            ),
+                        ));
+                    }
                     if let Some(beacon) = self.beacon_entity {
                         let pulse = 1.0 + (self.animation_time * 2.0).sin() * 0.06;
                         self.animated_transforms.push((
@@ -927,6 +945,33 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
+                            let nearby_loot = self.loot_entities.iter().position(|(entity, position, _)| {
+                                renderer.scene().get(*entity).is_some()
+                                    && distance_squared(transform.translation, *position) <= 1.8 * 1.8
+                            });
+                            if interact_pressed {
+                                if let Some(index) = nearby_loot {
+                                    let (entity, _position, kind) = self.loot_entities[index];
+                                    if self.inventory.add(kind, 1) == 0 {
+                                        let mut updated_scene = renderer.scene().clone();
+                                        updated_scene.despawn(entity);
+                                        if let Err(error) = renderer.set_scene(updated_scene) {
+                                            log::error!("Could not remove collected world loot: {error}");
+                                            event_loop.exit();
+                                            return;
+                                        }
+                                        self.loot_entities.remove(index);
+                                        let label = match kind {
+                                            ItemKind::Salvage => "salvage",
+                                            ItemKind::Medkit => "medkit",
+                                            _ => "item",
+                                        };
+                                        log::info!("Collected 1 {label}");
+                                    } else {
+                                        log::info!("Inventory full; world loot was left in place");
+                                    }
+                                }
+                            }
                             let checkpoint_activated =
                                 match (self.checkpoint, self.checkpoint_progress.as_mut()) {
                                     (Some(checkpoint), Some(progress)) => progress.activate(
@@ -1019,6 +1064,7 @@ impl ApplicationHandler for RiftboundApp {
                                 && self
                                     .sentinel_brain
                                     .is_some_and(|brain| brain.state() == EnemyState::Recover);
+                            let near_loot = nearby_loot.is_some();
                             let near_checkpoint = self.checkpoint.is_some_and(|checkpoint| {
                                 !self
                                     .checkpoint_progress
@@ -1047,6 +1093,8 @@ impl ApplicationHandler for RiftboundApp {
                                 Some(String::from("F - EXTRACT"))
                             } else if near_checkpoint {
                                 Some(String::from("F - ACTIVATE CHECKPOINT"))
+                            } else if near_loot {
+                                Some(String::from("F - PICK UP LOOT"))
                             } else if !self.mission.extraction_unlocked() && near_pickup {
                                 Some(String::from("F - COLLECT"))
                             } else {
@@ -1447,6 +1495,37 @@ fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
         entities.push(id);
     }
     (tracker, entities)
+}
+
+fn build_loot_pickups(scene: &mut Scene) -> Vec<(EntityId, Vec3, ItemKind)> {
+    let pickups = [
+        (Vec3::new(-7.0, terrain_height(-7.0, -2.0) + 0.32, -2.0), ItemKind::Salvage),
+        (Vec3::new(7.0, terrain_height(7.0, -2.0) + 0.32, -2.0), ItemKind::Medkit),
+        (Vec3::new(0.0, terrain_height(0.0, 8.0) + 0.32, 8.0), ItemKind::Salvage),
+    ];
+    pickups
+        .into_iter()
+        .map(|(position, kind)| {
+            let transform = Transform3::new(
+                position,
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.22, 0.28, 0.22),
+            );
+            let mesh = match kind {
+                ItemKind::Salvage => MeshId::PYRAMID,
+                ItemKind::Medkit => MeshId::CRYSTAL,
+                _ => MeshId::CUBE,
+            };
+            let entity = scene
+                .spawn_with_mesh(transform, mesh)
+                .expect("world loot entity ID space available");
+            scene.set_material(
+                entity,
+                if kind == ItemKind::Medkit { MaterialId::AMBER } else { MaterialId::RIFT },
+            );
+            (entity, position, kind)
+        })
+        .collect()
 }
 
 fn spawn_box(scene: &mut Scene, position: Vec3, scale: Vec3, material: MaterialId) {
