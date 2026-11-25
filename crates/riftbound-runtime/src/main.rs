@@ -41,6 +41,14 @@ fn vehicle_wheel_local_offsets(config: SuspensionConfig) -> [(f32, f32); 4] {
 fn wheel_local_vertical_offset(compression: f32, rest_length: f32, radius: f32) -> f32 {
     radius - rest_length + compression
 }
+
+fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
+    if speed.is_finite() && delta.is_finite() && radius.is_finite() && radius > 0.0 {
+        speed * delta.max(0.0) / radius
+    } else {
+        0.0
+    }
+}
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -58,6 +66,7 @@ struct RiftboundApp {
     player_parts: Option<CharacterParts>,
     vehicle: Option<EntityId>,
     vehicle_wheels: Option<[EntityId; 4]>,
+    vehicle_wheel_rotation: f32,
     vehicle_state: VehicleState,
     vehicle_surface_tracker: VehicleSurfaceTracker,
     vehicle_upgrades: VehicleUpgrades,
@@ -827,7 +836,10 @@ impl ApplicationHandler for RiftboundApp {
                             self.animated_transforms.push((vehicle, vehicle_transform));
                         }
                         if let Some(wheels) = self.vehicle_wheels {
-                            let wheel_spin = self.vehicle_state.speed * delta * 1.7;
+                            self.vehicle_wheel_rotation = (self.vehicle_wheel_rotation
+                                + wheel_rotation_delta(self.vehicle_state.speed, delta, 0.34))
+                                .rem_euclid(std::f32::consts::TAU);
+                            let wheel_spin = self.vehicle_wheel_rotation;
                             let wheel_offsets = vehicle_wheel_local_offsets(suspension_config);
                             for (index, wheel) in wheels.iter().enumerate() {
                                 let front = index < 2;
@@ -2368,6 +2380,17 @@ mod world_prop_tests {
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
         );
+    }
+
+    #[test]
+    fn wheel_rotation_accumulates_forward_and_reverse_travel() {
+        let forward = wheel_rotation_delta(8.0, 0.25, 0.5);
+        let reverse = wheel_rotation_delta(-8.0, 0.25, 0.5);
+
+        assert!((forward - 4.0).abs() < f32::EPSILON);
+        assert!((reverse + 4.0).abs() < f32::EPSILON);
+        assert_eq!(wheel_rotation_delta(8.0, f32::NAN, 0.5), 0.0);
+        assert_eq!(wheel_rotation_delta(8.0, 0.25, 0.0), 0.0);
     }
 
     #[test]
