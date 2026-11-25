@@ -259,11 +259,13 @@ impl ApplicationHandler for RiftboundApp {
                 if !renderer.sync_world_terrain(world_streamer.changes(), &mut world_slot_map) {
                     log::error!("Initial world terrain chunk synchronization failed");
                 }
+                let initial_obstacle_footprints =
+                    world_obstacle_footprints(world_streamer.active_chunks());
                 let mut world_obstacle_entities = Vec::new();
                 let mut scene_with_props = renderer.scene().clone();
                 spawn_world_obstacle_props(
                     &mut scene_with_props,
-                    world_streamer.active_chunks(),
+                    &initial_obstacle_footprints,
                     &mut world_obstacle_entities,
                 );
                 if let Err(error) = renderer.set_scene(scene_with_props) {
@@ -290,7 +292,8 @@ impl ApplicationHandler for RiftboundApp {
                 self.driving = false;
                 let mut collision = world_collision_world();
                 if let Some(streamer) = self.world_streamer.as_ref() {
-                    sync_world_collision(&mut collision, streamer.active_chunks());
+                    let obstacles = world_obstacle_footprints(streamer.active_chunks());
+                    sync_world_collision(&mut collision, &obstacles);
                 }
                 self.collision = Some(collision);
                 self.pickups = pickups;
