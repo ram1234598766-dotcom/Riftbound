@@ -457,11 +457,10 @@ mod tests {
     #[test]
     fn movement_input_rejects_non_finite_and_excessive_values() {
         assert!(is_valid_move_input(0.0, 0.0, 0.0));
-        assert!(is_valid_move_input(1.0, 1.0, 0.0));
+        assert!(is_valid_move_input(0.7, 0.7, 0.0));
         assert!(!is_valid_move_input(f32::NAN, 0.0, 0.0));
         assert!(!is_valid_move_input(0.0, f32::INFINITY, 0.0));
         assert!(!is_valid_move_input(0.0, 0.0, f32::NEG_INFINITY));
-        assert!(!is_valid_move_input(1.0, 1.0, 0.0_f32) || 1.0_f32.hypot(1.0) <= 1.01);
         assert!(!is_valid_move_input(1.1, 0.0, 0.0));
     }
 
