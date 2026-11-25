@@ -287,6 +287,12 @@ async fn handle_socket(socket: WebSocket, state: HostState) {
     }
 
     state.players.lock().await.remove(&id);
+    {
+        let mut driver = state.vehicle_driver.lock().await;
+        if release_vehicle_driver(&mut driver, id) {
+            state.vehicle.lock().await.speed = 0.0;
+        }
+    }
     publish_snapshot(&state).await;
     writer.abort();
 }
@@ -372,10 +378,9 @@ async fn handle_client_message(
         }
         "exit_vehicle" => {
             let mut driver = state.vehicle_driver.lock().await;
-            if *driver != Some(id) {
+            if !release_vehicle_driver(&mut driver, id) {
                 return false;
             }
-            *driver = None;
             state.vehicle.lock().await.speed = 0.0;
         }
         "drive" => {
@@ -516,6 +521,15 @@ fn within_extraction_range(x: f32, y: f32) -> bool {
     (x - EXTRACTION_POSITION.0).hypot(y - EXTRACTION_POSITION.1) <= 90.0
 }
 
+fn release_vehicle_driver(driver: &mut Option<u64>, player_id: u64) -> bool {
+    if *driver == Some(player_id) {
+        *driver = None;
+        true
+    } else {
+        false
+    }
+}
+
 fn is_valid_vehicle_input(throttle: f32, brake: f32, steering: f32) -> bool {
     throttle.is_finite()
         && brake.is_finite()
@@ -573,6 +587,16 @@ fn clamp_world_position(value: f32, maximum: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn disconnect_releases_only_the_matching_vehicle_driver() {
+        let mut driver = Some(42);
+        assert!(!release_vehicle_driver(&mut driver, 7));
+        assert_eq!(driver, Some(42));
+        assert!(release_vehicle_driver(&mut driver, 42));
+        assert_eq!(driver, None);
+        assert!(!release_vehicle_driver(&mut driver, 42));
+    }
 
     #[test]
     fn vehicle_input_is_bounded_and_rejects_non_finite_values() {
