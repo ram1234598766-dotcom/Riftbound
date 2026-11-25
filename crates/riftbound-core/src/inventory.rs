@@ -165,6 +165,39 @@ impl Inventory {
         quantity - remaining
     }
 
+    /// Moves one compatible item from inventory into its equipment slot.
+    ///
+    /// The operation is transactional: an existing equipped item is returned
+    /// to inventory, and no item is lost if the requested item is unavailable.
+    pub fn equip_from_inventory(&mut self, equipment: &mut Equipment, item: ItemKind) -> bool {
+        if item.equipment_slot().is_none() || self.count(item) == 0 {
+            return false;
+        }
+        self.remove(item, 1);
+        if let Some(replaced) = equipment.equip(item) {
+            let overflow = self.add(replaced, 1);
+            debug_assert_eq!(overflow, 0, "replacing equipment must free inventory capacity");
+        }
+        true
+    }
+
+    /// Moves equipped gear back into inventory when there is room.
+    pub fn unequip_to_inventory(
+        &mut self,
+        equipment: &mut Equipment,
+        slot: EquipmentSlot,
+    ) -> bool {
+        let Some(item) = equipment.item(slot) else {
+            return false;
+        };
+        if self.add(item, 1) != 0 {
+            return false;
+        }
+        let removed = equipment.unequip(slot);
+        debug_assert_eq!(removed, Some(item));
+        true
+    }
+
     /// Total quantity of an item across all stacks.
     #[must_use]
     pub fn count(&self, kind: ItemKind) -> u32 {
@@ -295,6 +328,39 @@ mod tests {
         assert_eq!(equipment.armor_bonus(), 8);
         assert_eq!(equipment.unequip(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
         assert_eq!(equipment.armor_bonus(), 0);
+    }
+
+    #[test]
+    fn equipping_moves_items_and_returns_replaced_gear() {
+        let mut inventory = Inventory::new(2);
+        let mut equipment = Equipment::default();
+        inventory.add(ItemKind::ExplorerVest, 1);
+        inventory.add(ItemKind::TrailBoots, 1);
+
+        assert!(inventory.equip_from_inventory(&mut equipment, ItemKind::ExplorerVest));
+        assert_eq!(inventory.count(ItemKind::ExplorerVest), 0);
+        assert_eq!(equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+
+        inventory.add(ItemKind::ExplorerVest, 1);
+        assert!(inventory.equip_from_inventory(&mut equipment, ItemKind::ExplorerVest));
+        assert_eq!(inventory.count(ItemKind::ExplorerVest), 1);
+        assert_eq!(equipment.item(EquipmentSlot::Body), Some(ItemKind::ExplorerVest));
+    }
+
+    #[test]
+    fn unequipping_requires_inventory_space() {
+        let mut inventory = Inventory::new(1);
+        let mut equipment = Equipment::default();
+        equipment.equip(ItemKind::TrailBoots);
+        inventory.add(ItemKind::Salvage, 99);
+
+        assert!(!inventory.unequip_to_inventory(&mut equipment, EquipmentSlot::Feet));
+        assert_eq!(equipment.item(EquipmentSlot::Feet), Some(ItemKind::TrailBoots));
+
+        inventory.remove(ItemKind::Salvage, 99);
+        assert!(inventory.unequip_to_inventory(&mut equipment, EquipmentSlot::Feet));
+        assert_eq!(equipment.item(EquipmentSlot::Feet), None);
+        assert_eq!(inventory.count(ItemKind::TrailBoots), 1);
     }
 
     #[test]
