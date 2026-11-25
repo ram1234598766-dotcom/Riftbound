@@ -14,6 +14,7 @@ pub struct VehicleAudioState {
     tyre_gain: f32,
     skid_gain: f32,
     surface_gain: f32,
+    impact_gain: f32,
 }
 
 /// Read-only audio parameters suitable for an audio backend or debug HUD.
@@ -29,6 +30,8 @@ pub struct VehicleAudioMix {
     pub skid_gain: f32,
     /// Terrain texture layer gain in the inclusive range 0..=1.
     pub surface_gain: f32,
+    /// Suspension impact layer gain in the inclusive range 0..=1.
+    pub impact_gain: f32,
 }
 
 impl VehicleAudioState {
@@ -42,9 +45,24 @@ impl VehicleAudioState {
         surface: VehicleSurface,
         delta_seconds: f32,
     ) -> VehicleAudioMix {
+        self.update_with_impact(speed, throttle, slip_ratios, surface, 0.0, delta_seconds)
+    }
+
+    /// Updates audio controls with a normalized suspension-impact signal.
+    /// Invalid inputs leave the previous state unchanged.
+    pub fn update_with_impact(
+        &mut self,
+        speed: f32,
+        throttle: f32,
+        slip_ratios: [f32; 4],
+        surface: VehicleSurface,
+        impact_intensity: f32,
+        delta_seconds: f32,
+    ) -> VehicleAudioMix {
         if !speed.is_finite()
             || !throttle.is_finite()
             || !delta_seconds.is_finite()
+            || !impact_intensity.is_finite()
             || slip_ratios.iter().any(|value| !value.is_finite())
             || delta_seconds <= 0.0
         {
@@ -68,6 +86,7 @@ impl VehicleAudioState {
             (speed_factor * tyre_factor * 0.48).clamp(0.0, 0.65),
             (max_slip * speed_factor * 0.78).clamp(0.0, 0.8),
             (surface_noise * speed_factor).clamp(0.0, 0.8),
+            impact_intensity.clamp(0.0, 1.0) * 0.72,
         ];
         let blend = (1.0 - (-delta_seconds.clamp(0.0, 0.1) * 12.0).exp()).clamp(0.0, 1.0);
         self.engine_frequency_hz = approach(self.engine_frequency_hz, targets[0], blend);
@@ -75,6 +94,8 @@ impl VehicleAudioState {
         self.tyre_gain = approach(self.tyre_gain, targets[2], blend);
         self.skid_gain = approach(self.skid_gain, targets[3], blend);
         self.surface_gain = approach(self.surface_gain, targets[4], blend);
+        let impact_blend = (1.0 - (-delta_seconds.clamp(0.0, 0.1) * 24.0).exp()).clamp(0.0, 1.0);
+        self.impact_gain = approach(self.impact_gain, targets[5], impact_blend);
         self.mix()
     }
 
@@ -87,6 +108,7 @@ impl VehicleAudioState {
             tyre_gain: self.tyre_gain,
             skid_gain: self.skid_gain,
             surface_gain: self.surface_gain,
+            impact_gain: self.impact_gain,
         }
     }
 }
@@ -109,6 +131,17 @@ mod tests {
         assert!(moving.tyre_gain > quiet.tyre_gain);
         assert!(moving.skid_gain > quiet.skid_gain);
         assert!(moving.surface_gain > quiet.surface_gain);
+    }
+
+    #[test]
+    fn suspension_impact_adds_a_smoothed_audio_layer() {
+        let mut audio = VehicleAudioState::default();
+        let quiet = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
+        let bump = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 1.0, 0.016);
+        assert!(bump.impact_gain > quiet.impact_gain);
+        assert!((0.0..=1.0).contains(&bump.impact_gain));
+        let settling = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
+        assert!(settling.impact_gain < bump.impact_gain);
     }
 
     #[test]
