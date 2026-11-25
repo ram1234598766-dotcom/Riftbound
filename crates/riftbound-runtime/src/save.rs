@@ -11,7 +11,6 @@ use riftbound_core::{
 const LEGACY_SAVE_FILE: &str = "riftbound-save-v1.txt";
 const HEADER: &str = "RIFTBOUND_SAVE_V1";
 
-
 /// A separate local campaign profile.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SaveSlot {
