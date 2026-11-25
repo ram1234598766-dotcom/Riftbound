@@ -52,6 +52,10 @@ fn wheel_rotation_delta(speed: f32, delta: f32, radius: f32) -> f32 {
 
 const MAX_VEHICLE_STEP: f32 = 1.0 / 30.0;
 
+fn clear_held_controls_on_focus_loss(input: &mut InputState) {
+    *input = InputState::default();
+}
+
 fn bounded_simulation_delta(delta: f32) -> f32 {
     if delta.is_finite() {
         delta.clamp(0.0, MAX_VEHICLE_STEP)
@@ -451,7 +455,7 @@ impl ApplicationHandler for RiftboundApp {
             WindowEvent::Focused(false) => {
                 // A lost focus can prevent key-release events from reaching the window.
                 // Clear held controls so movement and vehicle throttle cannot stick.
-                self.input = InputState::default();
+                clear_held_controls_on_focus_loss(&mut self.input);
                 window.request_redraw();
             }
             WindowEvent::Resized(size) => {
@@ -2435,6 +2439,20 @@ mod world_prop_tests {
             world_prop_variant_for_surface(VehicleSurface::Asphalt, 2),
             2
         );
+    }
+
+    #[test]
+    fn losing_window_focus_clears_held_movement_controls() {
+        let mut input = InputState::default();
+        input.set_button(Button::MoveForward, true);
+        input.set_button(Button::MoveLeft, true);
+
+        clear_held_controls_on_focus_loss(&mut input);
+
+        assert!(!input.is_held(Button::MoveForward));
+        assert!(!input.is_held(Button::MoveLeft));
+        assert!(!input.is_held(Button::MoveBackward));
+        assert!(!input.is_held(Button::MoveRight));
     }
 
     #[test]
