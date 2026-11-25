@@ -1054,6 +1054,20 @@ fn spawn_character_part(
     id
 }
 
+fn spawn_attached_character_detail(
+    scene: &mut Scene,
+    parent: EntityId,
+    transform: Transform3,
+    material: MaterialId,
+) -> EntityId {
+    let id = scene
+        .spawn(transform)
+        .expect("character detail entity ID space available");
+    assert!(scene.set_parent(id, Some(parent)));
+    assert!(scene.set_material(id, material));
+    id
+}
+
 fn build_player_character(scene: &mut Scene, player: EntityId) -> CharacterParts {
     // Hide the original root cube; the visible explorer is assembled from parented parts.
     if let Some(root) = scene.get_mut(player) {
@@ -1072,6 +1086,8 @@ fn build_player_character(scene: &mut Scene, player: EntityId) -> CharacterParts
         character_part_transform(0.0, 1.15, 0.0, 0.0, 0.0, 0.0, 0.38, 0.38, 0.38),
         MaterialId::DEFAULT,
     );
+    assert!(scene.set_mesh(head, MeshId::CRYSTAL));
+
     let left_arm = spawn_character_part(
         scene,
         player,
@@ -1096,18 +1112,75 @@ fn build_player_character(scene: &mut Scene, player: EntityId) -> CharacterParts
         character_part_transform(0.19, -0.32, 0.0, 0.0, 0.0, 0.0, 0.22, 0.62, 0.26),
         MaterialId::AMBER,
     );
-    let _backpack = spawn_character_part(
+
+    // Chest plate, collar and shoulder shells follow the animated torso.
+    spawn_attached_character_detail(
         scene,
-        player,
-        character_part_transform(0.0, 0.48, 0.30, 0.0, 0.0, 0.0, 0.34, 0.48, 0.18),
+        torso,
+        character_part_transform(0.0, 0.06, -0.88, 0.0, 0.0, 0.0, 0.78, 0.62, 0.20),
+        MaterialId::DEFAULT,
+    );
+    spawn_attached_character_detail(
+        scene,
+        torso,
+        character_part_transform(0.0, 0.48, -0.10, 0.0, 0.0, 0.0, 0.44, 0.18, 0.42),
         MaterialId::AMBER,
     );
-    let _visor = spawn_character_part(
+    for x in [-0.78, 0.78] {
+        spawn_attached_character_detail(
+            scene,
+            torso,
+            character_part_transform(x, 0.34, 0.0, 0.0, 0.0, 0.0, 0.38, 0.34, 0.42),
+            MaterialId::AMBER,
+        );
+    }
+
+    // A compact field pack and its cyan power cell sit behind the torso.
+    spawn_attached_character_detail(
         scene,
-        player,
-        character_part_transform(0.0, 1.18, -0.17, 0.0, 0.0, 0.0, 0.27, 0.12, 0.08),
+        torso,
+        character_part_transform(0.0, 0.0, 0.92, 0.0, 0.0, 0.0, 0.58, 0.70, 0.36),
+        MaterialId::AMBER,
+    );
+    spawn_attached_character_detail(
+        scene,
+        torso,
+        character_part_transform(0.0, 0.0, 1.28, 0.0, 0.0, 0.0, 0.28, 0.42, 0.12),
         MaterialId::RIFT,
     );
+
+    // The visor is parented to the helmet so it remains aligned during motion.
+    spawn_attached_character_detail(
+        scene,
+        head,
+        character_part_transform(0.0, -0.05, -0.82, 0.0, 0.0, 0.0, 0.68, 0.22, 0.16),
+        MaterialId::RIFT,
+    );
+
+    // Gloves and reinforced boots follow the corresponding animated limbs.
+    for arm in [left_arm, right_arm] {
+        spawn_attached_character_detail(
+            scene,
+            arm,
+            character_part_transform(0.0, -0.82, 0.0, 0.0, 0.0, 0.0, 1.24, 0.34, 1.20),
+            MaterialId::AMBER,
+        );
+    }
+    for leg in [left_leg, right_leg] {
+        spawn_attached_character_detail(
+            scene,
+            leg,
+            character_part_transform(0.0, -0.92, -0.10, 0.0, 0.0, 0.0, 1.42, 0.40, 1.62),
+            MaterialId::DEFAULT,
+        );
+        spawn_attached_character_detail(
+            scene,
+            leg,
+            character_part_transform(0.0, 0.02, -0.12, 0.0, 0.0, 0.0, 1.18, 0.22, 1.18),
+            MaterialId::RIFT,
+        );
+    }
+
     CharacterParts {
         torso,
         head,
