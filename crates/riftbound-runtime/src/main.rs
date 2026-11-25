@@ -25,6 +25,12 @@ use winit::{
 };
 
 const PLAYER_RADIUS: f32 = 0.19;
+const VEHICLE_WHEEL_OFFSETS: [(f32, f32); 4] = [
+    (-0.78, -1.32),
+    (0.78, -1.32),
+    (-0.78, 1.32),
+    (0.78, 1.32),
+];
 const PICKUP_POSITIONS: [Vec3; 5] = [
     Vec3::new(-5.0, 0.65, -4.0),
     Vec3::new(5.0, 0.65, -4.0),
@@ -781,7 +787,7 @@ impl ApplicationHandler for RiftboundApp {
                                 let steer = if front { steering * 0.35 } else { 0.0 };
                                 let local_y =
                                     ground_heights[index] + 0.34 - self.vehicle_state.position.y;
-                                let (local_x, local_z) = wheel_offsets[index];
+                                let (local_x, local_z) = VEHICLE_WHEEL_OFFSETS[index];
                                 self.animated_transforms.push((
                                     *wheel,
                                     Transform3::new(
@@ -2146,12 +2152,7 @@ fn world_prop_variant_for_surface(surface: VehicleSurface, variant: u32) -> u32 
 
 /// Samples terrain elevation beneath the vehicle's four suspension contact points.
 fn vehicle_wheel_ground_heights(position: Vec3, heading: f32) -> [f32; 4] {
-    let wheel_offsets = [
-        (-0.78_f32, -1.32_f32),
-        (0.78, -1.32),
-        (-0.78, 1.32),
-        (0.78, 1.32),
-    ];
+    let wheel_offsets = &VEHICLE_WHEEL_OFFSETS;
     let (sin_heading, cos_heading) = heading.sin_cos();
     let mut ground_heights = [0.0_f32; 4];
     for (index, (local_x, local_z)) in wheel_offsets.iter().enumerate() {
