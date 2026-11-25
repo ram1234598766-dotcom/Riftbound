@@ -685,16 +685,18 @@ impl ApplicationHandler for RiftboundApp {
                         );
                         self.animated_transforms.push((*entity, animated));
                     }
-                    for (index, (entity, base, _kind)) in self.loot_entities.iter().enumerate() {
+                    for ((entity, base, _kind), phase_offset) in
+                        self.loot_entities.iter().zip([0.0_f32, 1.7, 3.4])
+                    {
                         if renderer.scene().get(*entity).is_none() {
                             continue;
                         }
-                        let phase = self.animation_time * 1.8 + index as f32 * 1.7;
+                        let phase = self.animation_time * 1.8 + phase_offset;
                         self.animated_transforms.push((
                             *entity,
                             Transform3::new(
                                 Vec3::new(base.x, base.y + phase.sin() * 0.09, base.z),
-                                Vec3::new(0.0, self.animation_time * 0.8 + index as f32, 0.0),
+                                Vec3::new(0.0, self.animation_time * 0.8 + phase_offset, 0.0),
                                 Vec3::new(0.22, 0.28, 0.22),
                             ),
                         ));
@@ -945,10 +947,14 @@ impl ApplicationHandler for RiftboundApp {
                                 }
                             }
                             let interact_pressed = self.input.was_pressed(Button::Interact);
-                            let nearby_loot = self.loot_entities.iter().position(|(entity, position, _)| {
-                                renderer.scene().get(*entity).is_some()
-                                    && distance_squared(transform.translation, *position) <= 1.8 * 1.8
-                            });
+                            let nearby_loot = self
+                                .loot_entities
+                                .iter()
+                                .position(|(entity, position, _)| {
+                                    renderer.scene().get(*entity).is_some()
+                                        && distance_squared(transform.translation, *position)
+                                            <= 1.8 * 1.8
+                                });
                             if interact_pressed {
                                 if let Some(index) = nearby_loot {
                                     let (entity, _position, kind) = self.loot_entities[index];
@@ -1499,9 +1505,18 @@ fn build_pickups(scene: &mut Scene) -> (PickupTracker, Vec<EntityId>) {
 
 fn build_loot_pickups(scene: &mut Scene) -> Vec<(EntityId, Vec3, ItemKind)> {
     let pickups = [
-        (Vec3::new(-7.0, terrain_height(-7.0, -2.0) + 0.32, -2.0), ItemKind::Salvage),
-        (Vec3::new(7.0, terrain_height(7.0, -2.0) + 0.32, -2.0), ItemKind::Medkit),
-        (Vec3::new(0.0, terrain_height(0.0, 8.0) + 0.32, 8.0), ItemKind::Salvage),
+        (
+            Vec3::new(-7.0, terrain_height(-7.0, -2.0) + 0.32, -2.0),
+            ItemKind::Salvage,
+        ),
+        (
+            Vec3::new(7.0, terrain_height(7.0, -2.0) + 0.32, -2.0),
+            ItemKind::Medkit,
+        ),
+        (
+            Vec3::new(0.0, terrain_height(0.0, 8.0) + 0.32, 8.0),
+            ItemKind::Salvage,
+        ),
     ];
     pickups
         .into_iter()
@@ -1519,10 +1534,12 @@ fn build_loot_pickups(scene: &mut Scene) -> Vec<(EntityId, Vec3, ItemKind)> {
             let entity = scene
                 .spawn_with_mesh(transform, mesh)
                 .expect("world loot entity ID space available");
-            scene.set_material(
-                entity,
-                if kind == ItemKind::Medkit { MaterialId::AMBER } else { MaterialId::RIFT },
-            );
+            let material = if kind == ItemKind::Medkit {
+                MaterialId::AMBER
+            } else {
+                MaterialId::RIFT
+            };
+            scene.set_material(entity, material);
             (entity, position, kind)
         })
         .collect()
