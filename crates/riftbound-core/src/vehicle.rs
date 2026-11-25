@@ -495,6 +495,8 @@ pub struct VehicleState {
     pub heading: f32,
     /// Signed forward speed in world units per second.
     pub speed: f32,
+    /// Persistent rotational speed and slip for each wheel corner.
+    pub wheel_slip: WheelSlipState,
 }
 
 impl VehicleState {
@@ -541,10 +543,20 @@ impl VehicleState {
             half_wheelbase,
         );
         next_surface_tracker.update_wheel_contacts(dominant_surface, wheel_surfaces);
+        let wheel_traction = next_surface_tracker.wheel_traction();
+        next_vehicle.wheel_slip.update(
+            input,
+            next_vehicle.speed,
+            0.34,
+            wheel_traction,
+            delta_seconds,
+        );
+        let slip = next_vehicle.wheel_slip.slip_ratios();
+        let traction_with_slip = wheel_traction.map(|grip| grip * (1.0 - 0.35 * slip[0].abs()).clamp(0.55, 1.0));
         next_vehicle.update_with_four_wheel_surface_response(
             input,
             next_surface_tracker.response(),
-            next_surface_tracker.wheel_traction(),
+            traction_with_slip,
             config,
             delta_seconds,
         );
@@ -1032,6 +1044,24 @@ mod tests {
             1.0 / 60.0,
         );
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn world_vehicle_update_persists_wheel_spin_and_reduces_slipping_grip() {
+        let mut vehicle = VehicleState::default();
+        let mut suspension = SuspensionState::default();
+        let mut tracker = VehicleSurfaceTracker::default();
+        vehicle.update_on_world_terrain(
+            VehicleInput { throttle: 1.0, ..VehicleInput::default() },
+            VehicleConfig::default(),
+            &mut suspension,
+            SuspensionConfig::default(),
+            &mut tracker,
+            1.0 / 60.0,
+        ).expect("origin is within terrain bounds");
+        let spin = vehicle.wheel_slip.angular_velocities();
+        assert!(spin.iter().all(|speed| speed.is_finite() && *speed > 0.0));
+        assert!(vehicle.wheel_slip.slip_ratios().iter().all(|slip| slip.is_finite() && (-1.0..=1.0).contains(slip)));
     }
 
     #[test]
