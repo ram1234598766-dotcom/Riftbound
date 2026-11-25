@@ -397,7 +397,10 @@ async fn handle_client_message(
                 return false;
             }
             let now = Instant::now();
-            let elapsed = now.duration_since(*last_input_at).as_secs_f32().min(MAX_INPUT_DELTA);
+            let elapsed = now
+                .duration_since(*last_input_at)
+                .as_secs_f32()
+                .min(MAX_INPUT_DELTA);
             if elapsed < MIN_MOVE_INTERVAL.as_secs_f32() {
                 return false;
             }
@@ -599,10 +602,7 @@ fn circle_hits_world_obstacle(x: f32, y: f32, radius: f32) -> bool {
 }
 
 fn is_valid_move_input(dx: f32, dy: f32, face: f32) -> bool {
-    dx.is_finite()
-        && dy.is_finite()
-        && face.is_finite()
-        && dx.hypot(dy) <= 1.01
+    dx.is_finite() && dy.is_finite() && face.is_finite() && dx.hypot(dy) <= 1.01
 }
 
 fn can_accept_player(current_players: usize) -> bool {
@@ -659,7 +659,11 @@ mod tests {
         assert!(circle_hits_world_obstacle(630.0, 400.0, VEHICLE_RADIUS));
         assert!(!circle_hits_world_obstacle(600.0, 400.0, VEHICLE_RADIUS));
         assert!(circle_hits_world_obstacle(60.0, 750.0, VEHICLE_RADIUS));
-        assert!(circle_hits_world_obstacle(WORLD_WIDTH - 60.0, 750.0, VEHICLE_RADIUS));
+        assert!(circle_hits_world_obstacle(
+            WORLD_WIDTH - 60.0,
+            750.0,
+            VEHICLE_RADIUS
+        ));
     }
 
     #[test]
