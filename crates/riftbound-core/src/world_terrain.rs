@@ -218,11 +218,22 @@ pub fn world_terrain_vehicle_surfaces(
         (-half_track, half_wheelbase),
         (half_track, half_wheelbase),
     ];
-    offsets.map(|(local_x, local_z)| {
+    let mut surfaces = [VehicleSurface::Rock; 4];
+    for (index, (local_x, local_z)) in offsets.into_iter().enumerate() {
         let contact_x = world_x + cos_heading * local_x + sin_heading * local_z;
         let contact_z = world_z - sin_heading * local_x + cos_heading * local_z;
-        world_terrain_sample(contact_x, contact_z).surface
-    })
+        // Keep the four-corner sample atomic: never mix valid biome contacts
+        // with fallback rock when one wheel leaves the supported world range.
+        if !contact_x.is_finite()
+            || !contact_z.is_finite()
+            || contact_x.abs() > 1_000_000.0
+            || contact_z.abs() > 1_000_000.0
+        {
+            return [VehicleSurface::Rock; 4];
+        }
+        surfaces[index] = world_terrain_sample(contact_x, contact_z).surface;
+    }
+    surfaces
 }
 
 /// Samples the dominant world surface beneath all four tyre contact points.
@@ -552,6 +563,12 @@ mod tests {
             ),
             VehicleSurface::Gravel
         );
+    }
+
+    #[test]
+    fn wheel_surface_sampling_falls_back_atomically_at_world_precision_edge() {
+        let surfaces = world_terrain_vehicle_surfaces(999_999.5, 0.0, 0.0, 1.0, 1.0);
+        assert_eq!(surfaces, [VehicleSurface::Rock; 4]);
     }
 
     #[test]
