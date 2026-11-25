@@ -93,6 +93,18 @@ pub struct VehicleUpgrades {
 }
 
 impl VehicleUpgrades {
+    /// Restores validated upgrade tiers from a save file.
+    ///
+    /// Returns None when either tier exceeds the supported maximum.
+    #[must_use]
+    pub const fn from_levels(engine_level: u8, handling_level: u8) -> Option<Self> {
+        if engine_level > Self::MAX_ENGINE_LEVEL || handling_level > Self::MAX_ENGINE_LEVEL {
+            None
+        } else {
+            Some(Self { engine_level, handling_level })
+        }
+    }
+
     /// Maximum engine tuning tier.
     pub const MAX_ENGINE_LEVEL: u8 = 3;
     /// Salvage required for each successive engine tier.
