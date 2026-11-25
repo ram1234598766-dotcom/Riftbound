@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn profile_round_trip_preserves_inventory_equipment_xp_and_upgrades() {
-        let profile = SavedProfile {
+        let mut profile = SavedProfile {
             upgrades: VehicleUpgrades::from_levels(2, 3).unwrap(),
             ..SavedProfile::default()
         };
