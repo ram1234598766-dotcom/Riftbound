@@ -732,8 +732,10 @@ impl ApplicationHandler for RiftboundApp {
                             .update_wheel_contacts(sampled_surface, wheel_surfaces);
                         let (traction, speed_multiplier, rolling_resistance) =
                             self.vehicle_surface_tracker.response();
+                        let (left_traction, right_traction) =
+                            self.vehicle_surface_tracker.side_traction();
                         let vehicle_previous_position = self.vehicle_state.position;
-                        self.vehicle_state.update_with_surface_response(
+                        self.vehicle_state.update_with_wheel_surface_response(
                             VehicleInput {
                                 throttle,
                                 brake: if self.input.is_held(Button::Jump) {
@@ -746,6 +748,8 @@ impl ApplicationHandler for RiftboundApp {
                             traction,
                             speed_multiplier,
                             rolling_resistance,
+                            left_traction,
+                            right_traction,
                             self.vehicle_upgrades.apply_to(VehicleConfig::default()),
                             delta,
                         );
