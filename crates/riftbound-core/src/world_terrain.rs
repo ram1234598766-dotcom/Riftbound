@@ -386,9 +386,8 @@ fn lerp(start: f32, end: f32, amount: f32) -> f32 {
 mod tests {
     use super::{
         WorldTerrainSample, procedural_ground_height, value_noise, vehicle_contact_positions,
-        world_road_sample,
-        world_terrain_sample, world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
-        world_terrain_vehicle_surfaces,
+        world_road_sample, world_terrain_sample, world_terrain_vehicle_ground_heights,
+        world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
     };
     use crate::VehicleSurface;
 
