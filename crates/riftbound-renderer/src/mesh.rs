@@ -457,7 +457,102 @@ fn vehicle_body_data() -> (Vec<MeshVertex>, Vec<u16>) {
             color,
         );
     }
+
+    // Reinforced wheel arches sit just inside the tire sidewalls. Each arch is
+    // one joined low-poly strip, keeping the vehicle at its existing draw count.
+    for x in [-0.96, 0.96] {
+        for center_z in [-0.95, 0.95] {
+            append_vehicle_wheel_arch(
+                &mut vertices,
+                &mut indices,
+                x,
+                center_z,
+                -0.28,
+                0.62,
+                0.48,
+                8,
+            );
+        }
+    }
+
+    // Low-profile skid plate and longitudinal protection rails.
+    append_environment_part(
+        &mut vertices,
+        &mut indices,
+        cube_data(),
+        [1.42, 0.10, 2.52],
+        [0.0, -0.30, 0.0],
+        [0.12, 0.16, 0.20],
+    );
+    for x in [-0.78, 0.78] {
+        append_environment_part(
+            &mut vertices,
+            &mut indices,
+            cube_data(),
+            [0.12, 0.12, 2.78],
+            [x, -0.24, 0.0],
+            [0.28, 0.32, 0.36],
+        );
+    }
+
     (vertices, indices)
+}
+
+fn append_vehicle_wheel_arch(
+    vertices: &mut Vec<MeshVertex>,
+    indices: &mut Vec<u16>,
+    x: f32,
+    center_z: f32,
+    center_y: f32,
+    outer_radius: f32,
+    inner_radius: f32,
+    segments: u16,
+) {
+    let base = u16::try_from(vertices.len()).expect("vehicle arch vertex offset fits u16");
+    let side_offset = if x.is_sign_negative() { -0.035 } else { 0.035 };
+    let arch_color = [0.16, 0.22, 0.28];
+
+    for side in [x - side_offset, x + side_offset] {
+        for segment in 0..=segments {
+            let angle = std::f32::consts::PI * f32::from(segment) / f32::from(segments);
+            let sin = angle.sin();
+            let cos = angle.cos();
+            for radius in [outer_radius, inner_radius] {
+                vertices.push(MeshVertex {
+                    position: [side, center_y + radius * sin, center_z + radius * cos],
+                    color: arch_color,
+                });
+            }
+        }
+    }
+
+    let row = u16::from(segments + 1) * 2;
+    for side in 0..2 {
+        let side_base = base + u16::from(side) * row;
+        for segment in 0..segments {
+            let start = side_base + segment * 2;
+            indices.extend_from_slice(&[
+                start,
+                start + 1,
+                start + 2,
+                start + 1,
+                start + 3,
+                start + 2,
+            ]);
+        }
+    }
+    for segment in 0..segments {
+        let start = base + segment * 2;
+        let far = base + row + segment * 2;
+        indices.extend_from_slice(&[
+            start,
+            far,
+            start + 2,
+            start + 2,
+            far,
+            far + 2,
+        ]);
+    }
 }
 
 fn append_wheel_ring(
