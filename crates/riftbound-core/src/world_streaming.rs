@@ -579,23 +579,22 @@ mod tests {
             })
             .expect("valid terrain chunk")
         };
-        let compare_edges = |a: &WorldTerrainMeshData,
-                             b: &WorldTerrainMeshData,
-                             direction: (i32, i32)| {
-            let side = a.resolution;
-            assert_eq!(side, b.resolution);
-            for offset in 0..side {
-                let (a_index, b_index) = match direction {
-                    (1, 0) => (offset * side + side - 1, offset * side),
-                    (-1, 0) => (offset * side, offset * side + side - 1),
-                    (0, 1) => ((side - 1) * side + offset, offset),
-                    (0, -1) => (offset, (side - 1) * side + offset),
-                    _ => unreachable!("cardinal direction only"),
-                };
-                assert_eq!(a.vertices[a_index].position, b.vertices[b_index].position);
-                assert_eq!(a.vertices[a_index].normal, b.vertices[b_index].normal);
-            }
-        };
+        let compare_edges =
+            |a: &WorldTerrainMeshData, b: &WorldTerrainMeshData, direction: (i32, i32)| {
+                let side = a.resolution;
+                assert_eq!(side, b.resolution);
+                for offset in 0..side {
+                    let (a_index, b_index) = match direction {
+                        (1, 0) => (offset * side + side - 1, offset * side),
+                        (-1, 0) => (offset * side, offset * side + side - 1),
+                        (0, 1) => ((side - 1) * side + offset, offset),
+                        (0, -1) => (offset, (side - 1) * side + offset),
+                        _ => unreachable!("cardinal direction only"),
+                    };
+                    assert_eq!(a.vertices[a_index].position, b.vertices[b_index].position);
+                    assert_eq!(a.vertices[a_index].normal, b.vertices[b_index].normal);
+                }
+            };
 
         for lod in [WorldChunkLod::Detailed, WorldChunkLod::Distant] {
             let center = make(-2, 3, lod);
