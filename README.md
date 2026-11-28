@@ -39,15 +39,15 @@ See [the engine architecture](./docs/ENGINE_ARCHITECTURE.md) for module boundari
 
 ## Development checks
 
-Install a current stable Rust toolchain, then run:
+Install the stable Rust toolchain with the `rustfmt` and `clippy` components. Run the same Rust gates used by CI:
 
 ```sh
-cargo test --workspace
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings -A clippy::pedantic
+cargo test --workspace
 ```
 
-GitHub Actions runs these checks on pushes and pull requests.
+The CI workflow also extracts the browser script from `index.html` and validates it with `node --check`. Keep formatting, lint, browser syntax, and workspace tests green before merging.
 
 ## Roadmap
 

@@ -410,7 +410,6 @@ impl WorldChunkStreamer {
     }
 }
 
-
 /// One CPU-generated terrain vertex in absolute world coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorldTerrainVertex {
@@ -484,13 +483,21 @@ pub fn build_world_chunk_mesh(request: WorldChunkRequest) -> Option<WorldTerrain
             let bottom_left = top_left + u32::try_from(resolution).ok()?;
             let bottom_right = bottom_left + 1;
             indices.extend_from_slice(&[
-                top_left, bottom_left, top_right,
-                top_right, bottom_left, bottom_right,
+                top_left,
+                bottom_left,
+                top_right,
+                top_right,
+                bottom_left,
+                bottom_right,
             ]);
         }
     }
 
-    Some(WorldTerrainMeshData { resolution, vertices, indices })
+    Some(WorldTerrainMeshData {
+        resolution,
+        vertices,
+        indices,
+    })
 }
 
 #[cfg(test)]
@@ -510,7 +517,10 @@ mod tests {
         assert!(mesh.vertices.iter().all(|vertex| {
             vertex.position.iter().all(|value| value.is_finite())
                 && vertex.normal.iter().all(|value| value.is_finite())
-                && (vertex.normal[0].powi(2) + vertex.normal[1].powi(2) + vertex.normal[2].powi(2) - 1.0).abs() < 1.0e-4
+                && (vertex.normal[0].powi(2) + vertex.normal[1].powi(2) + vertex.normal[2].powi(2)
+                    - 1.0)
+                    .abs()
+                    < 1.0e-4
                 && vertex.normal[1] > 0.0
         }));
     }
@@ -521,12 +531,14 @@ mod tests {
             coord: WorldChunkCoord { x: 2, z: -3 },
             lod: WorldChunkLod::Detailed,
             distance_squared: 0,
-        }).expect("left chunk");
+        })
+        .expect("left chunk");
         let right = build_world_chunk_mesh(WorldChunkRequest {
             coord: WorldChunkCoord { x: 3, z: -3 },
             lod: WorldChunkLod::Detailed,
             distance_squared: 1,
-        }).expect("right chunk");
+        })
+        .expect("right chunk");
         for row in 0..left.resolution {
             let a = left.vertices[row * left.resolution + left.resolution - 1];
             let b = right.vertices[row * right.resolution];
@@ -541,12 +553,14 @@ mod tests {
             coord: WorldChunkCoord { x: 0, z: 0 },
             lod: WorldChunkLod::Detailed,
             distance_squared: 0,
-        }).expect("detailed chunk");
+        })
+        .expect("detailed chunk");
         let distant = build_world_chunk_mesh(WorldChunkRequest {
             coord: WorldChunkCoord { x: 1, z: 0 },
             lod: WorldChunkLod::Distant,
             distance_squared: 1,
-        }).expect("distant chunk");
+        })
+        .expect("distant chunk");
         for row in 0..distant.resolution {
             let a = detailed.vertices[(row * 2) * detailed.resolution + 8];
             let b = distant.vertices[row * distant.resolution];
@@ -555,6 +569,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn all_cardinal_chunk_edges_share_positions_and_normals_at_both_lods() {
+        let make = |x, z, lod| {
+            build_world_chunk_mesh(WorldChunkRequest {
+                coord: WorldChunkCoord { x, z },
+                lod,
+                distance_squared: 0,
+            })
+            .expect("valid terrain chunk")
+        };
+        let compare_edges =
+            |a: &WorldTerrainMeshData, b: &WorldTerrainMeshData, direction: (i32, i32)| {
+                let side = a.resolution;
+                assert_eq!(side, b.resolution);
+                for offset in 0..side {
+                    let (a_index, b_index) = match direction {
+                        (1, 0) => (offset * side + side - 1, offset * side),
+                        (-1, 0) => (offset * side, offset * side + side - 1),
+                        (0, 1) => ((side - 1) * side + offset, offset),
+                        (0, -1) => (offset, (side - 1) * side + offset),
+                        _ => unreachable!("cardinal direction only"),
+                    };
+                    assert_eq!(a.vertices[a_index].position, b.vertices[b_index].position);
+                    assert_eq!(a.vertices[a_index].normal, b.vertices[b_index].normal);
+                }
+            };
+
+        for lod in [WorldChunkLod::Detailed, WorldChunkLod::Distant] {
+            let center = make(-2, 3, lod);
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let neighbor = make(-2 + dx, 3 + dz, lod);
+                compare_edges(&center, &neighbor, (dx, dz));
+            }
+        }
+    }
 
     #[test]
     fn standard_window_is_bounded_and_uses_two_detail_tiers() {
@@ -826,7 +875,10 @@ mod tests {
         assert!(!slots.apply_changes(&oversized));
         assert_eq!(slots.occupied(), 1);
         assert_eq!(
-            slots.slot_for(original.coord).expect("original slot is retained").request,
+            slots
+                .slot_for(original.coord)
+                .expect("original slot is retained")
+                .request,
             original
         );
         assert!(slots.slot_for(replacement.coord).is_none());

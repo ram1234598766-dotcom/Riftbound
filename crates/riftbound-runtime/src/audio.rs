@@ -10,8 +10,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use rodio::{OutputStream, Sink, Source};
 use riftbound_core::VehicleAudioMix;
+use rodio::{OutputStream, Sink, Source};
 
 const SAMPLE_RATE: u32 = 44_100;
 const CONTROL_COUNT: usize = 6;
@@ -19,21 +19,25 @@ const CONTROL_COUNT: usize = 6;
 /// Owns the native output stream and a continuously generated vehicle sound.
 pub struct VehicleAudioOutput {
     _stream: OutputStream,
-    sink: Sink,
+    _sink: Sink,
     controls: Arc<[AtomicU32; CONTROL_COUNT]>,
 }
 
 impl VehicleAudioOutput {
     /// Opens the default output device and starts a quiet vehicle sound source.
     pub fn new() -> Result<Self, String> {
-        let (stream, stream_handle) =
-            OutputStream::try_default().map_err(|error| format!("audio output unavailable: {error}"))?;
+        let (stream, stream_handle) = OutputStream::try_default()
+            .map_err(|error| format!("audio output unavailable: {error}"))?;
         let sink = Sink::try_new(&stream_handle)
             .map_err(|error| format!("audio sink unavailable: {error}"))?;
         let controls = Arc::new(std::array::from_fn(|_| AtomicU32::new(0.0_f32.to_bits())));
         sink.append(VehicleSource::new(Arc::clone(&controls)));
         sink.play();
-        Ok(Self { _stream: stream, sink, controls })
+        Ok(Self {
+            _stream: stream,
+            _sink: sink,
+            controls,
+        })
     }
 
     /// Publishes the latest smoothed simulation mix without blocking playback.
@@ -47,15 +51,13 @@ impl VehicleAudioOutput {
             mix.impact_gain,
         ];
         for (control, value) in self.controls.iter().zip(values) {
-            let safe = if value.is_finite() { value.clamp(0.0, 1_000.0) } else { 0.0 };
+            let safe = if value.is_finite() {
+                value.clamp(0.0, 1_000.0)
+            } else {
+                0.0
+            };
             control.store(safe.to_bits(), Ordering::Relaxed);
         }
-    }
-
-    /// Returns whether the audio sink is still active.
-    #[must_use]
-    pub fn is_playing(&self) -> bool {
-        !self.sink.empty()
     }
 }
 
@@ -69,7 +71,13 @@ struct VehicleSource {
 
 impl VehicleSource {
     fn new(controls: Arc<[AtomicU32; CONTROL_COUNT]>) -> Self {
-        Self { controls, phase: 0.0, texture_phase: 0.0, frame_sample: 0.0, right_channel: false }
+        Self {
+            controls,
+            phase: 0.0,
+            texture_phase: 0.0,
+            frame_sample: 0.0,
+            right_channel: false,
+        }
     }
 
     fn control(&self, index: usize) -> f32 {
@@ -84,15 +92,16 @@ impl VehicleSource {
         let surface_gain = self.control(4).clamp(0.0, 1.0);
         let impact_gain = self.control(5).clamp(0.0, 1.0);
 
-        let engine = (self.phase.sin() + 0.32 * (self.phase * 2.0).sin()
-            + 0.12 * (self.phase * 3.0).sin()) * engine_gain;
-        let rolling = (self.texture_phase.sin() * 0.55
-            + (self.texture_phase * 2.71).sin() * 0.25) * tyre_gain;
+        let engine =
+            (self.phase.sin() + 0.32 * (self.phase * 2.0).sin() + 0.12 * (self.phase * 3.0).sin())
+                * engine_gain;
+        let rolling = (self.texture_phase.sin() * 0.55 + (self.texture_phase * 2.71).sin() * 0.25)
+            * tyre_gain;
         let skid = (self.texture_phase * 7.3).sin() * skid_gain;
-        let surface = ((self.texture_phase * 3.9).sin()
-            + (self.texture_phase * 11.1).sin() * 0.35) * surface_gain;
-        let impact = ((self.texture_phase * 19.0).sin()
-            + (self.texture_phase * 31.0).sin() * 0.35) * impact_gain;
+        let surface = ((self.texture_phase * 3.9).sin() + (self.texture_phase * 11.1).sin() * 0.35)
+            * surface_gain;
+        let impact = ((self.texture_phase * 19.0).sin() + (self.texture_phase * 31.0).sin() * 0.35)
+            * impact_gain;
 
         self.phase = (self.phase + std::f32::consts::TAU * frequency / SAMPLE_RATE as f32)
             .rem_euclid(std::f32::consts::TAU);
@@ -118,8 +127,16 @@ impl Iterator for VehicleSource {
 }
 
 impl Source for VehicleSource {
-    fn current_frame_len(&self) -> Option<usize> { None }
-    fn channels(&self) -> u16 { 2 }
-    fn sample_rate(&self) -> u32 { SAMPLE_RATE }
-    fn total_duration(&self) -> Option<Duration> { None }
+    fn current_frame_len(&self) -> Option<usize> {
+        None
+    }
+    fn channels(&self) -> u16 {
+        2
+    }
+    fn sample_rate(&self) -> u32 {
+        SAMPLE_RATE
+    }
+    fn total_duration(&self) -> Option<Duration> {
+        None
+    }
 }

@@ -100,8 +100,12 @@ impl CollisionWorld {
     /// Callers use this to keep streamed-world collision bounded to active chunks.
     pub fn replace_obstacles(&mut self, obstacles: &[Aabb2]) {
         self.obstacles.clear();
-        self.obstacles
-            .extend(obstacles.iter().copied().filter(|obstacle| obstacle.is_valid()));
+        self.obstacles.extend(
+            obstacles
+                .iter()
+                .copied()
+                .filter(|obstacle| obstacle.is_valid()),
+        );
     }
 
     /// Moves a character, resolving X and Z independently to allow wall sliding.
@@ -475,11 +479,8 @@ mod tests {
         ]);
 
         assert_eq!(collision.obstacles(), &[Aabb2::new(-1.0, 1.0, -1.0, 1.0)]);
-        let result = collision.move_character(
-            Vec3::new(-2.0, 0.0, 0.0),
-            Vec3::new(2.0, 0.0, 0.0),
-            0.25,
-        );
+        let result =
+            collision.move_character(Vec3::new(-2.0, 0.0, 0.0), Vec3::new(2.0, 0.0, 0.0), 0.25);
         assert!(result.blocked_x);
         assert!(result.position.x <= -1.25);
     }

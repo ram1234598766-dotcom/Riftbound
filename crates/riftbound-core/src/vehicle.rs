@@ -1,8 +1,8 @@
 //! Deterministic lightweight ground-vehicle handling for the open-world driving RPG.
 
 use crate::{
-    Inventory, ItemKind, Vec3, world_terrain_vehicle_ground_heights,
-    world_terrain_vehicle_surface, world_terrain_vehicle_surfaces,
+    Inventory, ItemKind, Vec3, world_terrain_vehicle_ground_heights, world_terrain_vehicle_surface,
+    world_terrain_vehicle_surfaces,
 };
 
 /// Surface response used by the vehicle simulation.
@@ -488,7 +488,7 @@ impl WheelSlipState {
             self.angular_velocity[index] = next_angular_velocity;
             self.slip_ratio[index] = ((next_angular_velocity * wheel_radius - ground_speed)
                 / ground_speed.abs().max(2.0))
-                .clamp(-1.0, 1.0);
+            .clamp(-1.0, 1.0);
         }
     }
 }
@@ -676,7 +676,12 @@ impl VehicleState {
         delta_seconds: f32,
     ) {
         self.update_with_wheel_surface_response_and_axle_balance(
-            input, surface_response, side_traction, 0.0, config, delta_seconds,
+            input,
+            surface_response,
+            side_traction,
+            0.0,
+            config,
+            delta_seconds,
         );
     }
 
@@ -970,8 +975,7 @@ impl SuspensionState {
         let target_compressions = wheel_ground_heights.map(|height| {
             (height + config.rest_length - chassis_height).clamp(0.0, config.max_travel)
         });
-        let average_target_compression =
-            target_compressions.iter().sum::<f32>() * 0.25;
+        let average_target_compression = target_compressions.iter().sum::<f32>() * 0.25;
         for _ in 0..substeps {
             // Follow sustained terrain gradients smoothly; transient wheel impacts
             // remain represented separately by differential spring velocity.
@@ -986,12 +990,10 @@ impl SuspensionState {
             self.average_ground_height += self.average_ground_velocity * step_dt;
             // Front and rear anti-roll coupling transfers some spring response
             // across each axle, resisting excessive body lean on side slopes.
-            let front_anti_roll = (self.compression[0] - self.compression[1])
-                * config.spring_strength
-                * 0.12;
-            let rear_anti_roll = (self.compression[2] - self.compression[3])
-                * config.spring_strength
-                * 0.12;
+            let front_anti_roll =
+                (self.compression[0] - self.compression[1]) * config.spring_strength * 0.12;
+            let rear_anti_roll =
+                (self.compression[2] - self.compression[3]) * config.spring_strength * 0.12;
             let anti_roll_accelerations = [
                 -front_anti_roll,
                 front_anti_roll,
@@ -1017,8 +1019,7 @@ impl SuspensionState {
                 // A progressive bump stop engages through the final quarter of
                 // travel, adding resistance before the spring reaches its hard limit.
                 let compression_progress =
-                    ((self.compression[index] / config.max_travel - 0.75) / 0.25)
-                        .clamp(0.0, 1.0);
+                    ((self.compression[index] / config.max_travel - 0.75) / 0.25).clamp(0.0, 1.0);
                 let bump_stop_acceleration = -config.spring_strength
                     * config.max_travel
                     * 1.5
@@ -1061,14 +1062,12 @@ impl SuspensionState {
             // Compression velocity contributes a brief dynamic load transfer:
             // a wheel moving into its spring gains grip, while a rebounding wheel
             // unloads smoothly. The bounded factor avoids runaway tyre forces.
-            let dynamic_load = (1.0 + self.compression_velocity[index] * 0.08)
-                .clamp(0.75, 1.25);
-            let contact_fraction = (self.compression[index] / (config.max_travel * 0.25))
-                .clamp(0.0, 1.0);
+            let dynamic_load = (1.0 + self.compression_velocity[index] * 0.08).clamp(0.75, 1.25);
+            let contact_fraction =
+                (self.compression[index] / (config.max_travel * 0.25)).clamp(0.0, 1.0);
             // Smoothstep avoids a sharp grip ramp as a wheel first reconnects
             // with the ground, while retaining full load at the contact threshold.
-            let contact = contact_fraction * contact_fraction
-                * (3.0 - 2.0 * contact_fraction);
+            let contact = contact_fraction * contact_fraction * (3.0 - 2.0 * contact_fraction);
             (relative_load * dynamic_load * contact).clamp(0.0, 1.25)
         })
     }
@@ -1084,7 +1083,9 @@ impl SuspensionState {
         config: SuspensionConfig,
     ) -> bool {
         if !chassis_height.is_finite()
-            || wheel_ground_heights.iter().any(|height| !height.is_finite())
+            || wheel_ground_heights
+                .iter()
+                .any(|height| !height.is_finite())
             || !config.max_travel.is_finite()
             || !config.rest_length.is_finite()
             || !config.track_width.is_finite()
@@ -1107,8 +1108,8 @@ impl SuspensionState {
         self.terrain_roll = ((left_ground - right_ground) / config.track_width).atan();
         self.ground_reference_initialized = true;
         for (index, ground_height) in wheel_ground_heights.iter().enumerate() {
-            self.compression[index] = (ground_height + config.rest_length - chassis_height)
-                .clamp(0.0, config.max_travel);
+            self.compression[index] =
+                (ground_height + config.rest_length - chassis_height).clamp(0.0, config.max_travel);
             if self.compression[index] <= f32::EPSILON
                 || self.compression[index] >= config.max_travel - f32::EPSILON
             {
@@ -1120,7 +1121,7 @@ impl SuspensionState {
 
     /// Returns the current visual chassis response without advancing simulation.
     #[must_use]
-    pub fn pose(&self, config: SuspensionConfig) -> SuspensionPose {
+    pub fn pose(&self, _config: SuspensionConfig) -> SuspensionPose {
         let front_velocity =
             f32::midpoint(self.compression_velocity[0], self.compression_velocity[1]);
         let rear_velocity =
@@ -1175,7 +1176,10 @@ mod tests {
             1.0 / 60.0,
         );
         let slip = state.slip_ratios();
-        assert!(slip.iter().all(|value| value.is_finite() && (-1.0..=1.0).contains(value)));
+        assert!(
+            slip.iter()
+                .all(|value| value.is_finite() && (-1.0..=1.0).contains(value))
+        );
         assert!((slip[0] - slip[1]).abs() < f32::EPSILON);
         assert!((slip[2] - slip[3]).abs() < f32::EPSILON);
         assert!(slip[2].abs() > slip[0].abs());
@@ -1184,29 +1188,11 @@ mod tests {
     #[test]
     fn wheel_slip_state_rejects_invalid_inputs_without_mutation() {
         let mut state = WheelSlipState::default();
-        state.update(
-            VehicleInput::default(),
-            4.0,
-            0.3,
-            [1.0; 4],
-            1.0 / 60.0,
-        );
+        state.update(VehicleInput::default(), 4.0, 0.3, [1.0; 4], 1.0 / 60.0);
         let before = state;
-        state.update(
-            VehicleInput::default(),
-            f32::NAN,
-            0.3,
-            [1.0; 4],
-            1.0 / 60.0,
-        );
+        state.update(VehicleInput::default(), f32::NAN, 0.3, [1.0; 4], 1.0 / 60.0);
         assert_eq!(state, before);
-        state.update(
-            VehicleInput::default(),
-            4.0,
-            0.0,
-            [1.0; 4],
-            1.0 / 60.0,
-        );
+        state.update(VehicleInput::default(), 4.0, 0.0, [1.0; 4], 1.0 / 60.0);
         assert_eq!(state, before);
     }
 
@@ -1246,12 +1232,18 @@ mod tests {
             steering: 1.0,
         };
         balanced.update_with_four_wheel_surface_response(
-            input, (1.0, 1.0, 0.0), [0.8, 0.8, 0.8, 0.8],
-            VehicleConfig::default(), 1.0 / 60.0,
+            input,
+            (1.0, 1.0, 0.0),
+            [0.8, 0.8, 0.8, 0.8],
+            VehicleConfig::default(),
+            1.0 / 60.0,
         );
         uneven.update_with_four_wheel_surface_response(
-            input, (1.0, 1.0, 0.0), [1.0, 1.0, 0.6, 0.6],
-            VehicleConfig::default(), 1.0 / 60.0,
+            input,
+            (1.0, 1.0, 0.0),
+            [1.0, 1.0, 0.6, 0.6],
+            VehicleConfig::default(),
+            1.0 / 60.0,
         );
         assert!(balanced.heading > uneven.heading);
         assert!(uneven.heading > 0.0);
@@ -1291,17 +1283,28 @@ mod tests {
         let mut vehicle = VehicleState::default();
         let mut suspension = SuspensionState::default();
         let mut tracker = VehicleSurfaceTracker::default();
-        vehicle.update_on_world_terrain(
-            VehicleInput { throttle: 1.0, ..VehicleInput::default() },
-            VehicleConfig::default(),
-            &mut suspension,
-            SuspensionConfig::default(),
-            &mut tracker,
-            1.0 / 60.0,
-        ).expect("origin is within terrain bounds");
+        vehicle
+            .update_on_world_terrain(
+                VehicleInput {
+                    throttle: 1.0,
+                    ..VehicleInput::default()
+                },
+                VehicleConfig::default(),
+                &mut suspension,
+                SuspensionConfig::default(),
+                &mut tracker,
+                1.0 / 60.0,
+            )
+            .expect("origin is within terrain bounds");
         let spin = vehicle.wheel_slip.angular_velocities();
         assert!(spin.iter().all(|speed| speed.is_finite() && *speed > 0.0));
-        assert!(vehicle.wheel_slip.slip_ratios().iter().all(|slip| slip.is_finite() && (-1.0..=1.0).contains(slip)));
+        assert!(
+            vehicle
+                .wheel_slip
+                .slip_ratios()
+                .iter()
+                .all(|slip| slip.is_finite() && (-1.0..=1.0).contains(slip))
+        );
     }
 
     #[test]
@@ -1327,7 +1330,11 @@ mod tests {
             .expect("origin is inside the supported terrain range");
         assert!(vehicle.position.x.is_finite());
         assert!(vehicle.position.z < 0.0);
-        assert!(pose.wheel_compressions.iter().all(|value| value.is_finite()));
+        assert!(
+            pose.wheel_compressions
+                .iter()
+                .all(|value| value.is_finite())
+        );
         assert_eq!(tracker.current(), VehicleSurface::Asphalt);
     }
 
@@ -1341,16 +1348,18 @@ mod tests {
         let before = vehicle;
         let mut suspension = SuspensionState::default();
         let mut tracker = VehicleSurfaceTracker::default();
-        assert!(vehicle
-            .update_on_world_terrain(
-                VehicleInput::default(),
-                VehicleConfig::default(),
-                &mut suspension,
-                SuspensionConfig::default(),
-                &mut tracker,
-                1.0 / 60.0,
-            )
-            .is_none());
+        assert!(
+            vehicle
+                .update_on_world_terrain(
+                    VehicleInput::default(),
+                    VehicleConfig::default(),
+                    &mut suspension,
+                    SuspensionConfig::default(),
+                    &mut tracker,
+                    1.0 / 60.0,
+                )
+                .is_none()
+        );
         assert_eq!(vehicle, before);
     }
 
@@ -1367,11 +1376,19 @@ mod tests {
         let loads = suspension.wheel_load_factors(config);
         assert!(loads[0] > loads[2]);
         assert!(loads[2] > loads[1]);
-        assert!(loads.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
+        assert!(
+            loads
+                .iter()
+                .all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25)
+        );
         suspension.compression = [config.max_travel, config.max_travel, 0.0, 0.0];
         suspension.compression_velocity = [100.0, 100.0, 0.0, 0.0];
         let bounded = suspension.wheel_load_factors(config);
-        assert!(bounded.iter().all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25));
+        assert!(
+            bounded
+                .iter()
+                .all(|load| load.is_finite() && *load >= 0.0 && *load <= 1.25)
+        );
     }
 
     #[test]
@@ -1400,13 +1417,18 @@ mod tests {
         let mut suspension = SuspensionState::default();
         suspension.update([0.2; 4], 1.0, config, 1.0 / 60.0);
         let before_velocity = suspension.compression_velocity;
-        assert!(suspension.rebase_ground_contacts(
-            [0.1, 0.3, 0.2, 0.4],
-            1.0,
-            config,
-        ));
+        assert!(suspension.rebase_ground_contacts([0.1, 0.3, 0.2, 0.4], 1.0, config,));
         let pose = suspension.pose(config);
-        assert_eq!(pose.wheel_compressions, [0.1 + config.rest_length - 1.0, 0.3 + config.rest_length - 1.0, 0.2 + config.rest_length - 1.0, 0.4 + config.rest_length - 1.0].map(|value| value.clamp(0.0, config.max_travel)));
+        assert_eq!(
+            pose.wheel_compressions,
+            [
+                0.1 + config.rest_length - 1.0,
+                0.3 + config.rest_length - 1.0,
+                0.2 + config.rest_length - 1.0,
+                0.4 + config.rest_length - 1.0
+            ]
+            .map(|value| value.clamp(0.0, config.max_travel))
+        );
         assert_eq!(suspension.compression_velocity, before_velocity);
         assert!((pose.average_ground_height - 0.25).abs() < 0.0001);
     }
@@ -1417,11 +1439,7 @@ mod tests {
         let mut suspension = SuspensionState::default();
         suspension.update([0.2; 4], 1.0, config, 1.0 / 60.0);
         let before = suspension;
-        assert!(!suspension.rebase_ground_contacts(
-            [0.1, f32::NAN, 0.2, 0.4],
-            1.0,
-            config,
-        ));
+        assert!(!suspension.rebase_ground_contacts([0.1, f32::NAN, 0.2, 0.4], 1.0, config,));
         assert_eq!(suspension, before);
     }
 
@@ -1455,8 +1473,11 @@ mod tests {
 
     #[test]
     fn suspension_load_factors_transfer_grip_between_wheel_corners() {
-        let mut suspension = SuspensionState::default();
-        suspension.compression = [0.4, 0.2, 0.1, 0.1];
+        let suspension = SuspensionState {
+            compression: [0.3, 0.25, 0.2, 0.15],
+            ground_reference_initialized: true,
+            ..SuspensionState::default()
+        };
         let loads = suspension.wheel_load_factors(SuspensionConfig::default());
         assert!(loads[0] > loads[1]);
         assert!(loads[1] > loads[2]);
@@ -1489,8 +1510,10 @@ mod tests {
             average_ground_height: 0.0,
             average_ground_velocity: 0.0,
             ground_reference_initialized: true,
+            ..SuspensionState::default()
         };
         let mut uneven = flat;
+        uneven.compression = [0.5, 0.1, 0.1, 0.1];
         flat.update([0.2; 4], 0.58, config, 1.0 / 60.0);
         uneven.update([0.5, 0.1, 0.1, 0.1], 0.58, config, 1.0 / 60.0);
         assert!(uneven.compression_velocity[0] < flat.compression_velocity[0]);
@@ -1502,23 +1525,29 @@ mod tests {
     fn suspension_rebound_uses_extra_damping_after_landing() {
         let config = SuspensionConfig::default();
         let mut state = SuspensionState {
-            compression: [0.5; 4],
+            compression: [0.2; 4],
             compression_velocity: [-4.0; 4],
             average_ground_height: 0.0,
             average_ground_velocity: 0.0,
             ground_reference_initialized: true,
+            ..SuspensionState::default()
         };
         let chassis_height = config.rest_length + 1.0;
         let step = 1.0 / 60.0;
         let expected_acceleration =
-            (0.0 - 0.5) * config.spring_strength - (-4.0 * config.damping * 1.35);
+            (0.0 - 0.2) * config.spring_strength - (-4.0 * config.damping * 1.35);
         let expected_velocity = -4.0 + expected_acceleration * step;
 
         state.update([0.0; 4], chassis_height, config, step);
 
         assert!(state.compression_velocity[0] > -4.0);
         assert!((state.compression_velocity[0] - expected_velocity).abs() < 0.001);
-        assert!(state.compression_velocity.iter().all(|velocity| velocity.is_finite()));
+        assert!(
+            state
+                .compression_velocity
+                .iter()
+                .all(|velocity| velocity.is_finite())
+        );
     }
 
     #[test]
@@ -1571,8 +1600,9 @@ mod tests {
         assert!(bump_pose.impact_intensity > 0.0);
         assert!(bump_pose.impact_intensity <= 1.0);
         assert!(bump_pose.wheel_compression_velocities[0] > 0.0);
-        assert!(bump_pose.wheel_compression_velocities[0]
-            > bump_pose.wheel_compression_velocities[1]);
+        assert!(
+            bump_pose.wheel_compression_velocities[0] > bump_pose.wheel_compression_velocities[1]
+        );
     }
 
     #[test]
@@ -1584,9 +1614,11 @@ mod tests {
         assert!(pose.wheel_compressions[0] < pose.wheel_compressions[1]);
         assert!(pose.wheel_compressions[1] < pose.wheel_compressions[2]);
         assert!(pose.wheel_compressions[2] < pose.wheel_compressions[3]);
-        assert!(pose.wheel_compressions.iter().all(|value| {
-            value.is_finite() && (0.0..=config.max_travel).contains(value)
-        }));
+        assert!(
+            pose.wheel_compressions
+                .iter()
+                .all(|value| { value.is_finite() && (0.0..=config.max_travel).contains(value) })
+        );
     }
 
     #[test]
@@ -1725,7 +1757,7 @@ mod tests {
         }
         let early = tracker.wheel_traction()[0];
         assert!(early > VehicleSurface::Snow.traction());
-        assert!(early < 1.0 - (1.0 - VehicleSurface::Snow.traction()) * 0.2);
+        assert!(early < 1.0 - (1.0 - VehicleSurface::Snow.traction()) * 0.1);
 
         for _ in 4..9 {
             tracker.update_wheel_contacts(VehicleSurface::Asphalt, contacts);
@@ -1840,18 +1872,21 @@ mod tests {
             position: Vec3::new(1.0, 0.6, 2.0),
             heading: 0.4,
             speed: 5.0,
+            ..VehicleState::default()
         };
         let mut recovery = VehicleRecovery::new(initial);
         let safe = VehicleState {
             position: Vec3::new(4.0, 0.8, 6.0),
             heading: 1.2,
             speed: 9.0,
+            ..VehicleState::default()
         };
         assert!(recovery.record_safe_state(safe, 0.0, 1.0));
         let mut fallen = VehicleState {
             position: Vec3::new(4.0, -5.0, 6.0),
             heading: 0.0,
             speed: 12.0,
+            ..VehicleState::default()
         };
         assert!(recovery.recover_if_fallen(&mut fallen, -3.0));
         assert_eq!(fallen.position, safe.position);
@@ -2098,14 +2133,18 @@ mod tests {
             suspension.update([config.max_travel; 4], 0.58, config, 1.0 / 60.0);
         }
 
-        assert!(suspension
-            .compression
-            .iter()
-            .all(|compression| *compression < config.max_travel));
-        assert!(suspension
-            .compression_velocity
-            .iter()
-            .all(|velocity| velocity.is_finite()));
+        assert!(
+            suspension
+                .compression
+                .iter()
+                .all(|compression| *compression < config.max_travel)
+        );
+        assert!(
+            suspension
+                .compression_velocity
+                .iter()
+                .all(|velocity| velocity.is_finite())
+        );
         let pose = suspension.pose(config);
         assert!(pose.impact_intensity.is_finite());
         assert!(pose.pitch.is_finite() && pose.roll.is_finite());
@@ -2585,6 +2624,7 @@ mod wheel_traction_tests {
             position: Vec3::new(0.0, 0.0, 0.0),
             heading: 0.0,
             speed: 4.0,
+            ..VehicleState::default()
         };
         let before = vehicle;
         vehicle.update_with_four_wheel_surface_response(

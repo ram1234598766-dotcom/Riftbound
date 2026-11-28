@@ -530,12 +530,12 @@ impl Renderer {
                 continue;
             }
             let mesh = match request.lod {
-                WorldChunkLod::Detailed => Mesh::world_terrain_chunk(
-                    &self.device, request.coord.x, request.coord.z,
-                ),
-                WorldChunkLod::Distant => Mesh::world_terrain_chunk_lod(
-                    &self.device, request.coord.x, request.coord.z,
-                ),
+                WorldChunkLod::Detailed => {
+                    Mesh::world_terrain_chunk(&self.device, request.coord.x, request.coord.z)
+                }
+                WorldChunkLod::Distant => {
+                    Mesh::world_terrain_chunk_lod(&self.device, request.coord.x, request.coord.z)
+                }
             };
             let Some(mesh) = mesh else {
                 return false;
@@ -550,19 +550,22 @@ impl Renderer {
             let instance = InstanceRaw::from_matrix(model, [1.0; 4]);
             let mut bytes = Vec::with_capacity(80);
             append_instance_bytes(&mut bytes, &instance);
-            let instance_buffer = self.device.create_buffer_init(
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some("riftbound-world-terrain-instance"),
-                    contents: &bytes,
-                    usage: wgpu::BufferUsages::VERTEX,
+            let instance_buffer =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("riftbound-world-terrain-instance"),
+                        contents: &bytes,
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+            staged.push((
+                slot.slot_index,
+                WorldTerrainGpuSlot {
+                    coord: request.coord,
+                    lod: request.lod,
+                    mesh,
+                    instance_buffer,
                 },
-            );
-            staged.push((slot.slot_index, WorldTerrainGpuSlot {
-                coord: request.coord,
-                lod: request.lod,
-                mesh,
-                instance_buffer,
-            }));
+            ));
         }
 
         let mut removed_slots = [0_usize; 25];

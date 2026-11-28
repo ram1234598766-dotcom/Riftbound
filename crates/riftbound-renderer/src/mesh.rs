@@ -140,7 +140,12 @@ impl Mesh {
     #[must_use]
     pub fn vehicle_particle(device: &wgpu::Device) -> Option<Self> {
         let (vertices, indices) = vehicle_particle_data();
-        Self::from_data(device, &vertices, &indices, "riftbound-vehicle-particle-mesh")
+        Self::from_data(
+            device,
+            &vertices,
+            &indices,
+            "riftbound-vehicle-particle-mesh",
+        )
     }
 
     /// Creates a joined low-poly vehicle body with cabin, bumpers and lights.
@@ -462,8 +467,7 @@ fn vehicle_particle_data() -> (Vec<MeshVertex>, Vec<u16>) {
         .map(|position| MeshVertex { position, color })
         .collect();
     let indices = vec![
-        0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2,
-        1, 4, 2, 1, 3, 4, 1, 5, 3, 1, 2, 5,
+        0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2, 1, 4, 2, 1, 3, 4, 1, 5, 3, 1, 2, 5,
     ];
     (vertices, indices)
 }
@@ -663,6 +667,7 @@ fn terrain_surface_color(surface: VehicleSurface) -> [f32; 3] {
 }
 
 /// Returns a soft directional-light factor from the shared world height field.
+#[cfg(test)]
 fn terrain_light_factor(world_x: f32, world_z: f32) -> f32 {
     let center_height = world_terrain_sample(world_x, world_z).height;
     terrain_light_factor_with_center(world_x, world_z, center_height)
@@ -680,21 +685,19 @@ fn terrain_light_factor_with_center(world_x: f32, world_z: f32, center_height: f
     let right = world_terrain_sample(world_x + SAMPLE_STEP, world_z).height;
     let back = world_terrain_sample(world_x, world_z - SAMPLE_STEP).height;
     let front = world_terrain_sample(world_x, world_z + SAMPLE_STEP).height;
-    if ![left, right, back, front].iter().all(|height| height.is_finite()) {
+    if ![left, right, back, front]
+        .iter()
+        .all(|height| height.is_finite())
+    {
         return 0.82;
     }
-    let normal = [
-        left - right,
-        SAMPLE_STEP * 2.0,
-        back - front,
-    ];
+    let normal = [left - right, SAMPLE_STEP * 2.0, back - front];
     let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
     if !length.is_finite() || length <= f32::EPSILON {
         return 0.82;
     }
-    let diffuse = ((normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2])
-        / length)
-        .max(0.0);
+    let diffuse =
+        ((normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2]) / length).max(0.0);
     (0.72 + diffuse * 0.28).clamp(0.72, 1.0)
 }
 
@@ -735,8 +738,7 @@ fn terrain_color_at(surface: VehicleSurface, world_x: f32, world_z: f32) -> [f32
 }
 
 fn terrain_lattice_noise(x: i32, z: i32) -> f32 {
-    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9)
-        ^ (z as u32).wrapping_mul(0x85EB_CA6B);
+    let mut hash = (x as u32).wrapping_mul(0x9E37_79B9) ^ (z as u32).wrapping_mul(0x85EB_CA6B);
     hash ^= hash >> 16;
     hash = hash.wrapping_mul(0x7FEB_352D);
     hash ^= hash >> 15;
@@ -752,8 +754,10 @@ fn terrain_detail_noise(world_x: f32, world_z: f32, scale: f32) -> f32 {
     let grid_z = world_z / scale;
     let cell_x = grid_x.floor();
     let cell_z = grid_z.floor();
-    if cell_x < i32::MIN as f32 || cell_x >= i32::MAX as f32
-        || cell_z < i32::MIN as f32 || cell_z >= i32::MAX as f32
+    if cell_x < i32::MIN as f32
+        || cell_x >= i32::MAX as f32
+        || cell_z < i32::MIN as f32
+        || cell_z >= i32::MAX as f32
     {
         return 0.5;
     }
@@ -923,7 +927,7 @@ fn world_terrain_chunk_data(
                 index * side + side - 1,
                 (side - 1) * side + index,
             ] {
-                let (before, after) = if edge_index < side {
+                let (before, after) = if edge_index < side || edge_index >= (side - 1) * side {
                     (edge_index - 1, edge_index + 1)
                 } else {
                     (edge_index - side, edge_index + side)
@@ -931,8 +935,7 @@ fn world_terrain_chunk_data(
                 let before_vertex = *vertices.get(before)?;
                 let after_vertex = *vertices.get(after)?;
                 let midpoint = vertices.get_mut(edge_index)?;
-                midpoint.position[1] =
-                    (before_vertex.position[1] + after_vertex.position[1]) * 0.5;
+                midpoint.position[1] = (before_vertex.position[1] + after_vertex.position[1]) * 0.5;
                 for channel in 0..3 {
                     midpoint.color[channel] =
                         (before_vertex.color[channel] + after_vertex.color[channel]) * 0.5;
@@ -1629,16 +1632,45 @@ mod tests {
         }
         let skirt_vertex_count = 4 * (5 - 1) * 4;
         let skirt_start = distant.0.len() - skirt_vertex_count;
-        assert!(distant.0[skirt_start..].chunks_exact(4).all(|skirt| {
+        for (skirt_index, skirt) in distant.0[skirt_start..].chunks_exact(4).enumerate() {
             let first_depth = skirt[0].position[1] - skirt[1].position[1];
             let second_depth = skirt[2].position[1] - skirt[3].position[1];
-            first_depth.is_finite()
-                && second_depth.is_finite()
-                && (first_depth - second_depth).abs() < 1.0e-4
-                && first_depth >= WORLD_TERRAIN_SKIRT_DEPTH
-        }));
+            assert!(
+                first_depth.is_finite()
+                    && second_depth.is_finite()
+                    && (first_depth - second_depth).abs() < 1.0e-4
+                    && first_depth + 1.0e-4 >= WORLD_TERRAIN_SKIRT_DEPTH,
+                "skirt {skirt_index} has depths {first_depth} and {second_depth}"
+            );
+        }
         assert!(world_terrain_chunk_data(i32::MAX, 0, 9).is_none());
         assert!(world_terrain_chunk_data(0, 0, 7).is_none());
+    }
+
+    #[test]
+    fn terrain_detail_noise_is_continuous_across_chunk_boundaries() {
+        for boundary in [-768.0_f32, -64.0, 0.0, 64.0, 768.0] {
+            for offset in [-18.0_f32, -4.5, 0.0, 4.5, 18.0] {
+                let z = boundary + offset;
+                let left = terrain_detail_noise(boundary - 0.001, z, 18.0);
+                let right = terrain_detail_noise(boundary + 0.001, z, 18.0);
+                assert!(
+                    (left - right).abs() < 0.001,
+                    "noise discontinuity at x={boundary}, z={z}: {left} vs {right}"
+                );
+            }
+        }
+        for boundary in [-768.0_f32, -64.0, 0.0, 64.0, 768.0] {
+            for offset in [-18.0_f32, -4.5, 0.0, 4.5, 18.0] {
+                let x = boundary + offset;
+                let north = terrain_detail_noise(x, boundary - 0.001, 4.5);
+                let south = terrain_detail_noise(x, boundary + 0.001, 4.5);
+                assert!(
+                    (north - south).abs() < 0.001,
+                    "noise discontinuity at x={x}, z={boundary}: {north} vs {south}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -1698,7 +1730,7 @@ mod tests {
                 (side - 1) * side + index,
             ];
             for edge_index in edge_indices {
-                let (before, after) = if edge_index < side {
+                let (before, after) = if edge_index < side || edge_index >= (side - 1) * side {
                     (edge_index - 1, edge_index + 1)
                 } else {
                     (edge_index - side, edge_index + side)
@@ -1742,8 +1774,8 @@ mod tests {
                         .iter()
                         .map(|index| vertices[*index].position[1])
                         .fold(f32::INFINITY, f32::min);
-                    let edge_skirts = &vertices
-                        [skirt_offset..skirt_offset + skirt_vertices_per_edge];
+                    let edge_skirts =
+                        &vertices[skirt_offset..skirt_offset + skirt_vertices_per_edge];
                     for quad in edge_skirts.chunks_exact(4) {
                         assert!(quad[1].position[1] <= edge_min - 4.0);
                         assert!(quad[3].position[1] <= edge_min - 4.0);

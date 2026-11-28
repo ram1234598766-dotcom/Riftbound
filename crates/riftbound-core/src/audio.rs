@@ -71,7 +71,10 @@ impl VehicleAudioState {
 
         let speed_factor = (speed.abs() / 42.0).clamp(0.0, 1.0);
         let throttle = throttle.clamp(0.0, 1.0);
-        let max_slip = slip_ratios.iter().fold(0.0_f32, |peak, slip| peak.max(slip.abs())).clamp(0.0, 1.0);
+        let max_slip = slip_ratios
+            .iter()
+            .fold(0.0_f32, |peak, slip| peak.max(slip.abs()))
+            .clamp(0.0, 1.0);
         let (surface_noise, tyre_factor) = match surface {
             VehicleSurface::Asphalt => (0.12, 0.75),
             VehicleSurface::Gravel => (0.72, 1.0),
@@ -136,11 +139,13 @@ mod tests {
     #[test]
     fn suspension_impact_adds_a_smoothed_audio_layer() {
         let mut audio = VehicleAudioState::default();
-        let quiet = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
+        let quiet =
+            audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
         let bump = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 1.0, 0.016);
         assert!(bump.impact_gain > quiet.impact_gain);
         assert!((0.0..=1.0).contains(&bump.impact_gain));
-        let settling = audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
+        let settling =
+            audio.update_with_impact(8.0, 0.2, [0.0; 4], VehicleSurface::Gravel, 0.0, 0.016);
         assert!(settling.impact_gain < bump.impact_gain);
     }
 
@@ -156,7 +161,12 @@ mod tests {
     fn audio_gains_remain_bounded() {
         let mut audio = VehicleAudioState::default();
         let mix = audio.update(10_000.0, 10.0, [10.0; 4], VehicleSurface::Sand, 0.1);
-        for gain in [mix.engine_gain, mix.tyre_gain, mix.skid_gain, mix.surface_gain] {
+        for gain in [
+            mix.engine_gain,
+            mix.tyre_gain,
+            mix.skid_gain,
+            mix.surface_gain,
+        ] {
             assert!((0.0..=1.0).contains(&gain));
         }
     }
